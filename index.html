@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>芯瑤💕陪你玩</title>
+
+  <meta name="description" content="芯瑤💕陪你玩 AI 聊天助手">
+  <meta name="theme-color" content="#ff79b7">
+
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="芯瑤💕陪你玩">
+
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+  <link rel="icon" href="./favicon.png" type="image/png">
+
+  <style>
+    :root {
+      --pink: #ff79b7;
+      --pink-dark: #ea4e98;
+      --pink-soft: #fff0f7;
+      --text: #3d2c38;
+      --muted: #8b7180;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+        "PingFang TC", "Microsoft JhengHei", sans-serif;
+    }
+
+    body {
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: 22px;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% 10%, rgba(255,255,255,.9), transparent 28%),
+        radial-gradient(circle at 85% 20%, rgba(255,214,235,.9), transparent 32%),
+        linear-gradient(160deg, #fff7fb 0%, #ffd9ec 45%, #ffc4e2 100%);
+    }
+
+    .card {
+      width: min(440px, 100%);
+      padding: 34px 24px 26px;
+      text-align: center;
+      background: rgba(255,255,255,.88);
+      border: 1px solid rgba(255,255,255,.9);
+      border-radius: 30px;
+      box-shadow: 0 24px 70px rgba(194, 70, 132, .22);
+      backdrop-filter: blur(16px);
+    }
+
+    .logo {
+      width: 116px;
+      height: 116px;
+      object-fit: cover;
+      border-radius: 28px;
+      border: 4px solid white;
+      box-shadow: 0 12px 32px rgba(234,78,152,.25);
+    }
+
+    h1 {
+      margin: 18px 0 8px;
+      font-size: 30px;
+      line-height: 1.2;
+    }
+
+    .subtitle {
+      margin: 0 auto 22px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .chips {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin: 20px 0 24px;
+    }
+
+    .chip {
+      padding: 12px 8px;
+      font-size: 14px;
+      background: var(--pink-soft);
+      border: 1px solid #ffd0e6;
+      border-radius: 16px;
+    }
+
+    .start {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 56px;
+      color: white;
+      text-decoration: none;
+      font-size: 18px;
+      font-weight: 800;
+      border-radius: 18px;
+      background: linear-gradient(135deg, var(--pink), var(--pink-dark));
+      box-shadow: 0 12px 26px rgba(234,78,152,.34);
+      transition: transform .15s ease;
+    }
+
+    .start:active {
+      transform: scale(.98);
+    }
+
+    .hint {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="card">
+    <img
+      class="logo"
+      src="./icon-512.png"
+      alt="芯瑤💕陪你玩"
+    >
+
+    <h1>芯瑤💕陪你玩</h1>
+
+    <p class="subtitle">
+      你的專屬 AI 小幫手<br>
+      陪聊、賽事、今彩539、老虎機都能問 💕
+    </p>
+
+    <section class="chips">
+      <div class="chip">⚽ 賽事分析</div>
+      <div class="chip">🎲 今彩539</div>
+      <div class="chip">🎰 老虎機</div>
+      <div class="chip">💬 陪你聊天</div>
+    </section>
+
+    <a
+      class="start"
+      href="https://udify.app/chat/fUPD0gOuyhQ7JL4k"
+    >
+      開始聊天 💬
+    </a>
+
+    <p class="hint">
+      iPhone：Safari 分享 → 加入主畫面<br>
+      加入後會顯示「芯瑤💕陪你玩」和專屬圖示。
+    </p>
+  </main>
+
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("./sw.js");
+      });
+    }
+  </script>
+</body>
+</html>
