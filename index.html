@@ -2,171 +2,793 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  >
 
   <title>芯瑤💕陪你玩</title>
 
-  <meta name="description" content="芯瑤💕陪你玩 AI 聊天助手">
-  <meta name="theme-color" content="#ff79b7">
+  <meta
+    name="description"
+    content="芯瑤💕陪你玩｜獨創電子爆分技巧、各項賽事分析"
+  >
+
+  <meta name="theme-color" content="#ffdbe9">
 
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="芯瑤💕陪你玩">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <meta
+    name="apple-mobile-web-app-status-bar-style"
+    content="default"
+  >
+
+  <meta
+    name="apple-mobile-web-app-title"
+    content="芯瑤💕陪你玩"
+  >
 
   <link rel="manifest" href="./manifest.json">
-  <link rel="apple-touch-icon" href="./apple-touch-icon.png">
-  <link rel="icon" href="./favicon.png" type="image/png">
+
+  <link
+    rel="apple-touch-icon"
+    href="./apple-touch-icon.png"
+  >
+
+  <link
+    rel="icon"
+    href="./favicon.png"
+    type="image/png"
+  >
 
   <style>
     :root {
-      --pink: #ff79b7;
-      --pink-dark: #ea4e98;
-      --pink-soft: #fff0f7;
-      --text: #3d2c38;
-      --muted: #8b7180;
+      --pink-light: #fff7fb;
+      --pink-soft: #ffe8f1;
+      --pink-main: #ff82b8;
+      --pink-deep: #e84d96;
+      --pink-dark: #cf367f;
+
+      --text-main: #4b3541;
+      --text-soft: #8b6c7a;
+
+      --glass: rgba(255, 255, 255, 0.78);
+      --glass-border: rgba(255, 255, 255, 0.9);
     }
 
     * {
       box-sizing: border-box;
-    }
-
-    html,
-    body {
       margin: 0;
+      padding: 0;
+    }
+
+    html {
       min-height: 100%;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-        "PingFang TC", "Microsoft JhengHei", sans-serif;
+      background: var(--pink-light);
     }
 
     body {
+      min-height: 100vh;
       min-height: 100dvh;
-      display: grid;
-      place-items: center;
-      padding: 22px;
-      color: var(--text);
-      background:
-        radial-gradient(circle at 15% 10%, rgba(255,255,255,.9), transparent 28%),
-        radial-gradient(circle at 85% 20%, rgba(255,214,235,.9), transparent 32%),
-        linear-gradient(160deg, #fff7fb 0%, #ffd9ec 45%, #ffc4e2 100%);
-    }
 
-    .card {
-      width: min(440px, 100%);
-      padding: 34px 24px 26px;
-      text-align: center;
-      background: rgba(255,255,255,.88);
-      border: 1px solid rgba(255,255,255,.9);
-      border-radius: 30px;
-      box-shadow: 0 24px 70px rgba(194, 70, 132, .22);
-      backdrop-filter: blur(16px);
-    }
-
-    .logo {
-      width: 116px;
-      height: 116px;
-      object-fit: cover;
-      border-radius: 28px;
-      border: 4px solid white;
-      box-shadow: 0 12px 32px rgba(234,78,152,.25);
-    }
-
-    h1 {
-      margin: 18px 0 8px;
-      font-size: 30px;
-      line-height: 1.2;
-    }
-
-    .subtitle {
-      margin: 0 auto 22px;
-      color: var(--muted);
-      font-size: 15px;
-      line-height: 1.7;
-    }
-
-    .chips {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-      margin: 20px 0 24px;
-    }
-
-    .chip {
-      padding: 12px 8px;
-      font-size: 14px;
-      background: var(--pink-soft);
-      border: 1px solid #ffd0e6;
-      border-radius: 16px;
-    }
-
-    .start {
       display: flex;
-      align-items: center;
       justify-content: center;
+      align-items: center;
+
+      overflow-x: hidden;
+
+      padding:
+        calc(28px + env(safe-area-inset-top))
+        18px
+        calc(28px + env(safe-area-inset-bottom));
+
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        "PingFang TC",
+        "Microsoft JhengHei",
+        sans-serif;
+
+      color: var(--text-main);
+
+      background:
+        radial-gradient(
+          circle at 15% 10%,
+          rgba(255, 255, 255, 0.98) 0,
+          rgba(255, 255, 255, 0.6) 19%,
+          transparent 43%
+        ),
+        radial-gradient(
+          circle at 88% 18%,
+          rgba(255, 205, 229, 0.76) 0,
+          transparent 35%
+        ),
+        radial-gradient(
+          circle at 50% 100%,
+          rgba(255, 185, 218, 0.48) 0,
+          transparent 45%
+        ),
+        linear-gradient(
+          155deg,
+          #fffafd 0%,
+          #ffe9f2 48%,
+          #ffd3e6 100%
+        );
+    }
+
+    .background-heart {
+      position: fixed;
+
+      color: rgba(255, 111, 176, 0.16);
+
+      font-size: 22px;
+
+      pointer-events: none;
+
+      animation:
+        floatHeart 8s ease-in-out infinite;
+
+      z-index: 0;
+    }
+
+    .heart-one {
+      top: 12%;
+      left: 8%;
+      animation-delay: 0s;
+    }
+
+    .heart-two {
+      top: 18%;
+      right: 9%;
+      font-size: 30px;
+      animation-delay: 1.2s;
+    }
+
+    .heart-three {
+      bottom: 12%;
+      left: 11%;
+      font-size: 27px;
+      animation-delay: 2.4s;
+    }
+
+    .heart-four {
+      bottom: 16%;
+      right: 10%;
+      font-size: 19px;
+      animation-delay: 3.4s;
+    }
+
+    @keyframes floatHeart {
+      0%,
+      100% {
+        transform:
+          translateY(0)
+          rotate(-5deg);
+      }
+
+      50% {
+        transform:
+          translateY(-16px)
+          rotate(7deg);
+      }
+    }
+
+    .app-shell {
+      position: relative;
+      z-index: 1;
+
+      width: min(460px, 100%);
+    }
+
+    .glass-card {
+      position: relative;
+
       width: 100%;
-      min-height: 56px;
-      color: white;
-      text-decoration: none;
+
+      padding:
+        42px
+        27px
+        28px;
+
+      text-align: center;
+
+      overflow: hidden;
+
+      border:
+        1px solid
+        var(--glass-border);
+
+      border-radius: 36px;
+
+      background: var(--glass);
+
+      box-shadow:
+        0 30px 80px rgba(196, 71, 130, 0.2),
+        0 10px 30px rgba(255, 120, 181, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.95);
+
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+    }
+
+    .glass-card::before {
+      content: "";
+
+      position: absolute;
+      top: -90px;
+      left: -70px;
+
+      width: 210px;
+      height: 210px;
+
+      border-radius: 50%;
+
+      background:
+        radial-gradient(
+          circle,
+          rgba(255, 255, 255, 0.88) 0,
+          rgba(255, 255, 255, 0.15) 58%,
+          transparent 72%
+        );
+
+      pointer-events: none;
+    }
+
+    .glass-card::after {
+      content: "";
+
+      position: absolute;
+      right: -72px;
+      bottom: -85px;
+
+      width: 210px;
+      height: 210px;
+
+      border-radius: 50%;
+
+      background:
+        radial-gradient(
+          circle,
+          rgba(255, 181, 217, 0.34) 0,
+          transparent 68%
+        );
+
+      pointer-events: none;
+    }
+
+    .logo-wrap {
+      position: relative;
+
+      width: 136px;
+      height: 136px;
+
+      margin:
+        0 auto
+        24px;
+
+      animation:
+        logoFloat
+        4.5s
+        ease-in-out
+        infinite;
+    }
+
+    .logo-glow {
+      position: absolute;
+      inset: 9px;
+
+      border-radius: 34px;
+
+      background:
+        radial-gradient(
+          circle,
+          rgba(255, 119, 181, 0.42),
+          transparent 72%
+        );
+
+      filter: blur(17px);
+
+      transform: scale(1.15);
+
+      z-index: 0;
+    }
+
+    .app-logo {
+      position: relative;
+      z-index: 1;
+
+      width: 136px;
+      height: 136px;
+
+      display: block;
+
+      object-fit: cover;
+
+      border:
+        5px solid
+        #ffffff;
+
+      border-radius: 34px;
+
+      box-shadow:
+        0 18px 42px rgba(218, 60, 133, 0.27),
+        0 0 0 1px rgba(235, 119, 173, 0.1);
+    }
+
+    @keyframes logoFloat {
+      0%,
+      100% {
+        transform:
+          translateY(0)
+          rotate(0deg);
+      }
+
+      50% {
+        transform:
+          translateY(-7px)
+          rotate(0.7deg);
+      }
+    }
+
+    .title {
+      margin: 0;
+
+      font-size:
+        clamp(
+          31px,
+          8vw,
+          42px
+        );
+
+      line-height: 1.2;
+
+      letter-spacing: -1.3px;
+
+      font-weight: 900;
+
+      color: var(--text-main);
+
+      text-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.9);
+    }
+
+    .intro {
+      margin:
+        23px auto
+        0;
+
+      display: flex;
+      flex-direction: column;
+
+      gap: 13px;
+
       font-size: 18px;
-      font-weight: 800;
-      border-radius: 18px;
-      background: linear-gradient(135deg, var(--pink), var(--pink-dark));
-      box-shadow: 0 12px 26px rgba(234,78,152,.34);
-      transition: transform .15s ease;
-    }
-
-    .start:active {
-      transform: scale(.98);
-    }
-
-    .hint {
-      margin-top: 16px;
-      color: var(--muted);
-      font-size: 12px;
       line-height: 1.6;
+
+      font-weight: 700;
+
+      color: #775966;
+    }
+
+    .intro-line {
+      display: block;
+    }
+
+    .sparkle {
+      display: inline-block;
+
+      animation:
+        sparkleMove
+        2.6s
+        ease-in-out
+        infinite;
+    }
+
+    @keyframes sparkleMove {
+      0%,
+      100% {
+        transform:
+          scale(1)
+          rotate(0deg);
+      }
+
+      50% {
+        transform:
+          scale(1.12)
+          rotate(5deg);
+      }
+    }
+
+    .chat-button {
+      position: relative;
+
+      width: 100%;
+
+      margin-top: 34px;
+
+      min-height: 61px;
+
+      display: flex;
+      justify-content: center;
+      align-items: center;
+
+      border: 0;
+
+      border-radius: 22px;
+
+      color: white;
+
+      text-decoration: none;
+
+      font-size: 22px;
+      line-height: 1.2;
+
+      font-weight: 900;
+
+      letter-spacing: 0.5px;
+
+      background:
+        linear-gradient(
+          135deg,
+          var(--pink-main) 0%,
+          var(--pink-deep) 55%,
+          var(--pink-dark) 100%
+        );
+
+      box-shadow:
+        0 17px 34px rgba(220, 54, 130, 0.33),
+        inset 0 1px 0 rgba(255, 255, 255, 0.33);
+
+      overflow: hidden;
+
+      cursor: pointer;
+
+      animation:
+        buttonBreath
+        2.8s
+        ease-in-out
+        infinite;
+
+      transition:
+        transform 0.16s ease,
+        box-shadow 0.16s ease;
+    }
+
+    .chat-button::before {
+      content: "";
+
+      position: absolute;
+      top: -50%;
+      left: -60%;
+
+      width: 35%;
+      height: 200%;
+
+      background:
+        linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.55),
+          transparent
+        );
+
+      transform:
+        rotate(20deg);
+
+      animation:
+        shine
+        3.6s
+        ease-in-out
+        infinite;
+    }
+
+    .chat-button span {
+      position: relative;
+      z-index: 1;
+    }
+
+    .chat-button:hover {
+      transform:
+        translateY(-2px);
+    }
+
+    .chat-button:active {
+      transform:
+        scale(0.98);
+
+      box-shadow:
+        0 9px 20px rgba(220, 54, 130, 0.25),
+        inset 0 1px 0 rgba(255, 255, 255, 0.33);
+    }
+
+    @keyframes buttonBreath {
+      0%,
+      100% {
+        box-shadow:
+          0 17px 34px rgba(220, 54, 130, 0.28),
+          0 0 0 0 rgba(255, 111, 176, 0.17);
+      }
+
+      50% {
+        box-shadow:
+          0 19px 38px rgba(220, 54, 130, 0.38),
+          0 0 0 9px rgba(255, 111, 176, 0);
+      }
+    }
+
+    @keyframes shine {
+      0%,
+      60% {
+        left: -60%;
+      }
+
+      100% {
+        left: 130%;
+      }
+    }
+
+    .install-section {
+      margin-top: 31px;
+
+      padding-top: 27px;
+
+      border-top:
+        1px solid
+        rgba(227, 159, 189, 0.33);
+    }
+
+    .install-title {
+      margin: 0 0 13px;
+
+      font-size: 17px;
+
+      font-weight: 900;
+
+      color: #614954;
+    }
+
+    .install-steps {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+
+      gap: 7px;
+
+      flex-wrap: wrap;
+
+      font-size: 14px;
+      line-height: 1.7;
+
+      font-weight: 700;
+
+      color: #846875;
+    }
+
+    .install-step {
+      white-space: nowrap;
+    }
+
+    .arrow {
+      color: var(--pink-deep);
+
+      font-weight: 900;
+    }
+
+    .install-note {
+      margin:
+        14px auto
+        0;
+
+      max-width: 350px;
+
+      font-size: 14px;
+      line-height: 1.75;
+
+      color: var(--text-soft);
+    }
+
+    .footer {
+      margin-top: 22px;
+
+      font-size: 11px;
+
+      letter-spacing: 1px;
+
+      color: rgba(120, 90, 105, 0.58);
+    }
+
+    @media (max-width: 390px) {
+      body {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+
+      .glass-card {
+        padding:
+          36px
+          21px
+          25px;
+
+        border-radius: 30px;
+      }
+
+      .logo-wrap,
+      .app-logo {
+        width: 116px;
+        height: 116px;
+      }
+
+      .app-logo {
+        border-radius: 29px;
+      }
+
+      .intro {
+        font-size: 16.5px;
+      }
+
+      .chat-button {
+        min-height: 57px;
+
+        font-size: 20px;
+      }
+
+      .install-steps {
+        flex-direction: column;
+
+        gap: 2px;
+      }
+
+      .arrow {
+        transform:
+          rotate(90deg);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+
+        animation-iteration-count: 1 !important;
+
+        scroll-behavior: auto !important;
+      }
     }
   </style>
 </head>
 
 <body>
-  <main class="card">
-    <img
-      class="logo"
-      src="./icon-512.png"
-      alt="芯瑤💕陪你玩"
-    >
 
-    <h1>芯瑤💕陪你玩</h1>
+  <div class="background-heart heart-one">
+    ♡
+  </div>
 
-    <p class="subtitle">
-      你的專屬 AI 小幫手<br>
-      陪聊、賽事、今彩539、老虎機都能問 💕
-    </p>
+  <div class="background-heart heart-two">
+    ♡
+  </div>
 
-    <section class="chips">
-      <div class="chip">⚽ 賽事分析</div>
-      <div class="chip">🎲 今彩539</div>
-      <div class="chip">🎰 老虎機</div>
+  <div class="background-heart heart-three">
+    ♡
+  </div>
+
+  <div class="background-heart heart-four">
+    ♡
+  </div>
+
+  <main class="app-shell">
+
+    <section class="glass-card">
+
+      <div class="logo-wrap">
+
+        <div class="logo-glow"></div>
+
+        <img
+          class="app-logo"
+          src="./icon-512.png"
+          alt="芯瑤💕陪你玩"
+        >
+
+      </div>
+
+      <h1 class="title">
+        芯瑤💕陪你玩
+      </h1>
+
+      <div class="intro">
+
+        <span class="intro-line">
+          <span class="sparkle">
+            👾
+          </span>
+          獨創電子爆分技巧
+        </span>
+
+        <span class="intro-line">
+          <span class="sparkle">
+            ⚽️
+          </span>
+          各項賽事分析
+        </span>
+
+      </div>
+
+      <a
+        class="chat-button"
+        href="https://udify.app/chat/fUPD0gOuyhQ7JL4k"
+      >
+        <span>
+          開始聊天💬
+        </span>
+      </a>
+
+      <section class="install-section">
+
+        <h2 class="install-title">
+          📱 新增至桌面
+        </h2>
+
+        <div class="install-steps">
+
+          <span class="install-step">
+            複製網址到瀏覽器開啟
+          </span>
+
+          <span class="arrow">
+            →
+          </span>
+
+          <span class="install-step">
+            分享
+          </span>
+
+          <span class="arrow">
+            →
+          </span>
+
+          <span class="install-step">
+            加入主畫面
+          </span>
+
+        </div>
+
+        <p class="install-note">
+          加入後會顯示「芯瑤💕陪你玩」和專屬圖示，方便後續使用。
+        </p>
+
+      </section>
+
+      <p class="footer">
+        XĪN YÁO AI · VERSION 1.0
+      </p>
+
     </section>
 
-    <a
-      class="start"
-      href="https://udify.app/chat/fUPD0gOuyhQ7JL4k"
-    >
-      開始聊天 💬
-    </a>
-
-    <p class="hint">
-      iPhone：Safari 分享 → 加入主畫面<br>
-      加入後會顯示「芯瑤💕陪你玩」和專屬圖示。
-    </p>
   </main>
 
   <script>
     if ("serviceWorker" in navigator) {
-      window.addEventListener("load", function () {
-        navigator.serviceWorker.register("./sw.js");
-      });
+      window.addEventListener(
+        "load",
+        function () {
+          navigator.serviceWorker
+            .register("./sw.js")
+            .catch(
+              function (error) {
+                console.log(
+                  "Service Worker 註冊失敗：",
+                  error
+                );
+              }
+            );
+        }
+      );
     }
   </script>
+
 </body>
 </html>
