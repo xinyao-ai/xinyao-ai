@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  >
+
+  <title>芯瑤💕ATG選房分析</title>
+
+  <meta
+    name="description"
+    content="依據個人實戰累積的選房邏輯，綜合得分率、未開、前一、前二及本金進行分析。"
+  >
+
+  <meta name="theme-color" content="#ffddea">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="芯瑤選房分析">
+
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+  <link rel="icon" href="./favicon.png" type="image/png">
+
+  <style>
+    :root {
+      --pink: #ff5f9e;
+      --pink-dark: #ef377e;
+      --pink-light: #fff0f6;
+      --pink-soft: #ffdbea;
+      --text: #2d2730;
+      --muted: #817782;
+      --white: #ffffff;
+      --border: #f0dbe4;
+      --shadow: 0 15px 45px rgba(229, 92, 148, 0.16);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-height: 100%;
+      background: #fff8fb;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        "PingFang TC",
+        "Noto Sans TC",
+        "Microsoft JhengHei",
+        sans-serif;
+      background:
+        radial-gradient(circle at top left, #ffe5f0 0, transparent 35%),
+        radial-gradient(circle at bottom right, #f7e7ff 0, transparent 35%),
+        linear-gradient(180deg, #fffafd 0%, #fff4f8 100%);
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .page {
+      width: min(100%, 760px);
+      margin: 0 auto;
+      padding:
+        calc(24px + env(safe-area-inset-top))
+        16px
+        calc(36px + env(safe-area-inset-bottom));
+    }
+
+    .hero {
+      margin-bottom: 18px;
+      padding: 22px;
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      border-radius: 28px;
+      background:
+        linear-gradient(
+          135deg,
+          rgba(255, 255, 255, 0.94),
+          rgba(255, 239, 246, 0.94)
+        );
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-icon {
+      width: 62px;
+      height: 62px;
+      flex: 0 0 62px;
+      object-fit: cover;
+      border: 3px solid var(--white);
+      border-radius: 20px;
+      box-shadow: 0 8px 22px rgba(238, 72, 139, 0.22);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 6vw, 34px);
+      line-height: 1.2;
+      letter-spacing: -0.5px;
+    }
+
+    .subtitle {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .card {
+      margin-top: 18px;
+      padding: 20px;
+      border: 1px solid rgba(240, 219, 228, 0.9);
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: var(--shadow);
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 16px;
+      font-size: 19px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .field.full {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      padding-left: 3px;
+      color: #554b56;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    input,
+    select {
+      width: 100%;
+      min-height: 52px;
+      padding: 0 15px;
+      color: var(--text);
+      border: 1.5px solid var(--border);
+      border-radius: 16px;
+      outline: none;
+      background: #fffafd;
+      transition:
+        border-color 0.18s ease,
+        box-shadow 0.18s ease,
+        transform 0.18s ease;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: var(--pink);
+      box-shadow: 0 0 0 4px rgba(255, 95, 158, 0.12);
+    }
+
+    input::placeholder {
+      color: #b6abb1;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    button {
+      min-height: 52px;
+      border: 0;
+      border-radius: 17px;
+      cursor: pointer;
+      font-weight: 800;
+      transition:
+        transform 0.15s ease,
+        opacity 0.15s ease,
+        box-shadow 0.15s ease;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    .primary {
+      flex: 1;
+      color: var(--white);
+      background: linear-gradient(135deg, var(--pink), var(--pink-dark));
+      box-shadow: 0 10px 24px rgba(239, 55, 126, 0.28);
+    }
+
+    .secondary {
+      width: 100px;
+      color: var(--pink-dark);
+      background: var(--pink-light);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.62;
+      box-shadow: none;
+    }
+
+    .result-card {
+      display: none;
+      overflow: hidden;
+    }
+
+    .result-card.show {
+      display: block;
+      animation: appear 0.25s ease;
+    }
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 15px;
+    }
+
+    .result-badge {
+      padding: 7px 11px;
+      color: var(--pink-dark);
+      border-radius: 999px;
+      background: var(--pink-light);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .result-content {
+      min-height: 120px;
+      padding: 17px;
+      overflow-wrap: anywhere;
+      color: #393039;
+      border: 1px solid #f4e0e9;
+      border-radius: 18px;
+      background: #fffbfd;
+      font-size: 15px;
+      line-height: 1.8;
+      white-space: pre-wrap;
+    }
+
+    .loading {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      min-height: 100px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .loading.show {
+      display: flex;
+    }
+
+    .spinner {
+      width: 22px;
+      height: 22px;
+      border: 3px solid var(--pink-soft);
+      border-top-color: var(--pink);
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+
+    .error {
+      color: #b4234c;
+      border-color: #ffd0dc;
+      background: #fff1f5;
+    }
+
+    .notice {
+      margin: 15px 4px 0;
+      color: #91858e;
+      font-size: 12px;
+      line-height: 1.6;
+      text-align: center;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes appear {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 560px) {
+      .page {
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+
+      .hero,
+      .card {
+        padding: 17px;
+        border-radius: 23px;
+      }
+
+      .brand-icon {
+        width: 54px;
+        height: 54px;
+        flex-basis: 54px;
+        border-radius: 17px;
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .field.full {
+        grid-column: auto;
+      }
+
+      .actions {
+        flex-direction: column-reverse;
+      }
+
+      .secondary {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="brand">
+        <img
+          class="brand-icon"
+          src="./icon-192.png"
+          alt="芯瑤選房分析"
+          onerror="this.src='./apple-touch-icon.png'"
+        >
+
+        <div>
+          <h1>芯瑤💕ATG選房分析</h1>
+
+          <p class="subtitle">
+            輸入遊戲畫面的房間數據，系統會依照選房規則自動評分並產生分析結果。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 class="section-title">🎰 輸入分析資料</h2>
+
+      <form id="analysisForm">
+        <div class="form-grid">
+          <div class="field full">
+            <label for="game">遊戲</label>
+
+            <select id="game" required>
+              <option value="">請選擇遊戲</option>
+              <option value="🔥 戰神賽特">🔥 戰神賽特</option>
+              <option value="🔥 戰神賽特II">🔥 戰神賽特II</option>
+              <option value="😈 古神巴風特">😈 古神巴風特</option>
+              <option value="🎋 赤三國">🎋 赤三國</option>
+              <option value="🐵 孫行者">🐵 孫行者</option>
+              <option value="🗡️ 武俠">🗡️ 武俠</option>
+              <option value="🐯 虎小妹">🐯 虎小妹</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="room">房號</label>
+
+            <input
+              id="room"
+              type="text"
+              inputmode="numeric"
+              placeholder="例如：417"
+              required
+            >
+          </div>
+
+          <div class="field">
+            <label for="score">得分率</label>
+
+            <input
+              id="score"
+              type="number"
+              inputmode="decimal"
+              step="0.01"
+              placeholder="例如：149.95"
+              required
+            >
+          </div>
+
+          <div class="field">
+            <label for="unopen">未開</label>
+
+            <input
+              id="unopen"
+              type="number"
+              inputmode="decimal"
+              step="0.01"
+              placeholder="請輸入未開"
+              required
+            >
+          </div>
+
+          <div class="field">
+            <label for="prev1">前一</label>
+
+            <input
+              id="prev1"
+              type="number"
+              inputmode="decimal"
+              step="0.01"
+              placeholder="請輸入前一"
+              required
+            >
+          </div>
+
+          <div class="field">
+            <label for="prev2">前二</label>
+
+            <input
+              id="prev2"
+              type="number"
+              inputmode="decimal"
+              step="0.01"
+              placeholder="請輸入前二"
+              required
+            >
+          </div>
+
+          <div class="field">
+            <label for="capital">本金</label>
+
+            <input
+              id="capital"
+              type="number"
+              inputmode="numeric"
+              min="1"
+              step="1"
+              placeholder="例如：2000"
+              required
+            >
+          </div>
+        </div>
+
+        <div class="actions">
+          <button
+            class="secondary"
+            id="clearButton"
+            type="button"
+          >
+            清除
+          </button>
+
+          <button
+            class="primary"
+            id="submitButton"
+            type="submit"
+          >
+            開始分析
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card result-card" id="resultCard">
+      <div class="result-header">
+        <h2 class="section-title" style="margin:0;">
+          ✨ 分析結果
+        </h2>
+
+        <span class="result-badge" id="resultBadge">
+          分析完成
+        </span>
+      </div>
+
+      <div class="loading" id="loading">
+        <span class="spinner"></span>
+        正在分析房間數據…
+      </div>
+
+      <div class="result-content" id="resultContent"></div>
+    </section>
+
+    <p class="notice">
+      ※ 分析結果僅依輸入數據及設定規則計算，不代表任何結果保證，請自行控管資金與風險。
+    </p>
+  </main>
+
+  <script>
+    const WORKER_URL =
+      "https://holy-violet-41e1.love06130430.workers.dev";
+
+    const form = document.getElementById("analysisForm");
+    const clearButton = document.getElementById("clearButton");
+    const submitButton = document.getElementById("submitButton");
+
+    const resultCard = document.getElementById("resultCard");
+    const resultContent = document.getElementById("resultContent");
+    const resultBadge = document.getElementById("resultBadge");
+    const loading = document.getElementById("loading");
+
+    function getNumber(id) {
+      const value = document.getElementById(id).value.trim();
+      return Number(value);
+    }
+
+    function showLoading() {
+      resultCard.classList.add("show");
+      loading.classList.add("show");
+      resultContent.style.display = "none";
+      resultContent.classList.remove("error");
+
+      resultBadge.textContent = "分析中";
+      submitButton.disabled = true;
+      submitButton.textContent = "分析中…";
+
+      resultCard.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }
+
+    function showResult(text) {
+      loading.classList.remove("show");
+      resultContent.style.display = "block";
+      resultContent.classList.remove("error");
+      resultContent.textContent = text;
+
+      resultBadge.textContent = "分析完成";
+      submitButton.disabled = false;
+      submitButton.textContent = "開始分析";
+    }
+
+    function showError(message) {
+      loading.classList.remove("show");
+      resultContent.style.display = "block";
+      resultContent.classList.add("error");
+      resultContent.textContent = message;
+
+      resultBadge.textContent = "發生錯誤";
+      submitButton.disabled = false;
+      submitButton.textContent = "重新分析";
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const payload = {
+        game: document.getElementById("game").value,
+        room: document.getElementById("room").value.trim(),
+        score: getNumber("score"),
+        unopen: getNumber("unopen"),
+        prev1: getNumber("prev1"),
+        prev2: getNumber("prev2"),
+        capital: getNumber("capital"),
+        user: "github-pages-user"
+      };
+
+      const invalidNumber =
+        !Number.isFinite(payload.score) ||
+        !Number.isFinite(payload.unopen) ||
+        !Number.isFinite(payload.prev1) ||
+        !Number.isFinite(payload.prev2) ||
+        !Number.isFinite(payload.capital);
+
+      if (!payload.game || !payload.room || invalidNumber) {
+        resultCard.classList.add("show");
+
+        showError("資料沒有填完整，請檢查所有欄位。");
+        return;
+      }
+
+      showLoading();
+
+      try {
+        const response = await fetch(WORKER_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        let data;
+
+        try {
+          data = await response.json();
+        } catch {
+          throw new Error("伺服器回傳格式錯誤");
+        }
+
+        if (!response.ok) {
+          const detail =
+            data?.detail?.message ||
+            data?.detail ||
+            data?.error ||
+            `請求失敗：${response.status}`;
+
+          throw new Error(
+            typeof detail === "string"
+              ? detail
+              : JSON.stringify(detail)
+          );
+        }
+
+        if (!data.result) {
+          throw new Error("沒有收到分析結果");
+        }
+
+        showResult(data.result);
+      } catch (error) {
+        console.error(error);
+
+        showError(
+          `分析失敗：${error.message}\n\n請確認 Cloudflare Worker 已部署，並且 Dify API Key 設定正確。`
+        );
+      }
+    });
+
+    clearButton.addEventListener("click", () => {
+      form.reset();
+
+      resultCard.classList.remove("show");
+      resultContent.textContent = "";
+      resultContent.classList.remove("error");
+
+      submitButton.disabled = false;
+      submitButton.textContent = "開始分析";
+
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+      });
+    });
+
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker
+          .register("./sw.js")
+          .catch((error) => {
+            console.warn("Service Worker 註冊失敗：", error);
+          });
+      });
+    }
+  </script>
+</body>
+</html>
