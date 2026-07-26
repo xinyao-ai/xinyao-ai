@@ -364,7 +364,39 @@
 </head>
 
 <body>
-  <main class="page">
+  <div id="loginPage" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(135deg,#fff5fa,#fde9f4);">
+  <div style="width:100%;max-width:420px;background:#fff;border:1px solid #f3d3e1;border-radius:28px;padding:32px;box-shadow:0 18px 50px rgba(229,92,148,.16);">
+    <div style="text-align:center;margin-bottom:24px;">
+      <img src="./icon-192.png" alt="芯瑤" style="width:84px;height:84px;border-radius:24px;object-fit:cover;box-shadow:0 10px 25px rgba(229,92,148,.22);">
+      <h2 style="margin:16px 0 8px;font-size:28px;">芯瑤💕會員登入</h2>
+      <p style="margin:0;color:#817782;">請輸入已開通的會員帳號</p>
+    </div>
+
+    <label for="memberAccount" style="display:block;margin-bottom:8px;font-weight:700;">會員帳號</label>
+
+    <input
+      id="memberAccount"
+      type="text"
+      placeholder="請輸入會員帳號"
+      autocomplete="username"
+      style="width:100%;padding:16px;border:1px solid #efccdc;border-radius:16px;font-size:16px;box-sizing:border-box;outline:none;"
+    >
+
+    <button
+      id="loginButton"
+      type="button"
+      style="width:100%;margin-top:16px;padding:16px;border:0;border-radius:16px;background:linear-gradient(90deg,#ff58a0,#ef2f80);color:#fff;font-size:18px;font-weight:800;cursor:pointer;"
+    >
+      登入
+    </button>
+
+    <div
+      id="loginMessage"
+      style="display:none;margin-top:16px;padding:14px;border-radius:14px;background:#fff0f6;color:#d6296f;line-height:1.6;"
+    ></div>
+  </div>
+</div>
+  <main id="appPage" class="page" style="display:none;">
     <section class="hero">
       <div class="brand">
         <img
@@ -394,7 +426,7 @@
 
             <select id="game" required>
               <option value="">請選擇遊戲</option>
-              <option value="🔥戰神賽特">🔥 戰神賽特</option>
+              <option value="🔥 戰神賽特">🔥 戰神賽特</option>
               <option value="🔥 戰神賽特II">🔥 戰神賽特II</option>
               <option value="😈 古神巴風特">😈 古神巴風特</option>
               <option value="🎋 赤三國">🎋 赤三國</option>
@@ -531,6 +563,84 @@
     const WORKER_URL =
       "https://holy-violet-41e1.love06130430.workers.dev";
 
+    const loginPage = document.getElementById("loginPage");
+    const appPage = document.getElementById("appPage");
+    const memberAccountInput = document.getElementById("memberAccount");
+    const loginButton = document.getElementById("loginButton");
+    const loginMessage = document.getElementById("loginMessage");
+
+    let loggedInMember = sessionStorage.getItem("memberAccount") || "";
+
+    function showLoginMessage(message) {
+      loginMessage.textContent = message;
+      loginMessage.style.display = "block";
+    }
+
+    function openAnalyzer(memberAccount) {
+      loggedInMember = memberAccount;
+      sessionStorage.setItem("memberAccount", memberAccount);
+      loginMessage.style.display = "none";
+      loginPage.style.display = "none";
+      appPage.style.display = "block";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    async function verifyMember() {
+      const memberAccount = memberAccountInput.value.trim();
+
+      if (!memberAccount) {
+        showLoginMessage("請輸入會員帳號");
+        return;
+      }
+
+      loginButton.disabled = true;
+      loginButton.textContent = "驗證中…";
+      loginMessage.style.display = "none";
+
+      try {
+        const response = await fetch(WORKER_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            action: "verify",
+            memberAccount
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(
+            data.message ||
+            data.error ||
+            "會員帳號不存在或尚未開通 AI 使用權限"
+          );
+        }
+
+        openAnalyzer(memberAccount);
+      } catch (error) {
+        showLoginMessage(error.message || "登入失敗，請稍後再試");
+      } finally {
+        loginButton.disabled = false;
+        loginButton.textContent = "登入";
+      }
+    }
+
+    loginButton.addEventListener("click", verifyMember);
+
+    memberAccountInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        verifyMember();
+      }
+    });
+
+    if (loggedInMember) {
+      memberAccountInput.value = loggedInMember;
+      openAnalyzer(loggedInMember);
+    }
+
     const form = document.getElementById("analysisForm");
     const clearButton = document.getElementById("clearButton");
     const submitButton = document.getElementById("submitButton");
@@ -587,15 +697,22 @@
       event.preventDefault();
 
       const payload = {
+        memberAccount: loggedInMember,
         game: document.getElementById("game").value,
         room: document.getElementById("room").value.trim(),
         score: getNumber("score"),
         unopen: getNumber("unopen"),
         prev1: getNumber("prev1"),
         prev2: getNumber("prev2"),
-        capital: getNumber("capital"),
-        user: "github-pages-user"
+        capital: getNumber("capital")
       };
+
+      if (!loggedInMember) {
+        loginPage.style.display = "flex";
+        appPage.style.display = "none";
+        showLoginMessage("登入狀態已失效，請重新輸入會員帳號");
+        return;
+      }
 
       const invalidNumber =
         !Number.isFinite(payload.score) ||
