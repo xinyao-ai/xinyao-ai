@@ -7,7 +7,7 @@
     content="width=device-width, initial-scale=1, viewport-fit=cover"
   >
 
-  <title>芯瑤💕ATG選房分析</title>
+  <title>芯瑤💕ATG AI助手</title>
 
   <meta
     name="description"
@@ -307,6 +307,78 @@
       text-align: center;
     }
 
+
+    .mode-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .mode-button {
+      min-height: 56px;
+      padding: 10px;
+      color: var(--pink-dark);
+      border: 1.5px solid var(--pink-soft);
+      border-radius: 17px;
+      background: var(--pink-light);
+      font-weight: 800;
+    }
+
+    .mode-button.active {
+      color: var(--white);
+      border-color: transparent;
+      background: linear-gradient(135deg, var(--pink), var(--pink-dark));
+      box-shadow: 0 10px 24px rgba(239, 55, 126, 0.24);
+    }
+
+    .panel {
+      display: none;
+    }
+
+    .panel.active {
+      display: block;
+      animation: appear 0.2s ease;
+    }
+
+    .history-empty {
+      padding: 20px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .history-item {
+      padding: 15px;
+      border: 1px solid #f4e0e9;
+      border-radius: 17px;
+      background: #fffbfd;
+    }
+
+    .history-item + .history-item {
+      margin-top: 10px;
+    }
+
+    .history-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 7px;
+      font-weight: 800;
+    }
+
+    .history-time {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .history-summary {
+      color: #5e535c;
+      font-size: 13px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
     @keyframes spin {
       to {
         transform: rotate(360deg);
@@ -344,6 +416,7 @@
         border-radius: 17px;
       }
 
+      .mode-grid,
       .form-grid {
         grid-template-columns: 1fr;
       }
@@ -407,17 +480,26 @@
         >
 
         <div>
-          <h1>芯瑤💕ATG選房分析</h1>
+          <h1>芯瑤💕ATG AI助手</h1>
 
           <p class="subtitle">
-            輸入遊戲畫面的房間數據，系統會依照選房規則自動評分並產生分析結果。
+            房號分析、續玩判讀與個人近期紀錄，一個頁面全部搞定。
           </p>
         </div>
       </div>
     </section>
 
-    <section class="card">
-      <h2 class="section-title">🎰 輸入分析資料</h2>
+    <section class="card" style="padding:14px;">
+      <div class="mode-grid" style="margin-top:0;">
+        <button class="mode-button active" data-panel="analyzePanel" type="button">🎰 房號分析</button>
+        <button class="mode-button" data-panel="continuePanel" type="button">🔄 續玩分析</button>
+        <button class="mode-button" data-panel="historyPanel" type="button">📜 分析紀錄</button>
+      </div>
+    </section>
+
+    <section class="panel active" id="analyzePanel">
+      <div class="card">
+        <h2 class="section-title">🎰 輸入房號資料</h2>
 
       <form id="analysisForm">
         <div class="form-grid">
@@ -533,6 +615,94 @@
           </button>
         </div>
       </form>
+      </div>
+    </section>
+
+    <section class="panel" id="continuePanel">
+      <div class="card">
+        <h2 class="section-title">🔄 輸入續玩資料</h2>
+
+        <form id="continueForm">
+          <div class="form-grid">
+            <div class="field full">
+              <label for="continueGame">遊戲</label>
+              <select id="continueGame" required>
+                <option value="">請選擇遊戲</option>
+                <option value="🔥戰神賽特">🔥 戰神賽特</option>
+                <option value="🔥戰神賽特II">🔥 戰神賽特II</option>
+                <option value="😈古神巴風特">😈 古神巴風特</option>
+                <option value="🎋赤三國">🎋 赤三國</option>
+                <option value="🐵孫行者">🐵 孫行者</option>
+                <option value="🗡️武俠">🗡️ 武俠</option>
+                <option value="🐯虎小妹">🐯 虎小妹</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="continueRoom">房號</label>
+              <input id="continueRoom" type="text" inputmode="numeric" placeholder="例如：417" required>
+            </div>
+
+            <div class="field">
+              <label for="continueCapital">原始本金</label>
+              <input id="continueCapital" type="number" inputmode="numeric" min="1" step="1" placeholder="例如：5000" required>
+            </div>
+
+            <div class="field">
+              <label for="currentBalance">目前餘額</label>
+              <input id="currentBalance" type="number" inputmode="decimal" min="0" step="0.01" placeholder="例如：4700" required>
+            </div>
+
+            <div class="field">
+              <label for="freeGameCount">免遊次數</label>
+              <input id="freeGameCount" type="number" inputmode="numeric" min="0" step="1" placeholder="例如：0" required>
+            </div>
+
+            <div class="field">
+              <label for="maxWin">最高單次中獎</label>
+              <input id="maxWin" type="number" inputmode="decimal" min="0" step="0.01" placeholder="例如：120" required>
+            </div>
+
+            <div class="field">
+              <label for="playDuration">目前玩多久</label>
+              <select id="playDuration" required>
+                <option value="">請選擇</option>
+                <option value="剛開始">剛開始</option>
+                <option value="約50轉">約 50 轉</option>
+                <option value="約100轉">約 100 轉</option>
+                <option value="玩很久了">玩很久了</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="continueStatus">目前狀況</label>
+              <select id="continueStatus" required>
+                <option value="">請選擇</option>
+                <option value="一直掉分">一直掉分</option>
+                <option value="持平">持平</option>
+                <option value="開始回分">開始回分</option>
+                <option value="已進免遊">已進免遊</option>
+                <option value="已爆分">已爆分</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="secondary" id="continueClearButton" type="button">清除</button>
+            <button class="primary" id="continueSubmitButton" type="submit">開始續玩分析</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="panel" id="historyPanel">
+      <div class="card">
+        <div class="result-header">
+          <h2 class="section-title" style="margin:0;">📜 近期分析紀錄</h2>
+          <button id="clearHistoryButton" type="button" class="secondary" style="width:auto;min-height:40px;padding:0 14px;">清空</button>
+        </div>
+        <div id="historyList"></div>
+      </div>
     </section>
 
     <section class="card result-card" id="resultCard">
@@ -563,13 +733,27 @@
     const WORKER_URL =
       "https://holy-violet-41e1.love06130430.workers.dev";
 
-    const loginPage = document.getElementById("loginPage");
-    const appPage = document.getElementById("appPage");
-    const memberAccountInput = document.getElementById("memberAccount");
-    const loginButton = document.getElementById("loginButton");
-    const loginMessage = document.getElementById("loginMessage");
+    const $ = (id) => document.getElementById(id);
+    const loginPage = $("loginPage");
+    const appPage = $("appPage");
+    const memberAccountInput = $("memberAccount");
+    const loginButton = $("loginButton");
+    const loginMessage = $("loginMessage");
+    const analysisForm = $("analysisForm");
+    const continueForm = $("continueForm");
+    const submitButton = $("submitButton");
+    const continueSubmitButton = $("continueSubmitButton");
+    const resultCard = $("resultCard");
+    const resultContent = $("resultContent");
+    const resultBadge = $("resultBadge");
+    const loading = $("loading");
+    const historyList = $("historyList");
 
     let loggedInMember = sessionStorage.getItem("memberAccount") || "";
+
+    function numberValue(id) {
+      return Number($(id).value.trim());
+    }
 
     function showLoginMessage(message) {
       loginMessage.textContent = message;
@@ -582,6 +766,7 @@
       loginMessage.style.display = "none";
       loginPage.style.display = "none";
       appPage.style.display = "block";
+      renderHistory();
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
@@ -600,9 +785,7 @@
       try {
         const response = await fetch(WORKER_URL, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             action: "verify",
             memberAccount
@@ -628,47 +811,22 @@
       }
     }
 
-    loginButton.addEventListener("click", verifyMember);
-
-    memberAccountInput.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        verifyMember();
-      }
-    });
-
-    if (loggedInMember) {
-      memberAccountInput.value = loggedInMember;
-      openAnalyzer(loggedInMember);
-    }
-
-    const form = document.getElementById("analysisForm");
-    const clearButton = document.getElementById("clearButton");
-    const submitButton = document.getElementById("submitButton");
-
-    const resultCard = document.getElementById("resultCard");
-    const resultContent = document.getElementById("resultContent");
-    const resultBadge = document.getElementById("resultBadge");
-    const loading = document.getElementById("loading");
-
-    function getNumber(id) {
-      const value = document.getElementById(id).value.trim();
-      return Number(value);
-    }
-
-    function showLoading() {
+    function showLoading(button, text) {
       resultCard.classList.add("show");
       loading.classList.add("show");
       resultContent.style.display = "none";
       resultContent.classList.remove("error");
-
       resultBadge.textContent = "分析中";
-      submitButton.disabled = true;
-      submitButton.textContent = "分析中…";
+      button.disabled = true;
+      button.textContent = text;
+      resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
 
-      resultCard.scrollIntoView({
-        behavior: "smooth",
-        block: "start"
-      });
+    function restoreButtons() {
+      submitButton.disabled = false;
+      submitButton.textContent = "開始分析";
+      continueSubmitButton.disabled = false;
+      continueSubmitButton.textContent = "開始續玩分析";
     }
 
     function showResult(text) {
@@ -676,10 +834,8 @@
       resultContent.style.display = "block";
       resultContent.classList.remove("error");
       resultContent.textContent = text;
-
       resultBadge.textContent = "分析完成";
-      submitButton.disabled = false;
-      submitButton.textContent = "開始分析";
+      restoreButtons();
     }
 
     function showError(message) {
@@ -687,26 +843,78 @@
       resultContent.style.display = "block";
       resultContent.classList.add("error");
       resultContent.textContent = message;
-
       resultBadge.textContent = "發生錯誤";
-      submitButton.disabled = false;
-      submitButton.textContent = "重新分析";
+      restoreButtons();
     }
 
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
+    function historyKey() {
+      return `xinyao_history_${loggedInMember}`;
+    }
 
-      const payload = {
-        memberAccount: loggedInMember,
-        game: document.getElementById("game").value,
-        room: document.getElementById("room").value.trim(),
-        score: getNumber("score"),
-        unopen: getNumber("unopen"),
-        prev1: getNumber("prev1"),
-        prev2: getNumber("prev2"),
-        capital: getNumber("capital")
-      };
+    function getHistory() {
+      try {
+        return JSON.parse(localStorage.getItem(historyKey()) || "[]");
+      } catch {
+        return [];
+      }
+    }
 
+    function addHistory(type, game, room, result) {
+      const history = getHistory();
+
+      history.unshift({
+        type,
+        game,
+        room,
+        result,
+        createdAt: new Date().toISOString()
+      });
+
+      localStorage.setItem(
+        historyKey(),
+        JSON.stringify(history.slice(0, 30))
+      );
+
+      renderHistory();
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function renderHistory() {
+      const history = getHistory();
+
+      if (!history.length) {
+        historyList.innerHTML =
+          '<div class="history-empty">目前還沒有分析紀錄。</div>';
+        return;
+      }
+
+      historyList.innerHTML = history.map((item) => {
+        const time = new Date(item.createdAt).toLocaleString("zh-TW");
+        const summary = item.result.length > 160
+          ? `${item.result.slice(0, 160)}…`
+          : item.result;
+
+        return `
+          <article class="history-item">
+            <div class="history-top">
+              <span>${escapeHtml(item.type)}｜${escapeHtml(item.game)}｜房號 ${escapeHtml(item.room)}</span>
+              <span class="history-time">${escapeHtml(time)}</span>
+            </div>
+            <div class="history-summary">${escapeHtml(summary)}</div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    async function sendAnalysis(payload, button, loadingText, historyType) {
       if (!loggedInMember) {
         loginPage.style.display = "flex";
         appPage.style.display = "none";
@@ -714,28 +922,12 @@
         return;
       }
 
-      const invalidNumber =
-        !Number.isFinite(payload.score) ||
-        !Number.isFinite(payload.unopen) ||
-        !Number.isFinite(payload.prev1) ||
-        !Number.isFinite(payload.prev2) ||
-        !Number.isFinite(payload.capital);
-
-      if (!payload.game || !payload.room || invalidNumber) {
-        resultCard.classList.add("show");
-
-        showError("資料沒有填完整，請檢查所有欄位。");
-        return;
-      }
-
-      showLoading();
+      showLoading(button, loadingText);
 
       try {
         const response = await fetch(WORKER_URL, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
 
@@ -766,31 +958,141 @@
         }
 
         showResult(data.result);
+        addHistory(historyType, payload.game, payload.room, data.result);
       } catch (error) {
         console.error(error);
-
-        showError(
-          `分析失敗：${error.message}\n\n請確認 Cloudflare Worker 已部署，並且 Dify API Key 設定正確。`
-        );
+        showError(`分析失敗：${error.message}`);
       }
+    }
+
+    analysisForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const payload = {
+        action: "analyze",
+        memberAccount: loggedInMember,
+        game: $("game").value,
+        room: $("room").value.trim(),
+        score: numberValue("score"),
+        unopen: numberValue("unopen"),
+        prev1: numberValue("prev1"),
+        prev2: numberValue("prev2"),
+        capital: numberValue("capital")
+      };
+
+      const invalid =
+        !payload.game ||
+        !payload.room ||
+        !Number.isFinite(payload.score) ||
+        !Number.isFinite(payload.unopen) ||
+        !Number.isFinite(payload.prev1) ||
+        !Number.isFinite(payload.prev2) ||
+        !Number.isFinite(payload.capital);
+
+      if (invalid) {
+        resultCard.classList.add("show");
+        showError("資料沒有填完整，請檢查所有欄位。");
+        return;
+      }
+
+      await sendAnalysis(payload, submitButton, "分析中…", "房號分析");
     });
 
-    clearButton.addEventListener("click", () => {
-      form.reset();
+    continueForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
 
+      const payload = {
+        action: "continue",
+        memberAccount: loggedInMember,
+        game: $("continueGame").value,
+        room: $("continueRoom").value.trim(),
+        capital: numberValue("continueCapital"),
+        current_balance: numberValue("currentBalance"),
+        free_game_count: numberValue("freeGameCount"),
+        max_win: numberValue("maxWin"),
+        play_duration: $("playDuration").value,
+        status: $("continueStatus").value
+      };
+
+      const invalid =
+        !payload.game ||
+        !payload.room ||
+        !payload.play_duration ||
+        !payload.status ||
+        !Number.isFinite(payload.capital) ||
+        !Number.isFinite(payload.current_balance) ||
+        !Number.isFinite(payload.free_game_count) ||
+        !Number.isFinite(payload.max_win);
+
+      if (invalid) {
+        resultCard.classList.add("show");
+        showError("續玩資料沒有填完整，請檢查所有欄位。");
+        return;
+      }
+
+      await sendAnalysis(
+        payload,
+        continueSubmitButton,
+        "續玩分析中…",
+        "續玩分析"
+      );
+    });
+
+    $("clearButton").addEventListener("click", () => {
+      analysisForm.reset();
       resultCard.classList.remove("show");
-      resultContent.textContent = "";
-      resultContent.classList.remove("error");
+    });
 
-      submitButton.disabled = false;
-      submitButton.textContent = "開始分析";
+    $("continueClearButton").addEventListener("click", () => {
+      continueForm.reset();
+      resultCard.classList.remove("show");
+    });
 
-      window.scrollTo({
-        top: 0,
-        behavior: "smooth"
+    $("clearHistoryButton").addEventListener("click", () => {
+      if (!confirm("確定要清空自己的分析紀錄嗎？")) {
+        return;
+      }
+
+      localStorage.removeItem(historyKey());
+      renderHistory();
+    });
+
+    document.querySelectorAll(".mode-button").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll(".mode-button").forEach((item) => {
+          item.classList.remove("active");
+        });
+
+        document.querySelectorAll(".panel").forEach((panel) => {
+          panel.classList.remove("active");
+        });
+
+        button.classList.add("active");
+        $(button.dataset.panel).classList.add("active");
+        resultCard.classList.remove("show");
+
+        if (button.dataset.panel === "historyPanel") {
+          renderHistory();
+        }
+
+        window.scrollTo({ top: 0, behavior: "smooth" });
       });
     });
 
-    // 已停用 Service Worker，避免載入舊版快取。\n  </script>
+    loginButton.addEventListener("click", verifyMember);
+
+    memberAccountInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        verifyMember();
+      }
+    });
+
+    if (loggedInMember) {
+      memberAccountInput.value = loggedInMember;
+      openAnalyzer(loggedInMember);
+    }
+
+    // 停用 Service Worker，避免 GitHub Pages 長期讀到舊版快取。
+  </script>
 </body>
 </html>
