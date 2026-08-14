@@ -433,10 +433,910 @@
         width: 100%;
       }
     }
+
+    /* ===== 芯瑤淡粉動畫升級 ===== */
+    body {
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      z-index: -3;
+      border-radius: 999px;
+      pointer-events: none;
+      opacity: .72;
+      animation: floatGlow 12s ease-in-out infinite alternate;
+    }
+
+    body::before {
+      width: 360px;
+      height: 360px;
+      top: -90px;
+      left: -120px;
+      background: radial-gradient(circle, rgba(255,195,221,.62), rgba(255,226,239,.18) 62%, transparent 72%);
+    }
+
+    body::after {
+      width: 420px;
+      height: 420px;
+      right: -160px;
+      bottom: -120px;
+      background: radial-gradient(circle, rgba(236,216,255,.52), rgba(255,226,241,.14) 64%, transparent 74%);
+      animation-delay: -4s;
+    }
+
+    .ambient-layer {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .ambient-orb {
+      position: absolute;
+      border-radius: 50%;
+      opacity: .45;
+      background: linear-gradient(135deg, rgba(255,255,255,.92), rgba(255,199,224,.5));
+      box-shadow: 0 0 40px rgba(255,144,190,.22);
+      animation: driftOrb 14s ease-in-out infinite;
+    }
+
+    .ambient-orb:nth-child(1) {
+      width: 95px;
+      height: 95px;
+      left: 8%;
+      top: 18%;
+    }
+
+    .ambient-orb:nth-child(2) {
+      width: 72px;
+      height: 72px;
+      right: 9%;
+      top: 36%;
+      animation-delay: -5s;
+      animation-duration: 17s;
+    }
+
+    .ambient-orb:nth-child(3) {
+      width: 120px;
+      height: 120px;
+      left: 18%;
+      bottom: 10%;
+      animation-delay: -9s;
+      animation-duration: 19s;
+    }
+
+    .ambient-sparkle {
+      position: absolute;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.95);
+      box-shadow: 0 0 12px rgba(255,255,255,.95), 0 0 22px rgba(255,145,191,.55);
+      animation: sparkle 3.6s ease-in-out infinite;
+    }
+
+    .ambient-sparkle:nth-of-type(4) { left: 18%; top: 14%; }
+    .ambient-sparkle:nth-of-type(5) { right: 22%; top: 24%; animation-delay: -1.2s; }
+    .ambient-sparkle:nth-of-type(6) { left: 28%; bottom: 22%; animation-delay: -2.1s; }
+    .ambient-sparkle:nth-of-type(7) { right: 13%; bottom: 16%; animation-delay: -.6s; }
+
+    #loginPage {
+      background: transparent !important;
+      animation: pageFade .65s ease both;
+    }
+
+    #loginPage > div {
+      position: relative;
+      overflow: hidden;
+      border-color: rgba(255,214,231,.86) !important;
+      background: linear-gradient(145deg, rgba(255,255,255,.96), rgba(255,247,251,.94)) !important;
+      box-shadow: 0 22px 70px rgba(222,103,154,.18), inset 0 1px 0 rgba(255,255,255,.92) !important;
+      backdrop-filter: blur(18px);
+      animation: cardEnter .72s cubic-bezier(.2,.8,.2,1) both;
+    }
+
+    #loginPage > div::before {
+      content: "";
+      position: absolute;
+      width: 160px;
+      height: 160px;
+      right: -55px;
+      top: -60px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,214,230,.75), rgba(255,214,230,0));
+      pointer-events: none;
+    }
+
+    #loginPage img,
+    .brand-icon {
+      animation: logoFloat 4s ease-in-out infinite;
+    }
+
+    #memberAccount {
+      transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease !important;
+      background: rgba(255,250,253,.96) !important;
+    }
+
+    #memberAccount:focus {
+      border-color: #ff77ad !important;
+      box-shadow: 0 0 0 5px rgba(255,119,173,.13), 0 8px 22px rgba(238,95,154,.08) !important;
+      transform: translateY(-1px);
+    }
+
+    #loginButton {
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 12px 28px rgba(239,47,128,.25);
+      animation: softPulse 3s ease-in-out infinite;
+    }
+
+    #loginButton::after,
+    .primary::after {
+      content: "";
+      position: absolute;
+      inset: -50% auto -50% -35%;
+      width: 34%;
+      transform: skewX(-20deg);
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.48), transparent);
+      animation: shine 3.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    .hero,
+    .card {
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(16px);
+      transition: transform .28s ease, box-shadow .28s ease, border-color .28s ease;
+    }
+
+    .hero::after,
+    .card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(130deg, rgba(255,255,255,.35), transparent 38%, rgba(255,226,239,.16));
+      opacity: .7;
+    }
+
+    .hero {
+      animation: heroEnter .7s cubic-bezier(.2,.8,.2,1) both;
+    }
+
+    .card {
+      animation: cardEnter .62s cubic-bezier(.2,.8,.2,1) both;
+    }
+
+    .panel.active .card {
+      animation: panelEnter .42s cubic-bezier(.2,.8,.2,1) both;
+    }
+
+    .mode-button {
+      position: relative;
+      overflow: hidden;
+      transition: transform .22s ease, box-shadow .22s ease, background .22s ease, color .22s ease;
+    }
+
+    .mode-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 22px rgba(239,55,126,.12);
+    }
+
+    .mode-button.active {
+      animation: selectedPop .32s ease both;
+    }
+
+    input:focus,
+    select:focus {
+      transform: translateY(-1px);
+      box-shadow: 0 0 0 5px rgba(255, 95, 158, 0.10), 0 10px 22px rgba(239,55,126,.08);
+    }
+
+    .primary {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(135deg, #ff8fba 0%, #ff5f9e 45%, #ef4b8d 100%);
+      box-shadow: 0 12px 28px rgba(239,55,126,.24), inset 0 1px 0 rgba(255,255,255,.28);
+      animation: softPulse 3.2s ease-in-out infinite;
+    }
+
+    .primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 16px 34px rgba(239,55,126,.3), inset 0 1px 0 rgba(255,255,255,.28);
+    }
+
+    .secondary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 18px rgba(239,55,126,.08);
+    }
+
+    .result-card.show {
+      display: block;
+      animation: resultReveal .55s cubic-bezier(.16,.84,.44,1) both;
+    }
+
+    .result-badge {
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.85);
+      animation: badgeGlow 2.8s ease-in-out infinite;
+    }
+
+    .loading.show {
+      animation: loadingFade .25s ease both;
+    }
+
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border-width: 3px;
+      box-shadow: 0 0 18px rgba(255,95,158,.18);
+    }
+
+    .loading::after {
+      content: "•••";
+      margin-left: 2px;
+      letter-spacing: 4px;
+      color: #f07fac;
+      animation: dots 1.2s steps(4, end) infinite;
+    }
+
+    .history-item {
+      transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+      animation: historyEnter .45s ease both;
+    }
+
+    .history-item:hover {
+      transform: translateY(-2px);
+      border-color: #efc9d9;
+      box-shadow: 0 12px 24px rgba(223,94,147,.09);
+    }
+
+    @keyframes pageFade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes floatGlow {
+      from { transform: translate3d(0,0,0) scale(1); }
+      to { transform: translate3d(30px,24px,0) scale(1.08); }
+    }
+
+    @keyframes driftOrb {
+      0%, 100% { transform: translate3d(0,0,0) scale(1); }
+      35% { transform: translate3d(24px,-20px,0) scale(1.06); }
+      70% { transform: translate3d(-16px,22px,0) scale(.96); }
+    }
+
+    @keyframes sparkle {
+      0%, 100% { opacity: .18; transform: scale(.7); }
+      50% { opacity: .95; transform: scale(1.35); }
+    }
+
+    @keyframes logoFloat {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-5px) rotate(.8deg); }
+    }
+
+    @keyframes heroEnter {
+      from { opacity: 0; transform: translateY(-10px) scale(.985); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes cardEnter {
+      from { opacity: 0; transform: translateY(14px) scale(.985); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes panelEnter {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes resultReveal {
+      0% { opacity: 0; transform: translateY(18px) scale(.98); }
+      70% { transform: translateY(-2px) scale(1.005); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes selectedPop {
+      0% { transform: scale(.96); }
+      70% { transform: scale(1.025); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes softPulse {
+      0%, 100% { filter: brightness(1); }
+      50% { filter: brightness(1.045); }
+    }
+
+    @keyframes shine {
+      0%, 58% { left: -40%; opacity: 0; }
+      66% { opacity: .7; }
+      78% { left: 115%; opacity: 0; }
+      100% { left: 115%; opacity: 0; }
+    }
+
+    @keyframes badgeGlow {
+      0%, 100% { box-shadow: 0 0 0 rgba(255,95,158,0), inset 0 1px 0 rgba(255,255,255,.85); }
+      50% { box-shadow: 0 0 18px rgba(255,95,158,.14), inset 0 1px 0 rgba(255,255,255,.85); }
+    }
+
+    @keyframes loadingFade {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes dots {
+      0% { clip-path: inset(0 100% 0 0); }
+      100% { clip-path: inset(0 0 0 0); }
+    }
+
+    @keyframes historyEnter {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
+
+    /* ===== 芯瑤 V2｜明顯動畫強化 ===== */
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background:
+        radial-gradient(circle at 15% 10%, rgba(255, 213, 231, .72), transparent 33%),
+        radial-gradient(circle at 85% 24%, rgba(244, 222, 255, .68), transparent 34%),
+        radial-gradient(circle at 50% 88%, rgba(255, 228, 239, .70), transparent 38%),
+        linear-gradient(135deg, #fff9fc 0%, #fff3f8 45%, #fffafd 100%);
+      background-size: 160% 160%;
+      animation: animatedBg 13s ease-in-out infinite alternate;
+    }
+
+    .page {
+      position: relative;
+      z-index: 2;
+    }
+
+    /* 漂浮愛心與泡泡 */
+    .fx-layer {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .fx-heart,
+    .fx-bubble {
+      position: absolute;
+      opacity: .22;
+      animation: floatUp linear infinite;
+      will-change: transform, opacity;
+    }
+
+    .fx-heart::before {
+      content: "♡";
+      display: block;
+      color: #ff8fbb;
+      text-shadow: 0 0 16px rgba(255, 132, 181, .38);
+      font-weight: 700;
+    }
+
+    .fx-bubble {
+      border-radius: 999px;
+      background: linear-gradient(
+        145deg,
+        rgba(255,255,255,.92),
+        rgba(255,198,223,.33)
+      );
+      box-shadow:
+        inset 0 0 18px rgba(255,255,255,.85),
+        0 0 20px rgba(255,144,190,.16);
+    }
+
+    /* Hero / Title */
+    .hero {
+      overflow: hidden;
+      animation:
+        heroEnter .72s cubic-bezier(.2,.8,.2,1) both,
+        cardBreath 5.6s ease-in-out 1.2s infinite;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: -100% -30%;
+      background: linear-gradient(
+        110deg,
+        transparent 35%,
+        rgba(255,255,255,.62) 48%,
+        transparent 61%
+      );
+      transform: rotate(8deg);
+      animation: heroSweep 6.5s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    h1 {
+      background: linear-gradient(
+        90deg,
+        #2d2730 0%,
+        #ef4f91 35%,
+        #ff8bb6 55%,
+        #2d2730 100%
+      );
+      background-size: 220% auto;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: titleShine 4.5s linear infinite;
+    }
+
+    .brand-icon {
+      animation:
+        logoFloat 3.8s ease-in-out infinite,
+        logoGlow 3.8s ease-in-out infinite;
+    }
+
+    /* 卡片明顯漂浮 */
+    .card {
+      animation:
+        cardEnter .55s cubic-bezier(.2,.8,.2,1) both,
+        cardBreath 6s ease-in-out 1.5s infinite;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background:
+        linear-gradient(
+          120deg,
+          rgba(255,255,255,.7),
+          rgba(255,133,181,.20),
+          rgba(238,211,255,.32),
+          rgba(255,255,255,.72)
+        );
+      background-size: 240% 240%;
+      animation: borderFlow 7s ease infinite;
+      -webkit-mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+
+    /* 分頁按鈕更有感 */
+    .mode-button {
+      transform-origin: center;
+    }
+
+    .mode-button:not(.active) {
+      animation: tabFloat 4.5s ease-in-out infinite;
+    }
+
+    .mode-button:nth-child(2) {
+      animation-delay: -.8s;
+    }
+
+    .mode-button:nth-child(3) {
+      animation-delay: -1.6s;
+    }
+
+    .mode-button.active {
+      animation:
+        selectedPop .32s ease both,
+        activeGlow 2.8s ease-in-out infinite;
+    }
+
+    /* 欄位逐格進場 */
+    .panel.active .field {
+      opacity: 0;
+      transform: translateY(12px);
+      animation: fieldEnter .42s ease forwards;
+    }
+
+    .panel.active .field:nth-child(1) { animation-delay: .04s; }
+    .panel.active .field:nth-child(2) { animation-delay: .08s; }
+    .panel.active .field:nth-child(3) { animation-delay: .12s; }
+    .panel.active .field:nth-child(4) { animation-delay: .16s; }
+    .panel.active .field:nth-child(5) { animation-delay: .20s; }
+    .panel.active .field:nth-child(6) { animation-delay: .24s; }
+    .panel.active .field:nth-child(7) { animation-delay: .28s; }
+    .panel.active .field:nth-child(8) { animation-delay: .32s; }
+
+    label {
+      position: relative;
+    }
+
+    label::after {
+      content: "✦";
+      margin-left: 6px;
+      color: #f7a2c4;
+      font-size: 10px;
+      opacity: .7;
+      animation: labelSparkle 2.6s ease-in-out infinite;
+    }
+
+    input,
+    select {
+      transition:
+        transform .2s ease,
+        box-shadow .2s ease,
+        border-color .2s ease,
+        background .2s ease;
+    }
+
+    input:hover,
+    select:hover {
+      transform: translateY(-1px);
+      border-color: #efbfd2;
+      background: #fff;
+    }
+
+    input:focus,
+    select:focus {
+      transform: translateY(-2px) scale(1.006);
+      box-shadow:
+        0 0 0 5px rgba(255, 95, 158, 0.11),
+        0 14px 30px rgba(239,55,126,.10);
+    }
+
+    /* 主按鈕更明顯 */
+    .primary {
+      animation:
+        buttonPulse 2.6s ease-in-out infinite,
+        softPulse 3.2s ease-in-out infinite;
+    }
+
+    .primary::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 50% 120%, rgba(255,255,255,.34), transparent 52%);
+      animation: buttonWave 2.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    .primary:hover {
+      transform: translateY(-3px) scale(1.012);
+    }
+
+    /* 分析 Loading 升級 */
+    .loading {
+      position: relative;
+      overflow: hidden;
+      flex-direction: column;
+      min-height: 150px;
+      gap: 12px;
+    }
+
+    .loading::before {
+      content: "";
+      position: absolute;
+      left: 8%;
+      right: 8%;
+      top: 50%;
+      height: 2px;
+      border-radius: 999px;
+      background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255,95,158,.18),
+        rgba(255,95,158,.75),
+        rgba(255,95,158,.18),
+        transparent
+      );
+      box-shadow: 0 0 18px rgba(255,95,158,.25);
+      animation: scanLine 1.55s ease-in-out infinite;
+    }
+
+    .spinner {
+      width: 38px;
+      height: 38px;
+      border-width: 4px;
+      position: relative;
+      z-index: 2;
+      animation:
+        spin .7s linear infinite,
+        spinnerPulse 1.5s ease-in-out infinite;
+    }
+
+    .loading-text {
+      position: relative;
+      z-index: 2;
+      font-weight: 800;
+      background: rgba(255,255,255,.82);
+      padding: 6px 12px;
+      border-radius: 999px;
+      backdrop-filter: blur(8px);
+    }
+
+    /* 結果卡 */
+    .result-card.show {
+      animation: resultReveal .6s cubic-bezier(.16,.84,.44,1) both;
+    }
+
+    .result-content {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .result-content.typing::after {
+      content: "▋";
+      margin-left: 3px;
+      color: #ef4f91;
+      animation: cursorBlink .75s steps(2,end) infinite;
+    }
+
+    .result-content::before {
+      content: "";
+      position: absolute;
+      inset: -70% auto -70% -50%;
+      width: 30%;
+      transform: skewX(-18deg);
+      background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255,255,255,.55),
+        transparent
+      );
+      animation: resultShine 5.5s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    /* 分析完成粒子 */
+    .celebration {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .celebration span {
+      position: absolute;
+      left: 50%;
+      top: 48%;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--particle-color, #ff8fba);
+      box-shadow: 0 0 12px rgba(255,116,175,.3);
+      animation: particleBurst .85s ease-out forwards;
+    }
+
+    /* 登入頁 */
+    #loginPage > div {
+      animation:
+        loginPop .68s cubic-bezier(.16,.84,.44,1) both,
+        loginFloat 5.2s ease-in-out 1.2s infinite;
+    }
+
+    #loginButton {
+      animation:
+        buttonPulse 2.8s ease-in-out infinite,
+        softPulse 3s ease-in-out infinite;
+    }
+
+    /* ===== Keyframes ===== */
+
+    @keyframes animatedBg {
+      0%   { background-position: 0% 0%; }
+      50%  { background-position: 70% 40%; }
+      100% { background-position: 100% 100%; }
+    }
+
+    @keyframes floatUp {
+      0% {
+        transform: translate3d(0, 110vh, 0) rotate(0deg) scale(.8);
+        opacity: 0;
+      }
+      10% { opacity: .18; }
+      60% { opacity: .30; }
+      100% {
+        transform: translate3d(var(--drift, 45px), -20vh, 0) rotate(280deg) scale(1.25);
+        opacity: 0;
+      }
+    }
+
+    @keyframes heroSweep {
+      0%, 58% { transform: translateX(-70%) rotate(8deg); opacity: 0; }
+      68% { opacity: .75; }
+      82%, 100% { transform: translateX(85%) rotate(8deg); opacity: 0; }
+    }
+
+    @keyframes titleShine {
+      to { background-position: -220% center; }
+    }
+
+    @keyframes logoGlow {
+      0%,100% {
+        box-shadow:
+          0 8px 22px rgba(238,72,139,.20),
+          0 0 0 rgba(255,124,176,0);
+      }
+      50% {
+        box-shadow:
+          0 12px 28px rgba(238,72,139,.26),
+          0 0 28px rgba(255,124,176,.22);
+      }
+    }
+
+    @keyframes cardBreath {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+
+    @keyframes borderFlow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    @keyframes tabFloat {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-2px); }
+    }
+
+    @keyframes activeGlow {
+      0%,100% {
+        box-shadow: 0 10px 24px rgba(239,55,126,.22);
+      }
+      50% {
+        box-shadow:
+          0 14px 30px rgba(239,55,126,.30),
+          0 0 22px rgba(255,139,184,.18);
+      }
+    }
+
+    @keyframes fieldEnter {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes labelSparkle {
+      0%,100% { opacity: .25; transform: scale(.8) rotate(0deg); }
+      50% { opacity: 1; transform: scale(1.15) rotate(90deg); }
+    }
+
+    @keyframes buttonPulse {
+      0%,100% { box-shadow: 0 12px 28px rgba(239,55,126,.22); }
+      50% {
+        box-shadow:
+          0 16px 34px rgba(239,55,126,.32),
+          0 0 24px rgba(255,139,184,.15);
+      }
+    }
+
+    @keyframes buttonWave {
+      0%,100% { transform: translateY(8px) scale(.9); opacity: .35; }
+      50% { transform: translateY(-5px) scale(1.08); opacity: .55; }
+    }
+
+    @keyframes scanLine {
+      0%   { transform: translateY(-54px) scaleX(.55); opacity: 0; }
+      15%  { opacity: 1; }
+      50%  { transform: translateY(0) scaleX(1); opacity: 1; }
+      85%  { opacity: 1; }
+      100% { transform: translateY(54px) scaleX(.55); opacity: 0; }
+    }
+
+    @keyframes spinnerPulse {
+      0%,100% { filter: drop-shadow(0 0 0 rgba(255,95,158,0)); }
+      50% { filter: drop-shadow(0 0 10px rgba(255,95,158,.4)); }
+    }
+
+    @keyframes cursorBlink {
+      50% { opacity: 0; }
+    }
+
+    @keyframes resultShine {
+      0%, 68% { left: -50%; opacity: 0; }
+      76% { opacity: .6; }
+      88%,100% { left: 120%; opacity: 0; }
+    }
+
+    @keyframes particleBurst {
+      0% {
+        transform: translate(-50%,-50%) scale(.55);
+        opacity: 1;
+      }
+      100% {
+        transform:
+          translate(
+            calc(-50% + var(--x)),
+            calc(-50% + var(--y))
+          )
+          rotate(var(--r))
+          scale(.1);
+        opacity: 0;
+      }
+    }
+
+    @keyframes loginPop {
+      0% {
+        opacity: 0;
+        transform: translateY(18px) scale(.96);
+      }
+      70% {
+        transform: translateY(-3px) scale(1.008);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes loginFloat {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+
+    @media (max-width: 560px) {
+      .fx-heart,
+      .fx-bubble {
+        opacity: .16;
+      }
+
+      .card,
+      .hero {
+        animation-name: cardEnter;
+        animation-duration: .5s;
+        animation-iteration-count: 1;
+      }
+    }
+
   </style>
 </head>
 
 <body>
+
+  <div class="fx-layer" aria-hidden="true">
+    <span class="fx-heart" style="left:8%;font-size:22px;animation-duration:13s;--drift:38px;"></span>
+    <span class="fx-heart" style="left:23%;font-size:16px;animation-duration:17s;animation-delay:-8s;--drift:-28px;"></span>
+    <span class="fx-heart" style="left:76%;font-size:26px;animation-duration:15s;animation-delay:-4s;--drift:-50px;"></span>
+    <span class="fx-heart" style="left:91%;font-size:18px;animation-duration:18s;animation-delay:-11s;--drift:30px;"></span>
+
+    <span class="fx-bubble" style="left:14%;width:34px;height:34px;animation-duration:16s;animation-delay:-7s;--drift:48px;"></span>
+    <span class="fx-bubble" style="left:42%;width:22px;height:22px;animation-duration:12s;animation-delay:-3s;--drift:-35px;"></span>
+    <span class="fx-bubble" style="left:67%;width:44px;height:44px;animation-duration:20s;animation-delay:-13s;--drift:42px;"></span>
+    <span class="fx-bubble" style="left:84%;width:28px;height:28px;animation-duration:14s;animation-delay:-5s;--drift:-40px;"></span>
+  </div>
+
+
+  <div class="ambient-layer" aria-hidden="true">
+    <span class="ambient-orb"></span>
+    <span class="ambient-orb"></span>
+    <span class="ambient-orb"></span>
+    <span class="ambient-sparkle"></span>
+    <span class="ambient-sparkle"></span>
+    <span class="ambient-sparkle"></span>
+    <span class="ambient-sparkle"></span>
+  </div>
+
   <div id="loginPage" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(135deg,#fff5fa,#fde9f4);">
   <div style="width:100%;max-width:420px;background:#fff;border:1px solid #f3d3e1;border-radius:28px;padding:32px;box-shadow:0 18px 50px rgba(229,92,148,.16);">
     <div style="text-align:center;margin-bottom:24px;">
@@ -483,7 +1383,7 @@
           <h1>芯瑤💕ATG AI助手</h1>
 
           <p class="subtitle">
-            房號分析、續玩判讀與個人近期紀錄，一個頁面全部搞定。
+            依據個人選房邏輯與即時數據進行分析，房號判讀、續玩評估與近期紀錄一次完成。
           </p>
         </div>
       </div>
@@ -718,7 +1618,7 @@
 
       <div class="loading" id="loading">
         <span class="spinner"></span>
-        正在分析房間數據…
+        <span class="loading-text">正在整理房間數據</span>
       </div>
 
       <div class="result-content" id="resultContent"></div>
@@ -829,13 +1729,67 @@
       continueSubmitButton.textContent = "開始續玩分析";
     }
 
+    function burstCelebration() {
+      const layer = document.createElement("div");
+      layer.className = "celebration";
+
+      const colors = ["#ff83b5", "#ffc0d8", "#f0c8ff", "#ffd8e7", "#ffffff"];
+
+      for (let i = 0; i < 22; i++) {
+        const p = document.createElement("span");
+        const angle = (Math.PI * 2 * i) / 22 + Math.random() * .25;
+        const distance = 70 + Math.random() * 135;
+        const x = Math.cos(angle) * distance;
+        const y = Math.sin(angle) * distance;
+
+        p.style.setProperty("--x", `${x}px`);
+        p.style.setProperty("--y", `${y}px`);
+        p.style.setProperty("--r", `${Math.random() * 240 - 120}deg`);
+        p.style.setProperty("--particle-color", colors[i % colors.length]);
+
+        if (i % 4 === 0) {
+          p.style.borderRadius = "2px";
+        }
+
+        layer.appendChild(p);
+      }
+
+      document.body.appendChild(layer);
+      setTimeout(() => layer.remove(), 950);
+    }
+
+    function typeResultText(text) {
+      resultContent.classList.add("typing");
+      resultContent.textContent = "";
+
+      const chars = Array.from(String(text));
+      let index = 0;
+      const step = Math.max(6, Math.min(16, 900 / Math.max(chars.length, 1)));
+
+      function typeNext() {
+        const chunk = chars.slice(index, index + 3).join("");
+        resultContent.textContent += chunk;
+        index += 3;
+
+        if (index < chars.length) {
+          setTimeout(typeNext, step);
+        } else {
+          resultContent.classList.remove("typing");
+        }
+      }
+
+      typeNext();
+    }
+
     function showResult(text) {
       loading.classList.remove("show");
       resultContent.style.display = "block";
       resultContent.classList.remove("error");
-      resultContent.textContent = text;
       resultBadge.textContent = "分析完成";
       restoreButtons();
+
+      burstCelebration();
+      typeResultText(text);
     }
 
     function showError(message) {
