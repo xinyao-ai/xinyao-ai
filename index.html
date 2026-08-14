@@ -1528,10 +1528,447 @@
       }
     }
 
+
+    /* ===== V4｜明顯動畫完整版（只改外觀/轉場，不動分析邏輯） ===== */
+
+    .screen-transition {
+      position: fixed;
+      inset: 0;
+      z-index: 9998;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at center, rgba(255,255,255,.92), rgba(255,231,241,.88) 45%, rgba(250,228,255,.78));
+      backdrop-filter: blur(10px);
+      opacity: 0;
+    }
+
+    .screen-transition.show {
+      display: flex;
+      animation: transitionFade .95s ease both;
+    }
+
+    .transition-core {
+      position: relative;
+      width: 128px;
+      height: 128px;
+      display: grid;
+      place-items: center;
+    }
+
+    .transition-ring,
+    .transition-ring::before,
+    .transition-ring::after {
+      position: absolute;
+      inset: 0;
+      content: "";
+      border-radius: 50%;
+      border: 2px solid rgba(255,123,175,.35);
+      box-shadow: 0 0 28px rgba(255,123,175,.16);
+    }
+
+    .transition-ring {
+      animation: ringExpand 1.25s ease-out infinite;
+    }
+
+    .transition-ring::before {
+      animation: ringExpand 1.25s .18s ease-out infinite;
+    }
+
+    .transition-ring::after {
+      animation: ringExpand 1.25s .36s ease-out infinite;
+    }
+
+    .transition-check {
+      position: relative;
+      z-index: 2;
+      width: 64px;
+      height: 64px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: white;
+      background: linear-gradient(135deg, #ff8fba, #ef4f91);
+      box-shadow: 0 12px 28px rgba(239,79,145,.28), 0 0 26px rgba(255,143,186,.28);
+      font-size: 30px;
+      font-weight: 900;
+      animation: checkPop .55s cubic-bezier(.2,.9,.3,1.2) both;
+    }
+
+    .transition-label {
+      position: absolute;
+      top: 148px;
+      width: 220px;
+      text-align: center;
+      color: #7d5d6a;
+      font-weight: 900;
+      letter-spacing: .5px;
+      animation: labelFade .55s .18s ease both;
+    }
+
+    /* 分析中完整舞台 */
+    .analysis-stage {
+      display: none;
+      position: relative;
+      overflow: hidden;
+      min-height: 210px;
+      padding: 18px 14px 16px;
+      border: 1px solid rgba(244,216,229,.88);
+      border-radius: 22px;
+      background:
+        radial-gradient(circle at 50% 38%, rgba(255,220,234,.46), transparent 34%),
+        linear-gradient(180deg, rgba(255,255,255,.96), rgba(255,248,252,.94));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 12px 28px rgba(227,103,154,.08);
+    }
+
+    .analysis-stage.show {
+      display: block;
+      animation: stageIn .35s ease both;
+    }
+
+    .scanner-wrap {
+      position: relative;
+      width: 112px;
+      height: 112px;
+      margin: 4px auto 14px;
+    }
+
+    .scanner-orbit,
+    .scanner-orbit::before,
+    .scanner-orbit::after {
+      position: absolute;
+      inset: 0;
+      content: "";
+      border-radius: 50%;
+      border: 1px solid rgba(255,118,171,.24);
+    }
+
+    .scanner-orbit {
+      animation: rotateOrbit 2.8s linear infinite;
+    }
+
+    .scanner-orbit::before {
+      inset: 13px;
+      border-color: rgba(239,79,145,.34);
+      animation: rotateOrbit 2.1s linear infinite reverse;
+    }
+
+    .scanner-orbit::after {
+      inset: 27px;
+      border-color: rgba(255,181,211,.52);
+      animation: rotateOrbit 1.7s linear infinite;
+    }
+
+    .scanner-dot {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 34px;
+      height: 34px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 35% 30%, #fff 0 9%, #ffbfd8 10% 28%, #ff7dad 29% 58%, #ee4f91 59% 100%);
+      box-shadow: 0 0 22px rgba(255,114,169,.45);
+      animation: corePulse 1.3s ease-in-out infinite;
+    }
+
+    .scanner-beam {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 52px;
+      height: 52px;
+      transform-origin: 0 0;
+      background: conic-gradient(from 0deg, rgba(255,114,169,.28), transparent 20%);
+      clip-path: polygon(0 0, 100% 0, 0 100%);
+      animation: beamSpin 1.7s linear infinite;
+      opacity: .9;
+    }
+
+    .progress-shell {
+      width: min(100%, 420px);
+      height: 12px;
+      margin: 0 auto;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #fdeaf2;
+      box-shadow: inset 0 1px 4px rgba(223,95,147,.08);
+    }
+
+    .progress-bar {
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #ffb9d4, #ff78ad, #ef4f91, #eebfff);
+      background-size: 220% 100%;
+      box-shadow: 0 0 18px rgba(239,79,145,.18);
+      animation: progressGradient 2.6s linear infinite;
+      transition: width .32s ease;
+    }
+
+    .analysis-status {
+      margin-top: 12px;
+      color: #6e5a63;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 900;
+      min-height: 22px;
+      animation: statusPulse 1.3s ease-in-out infinite;
+    }
+
+    .analysis-percent {
+      margin-top: 4px;
+      color: #ec5c95;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    /* 結果評分圈 */
+    .score-visual {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      margin: 2px 0 18px;
+    }
+
+    .score-visual.show {
+      display: flex;
+      animation: scoreBlockIn .45s ease both;
+    }
+
+    .score-ring {
+      --score: 0;
+      position: relative;
+      width: 122px;
+      height: 122px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background:
+        conic-gradient(#ef4f91 calc(var(--score) * 1%), #ffe5ef 0);
+      box-shadow:
+        0 14px 34px rgba(239,79,145,.18),
+        0 0 22px rgba(255,177,209,.16);
+      animation: ringGlow 2.8s ease-in-out infinite;
+    }
+
+    .score-ring::before {
+      content: "";
+      position: absolute;
+      inset: 10px;
+      border-radius: 50%;
+      background: linear-gradient(145deg, #fff, #fff7fb);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.95);
+    }
+
+    .score-number {
+      position: relative;
+      z-index: 2;
+      color: #3d3037;
+      font-size: 30px;
+      font-weight: 1000;
+      letter-spacing: -1px;
+    }
+
+    .score-number small {
+      margin-left: 2px;
+      color: #9d7c8a;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .score-stars {
+      margin-left: 18px;
+      min-width: 138px;
+    }
+
+    .score-stars-title {
+      margin-bottom: 7px;
+      color: #8a6d7a;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .star-line {
+      letter-spacing: 3px;
+      font-size: 20px;
+      line-height: 1.5;
+      color: #e7d5dc;
+    }
+
+    .star-line .lit {
+      display: inline-block;
+      color: #f4b83f;
+      text-shadow: 0 0 12px rgba(244,184,63,.28);
+      animation: starPop .34s cubic-bezier(.2,.9,.3,1.2) both;
+    }
+
+    /* 分頁滑動動畫 */
+    .panel.slide-out-left {
+      display: block !important;
+      animation: slideOutLeft .25s ease both;
+    }
+
+    .panel.slide-out-right {
+      display: block !important;
+      animation: slideOutRight .25s ease both;
+    }
+
+    .panel.slide-in-left {
+      display: block !important;
+      animation: slideInLeft .35s cubic-bezier(.2,.8,.2,1) both;
+    }
+
+    .panel.slide-in-right {
+      display: block !important;
+      animation: slideInRight .35s cubic-bezier(.2,.8,.2,1) both;
+    }
+
+    /* 點擊水波 */
+    .ripple {
+      position: absolute;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255,255,255,.42);
+      pointer-events: none;
+      animation: rippleOut .58s ease-out forwards;
+    }
+
+    /* 游標柔光跟隨（桌機） */
+    .pointer-glow {
+      position: fixed;
+      z-index: -1;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      pointer-events: none;
+      background: radial-gradient(circle, rgba(255,155,196,.18), transparent 68%);
+      transform: translate(-50%, -50%);
+      transition: left .12s ease-out, top .12s ease-out;
+      filter: blur(2px);
+    }
+
+    @media (hover: none) {
+      .pointer-glow { display: none; }
+    }
+
+    @media (max-width: 560px) {
+      .score-visual {
+        flex-direction: column;
+      }
+
+      .score-stars {
+        margin: 12px 0 0;
+        text-align: center;
+      }
+    }
+
+    @keyframes transitionFade {
+      0% { opacity: 0; }
+      20%, 70% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    @keyframes ringExpand {
+      0% { transform: scale(.35); opacity: .9; }
+      100% { transform: scale(1.45); opacity: 0; }
+    }
+
+    @keyframes checkPop {
+      0% { transform: scale(.4) rotate(-18deg); opacity: 0; }
+      70% { transform: scale(1.08) rotate(4deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0); }
+    }
+
+    @keyframes labelFade {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes stageIn {
+      from { opacity: 0; transform: translateY(8px) scale(.99); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes rotateOrbit {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes beamSpin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes corePulse {
+      0%,100% { transform: translate(-50%, -50%) scale(.92); }
+      50% { transform: translate(-50%, -50%) scale(1.08); }
+    }
+
+    @keyframes progressGradient {
+      to { background-position: -220% 0; }
+    }
+
+    @keyframes statusPulse {
+      0%,100% { opacity: .62; }
+      50% { opacity: 1; }
+    }
+
+    @keyframes scoreBlockIn {
+      from { opacity: 0; transform: translateY(10px) scale(.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes ringGlow {
+      0%,100% { box-shadow: 0 14px 34px rgba(239,79,145,.16), 0 0 18px rgba(255,177,209,.12); }
+      50% { box-shadow: 0 16px 38px rgba(239,79,145,.22), 0 0 30px rgba(255,177,209,.22); }
+    }
+
+    @keyframes starPop {
+      0% { transform: scale(.25) rotate(-20deg); opacity: 0; }
+      70% { transform: scale(1.18) rotate(5deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0); }
+    }
+
+    @keyframes slideOutLeft {
+      to { opacity: 0; transform: translateX(-30px); }
+    }
+
+    @keyframes slideOutRight {
+      to { opacity: 0; transform: translateX(30px); }
+    }
+
+    @keyframes slideInLeft {
+      from { opacity: 0; transform: translateX(-34px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes slideInRight {
+      from { opacity: 0; transform: translateX(34px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes rippleOut {
+      from { width: 0; height: 0; opacity: .55; }
+      to { width: 240px; height: 240px; opacity: 0; }
+    }
+
   </style>
 </head>
 
 <body>
+
+  <div class="screen-transition" id="screenTransition" aria-hidden="true">
+    <div class="transition-core">
+      <div class="transition-ring"></div>
+      <div class="transition-check">✓</div>
+      <div class="transition-label">會員驗證成功</div>
+    </div>
+  </div>
+  <div class="pointer-glow" id="pointerGlow" aria-hidden="true"></div>
+
 
   <div class="fx-layer" aria-hidden="true">
     <span class="fx-heart" style="left:8%;font-size:22px;animation-duration:13s;--drift:38px;"></span>
@@ -1844,9 +2281,30 @@
         </span>
       </div>
 
+      
       <div class="loading" id="loading">
-        <span class="spinner"></span>
-        <span class="loading-text">正在整理房間數據</span>
+        <div class="analysis-stage" id="analysisStage">
+          <div class="scanner-wrap">
+            <div class="scanner-orbit"></div>
+            <div class="scanner-beam"></div>
+            <div class="scanner-dot"></div>
+          </div>
+          <div class="progress-shell">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+          <div class="analysis-status" id="analysisStatus">正在讀取房號資料</div>
+          <div class="analysis-percent" id="analysisPercent">0%</div>
+        </div>
+      </div>
+
+      <div class="score-visual" id="scoreVisual">
+        <div class="score-ring" id="scoreRing">
+          <div class="score-number"><span id="scoreNumber">0</span><small>分</small></div>
+        </div>
+        <div class="score-stars">
+          <div class="score-stars-title">綜合評級</div>
+          <div class="star-line" id="starLine">☆☆☆☆☆</div>
+        </div>
       </div>
 
       <div class="result-content" id="resultContent"></div>
@@ -1876,6 +2334,16 @@
     const resultBadge = $("resultBadge");
     const loading = $("loading");
     const historyList = $("historyList");
+    const screenTransition = $("screenTransition");
+    const analysisStage = $("analysisStage");
+    const progressBar = $("progressBar");
+    const analysisStatus = $("analysisStatus");
+    const analysisPercent = $("analysisPercent");
+    const scoreVisual = $("scoreVisual");
+    const scoreRing = $("scoreRing");
+    const scoreNumber = $("scoreNumber");
+    const starLine = $("starLine");
+    const pointerGlow = $("pointerGlow");
     const memberDisplay = $("memberDisplay");
     const logoutButton = $("logoutButton");
 
@@ -1897,6 +2365,7 @@
       loginMessage.style.display = "none";
       loginPage.style.display = "none";
       appPage.style.display = "block";
+      playLoginTransition();
       renderHistory();
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -1942,12 +2411,135 @@
       }
     }
 
+    
+    let progressTimer = null;
+
+    function runAnalysisProgress() {
+      const steps = [
+        [18, "正在讀取房號資料"],
+        [42, "正在比對目前條件"],
+        [68, "正在計算房間評分"],
+        [88, "正在整理分析結果"],
+        [96, "即將完成"]
+      ];
+
+      analysisStage.classList.add("show");
+      progressBar.style.width = "0%";
+      analysisPercent.textContent = "0%";
+      analysisStatus.textContent = steps[0][1];
+
+      let current = 0;
+      let targetIndex = 0;
+
+      clearInterval(progressTimer);
+
+      progressTimer = setInterval(() => {
+        if (targetIndex < steps.length && current >= steps[targetIndex][0]) {
+          analysisStatus.textContent = steps[targetIndex][1];
+          targetIndex += 1;
+        }
+
+        if (current < 96) {
+          current += current < 70 ? 2 : 1;
+          progressBar.style.width = `${current}%`;
+          analysisPercent.textContent = `${current}%`;
+        }
+      }, 42);
+    }
+
+    function finishAnalysisProgress() {
+      clearInterval(progressTimer);
+      progressBar.style.width = "100%";
+      analysisPercent.textContent = "100%";
+      analysisStatus.textContent = "分析完成";
+    }
+
+    function extractScore(text) {
+      const match =
+        String(text).match(/綜合評分[:：]\s*(\d+(?:\.\d+)?)\s*分/) ||
+        String(text).match(/評分[:：]\s*(\d+(?:\.\d+)?)\s*分/);
+
+      if (!match) return null;
+
+      return Math.max(0, Math.min(100, Number(match[1])));
+    }
+
+    function scoreToStars(score) {
+      if (score >= 95) return 5;
+      if (score >= 85) return 4;
+      if (score >= 75) return 3;
+      if (score >= 65) return 2;
+      return 1;
+    }
+
+    function animateScore(score) {
+      if (score === null || !Number.isFinite(score)) {
+        scoreVisual.classList.remove("show");
+        return;
+      }
+
+      scoreVisual.classList.add("show");
+
+      const duration = 900;
+      const start = performance.now();
+
+      function tick(now) {
+        const p = Math.min(1, (now - start) / duration);
+        const eased = 1 - Math.pow(1 - p, 3);
+        const value = Math.round(score * eased);
+
+        scoreNumber.textContent = value;
+        scoreRing.style.setProperty("--score", value);
+
+        if (p < 1) requestAnimationFrame(tick);
+      }
+
+      requestAnimationFrame(tick);
+
+      const starCount = scoreToStars(score);
+      starLine.innerHTML = "";
+
+      for (let i = 1; i <= 5; i++) {
+        const span = document.createElement("span");
+        span.textContent = "★";
+
+        if (i <= starCount) {
+          span.className = "lit";
+          span.style.animationDelay = `${(i - 1) * 90}ms`;
+        }
+
+        starLine.appendChild(span);
+      }
+    }
+
+    function playLoginTransition() {
+      screenTransition.classList.remove("show");
+      void screenTransition.offsetWidth;
+      screenTransition.classList.add("show");
+
+      setTimeout(() => {
+        screenTransition.classList.remove("show");
+      }, 950);
+    }
+
+    function addRipple(event, button) {
+      const rect = button.getBoundingClientRect();
+      const ripple = document.createElement("span");
+      ripple.className = "ripple";
+      ripple.style.left = `${event.clientX - rect.left}px`;
+      ripple.style.top = `${event.clientY - rect.top}px`;
+      button.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 650);
+    }
+
     function showLoading(button, text) {
       resultCard.classList.add("show");
       loading.classList.add("show");
       resultContent.style.display = "none";
       resultContent.classList.remove("error");
       resultBadge.textContent = "分析中";
+      scoreVisual.classList.remove("show");
+      runAnalysisProgress();
       button.disabled = true;
       button.textContent = text;
       resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -2013,10 +2605,13 @@
     }
 
     function showResult(text) {
+      finishAnalysisProgress();
       loading.classList.remove("show");
+      analysisStage.classList.remove("show");
       resultContent.style.display = "block";
       resultContent.classList.remove("error");
       resultBadge.textContent = "分析完成";
+      animateScore(extractScore(text));
       restoreButtons();
 
       burstCelebration();
@@ -2024,7 +2619,10 @@
     }
 
     function showError(message) {
+      clearInterval(progressTimer);
       loading.classList.remove("show");
+      analysisStage.classList.remove("show");
+      scoreVisual.classList.remove("show");
       resultContent.style.display = "block";
       resultContent.classList.add("error");
       resultContent.textContent = message;
@@ -2244,16 +2842,37 @@
 
     document.querySelectorAll(".mode-button").forEach((button) => {
       button.addEventListener("click", () => {
-        document.querySelectorAll(".mode-button").forEach((item) => {
-          item.classList.remove("active");
-        });
+        const buttons = Array.from(document.querySelectorAll(".mode-button"));
+        const panels = Array.from(document.querySelectorAll(".panel"));
+        const oldButton = document.querySelector(".mode-button.active");
+        const oldPanel = document.querySelector(".panel.active");
 
-        document.querySelectorAll(".panel").forEach((panel) => {
-          panel.classList.remove("active");
-        });
+        if (oldButton === button) return;
 
+        const oldIndex = buttons.indexOf(oldButton);
+        const newIndex = buttons.indexOf(button);
+        const goRight = newIndex > oldIndex;
+        const newPanel = $(button.dataset.panel);
+
+        oldButton?.classList.remove("active");
         button.classList.add("active");
-        $(button.dataset.panel).classList.add("active");
+
+        if (oldPanel) {
+          oldPanel.classList.remove("active");
+          oldPanel.classList.add(goRight ? "slide-out-left" : "slide-out-right");
+
+          setTimeout(() => {
+            oldPanel.classList.remove("slide-out-left", "slide-out-right");
+          }, 260);
+        }
+
+        newPanel.classList.add(goRight ? "slide-in-right" : "slide-in-left");
+
+        setTimeout(() => {
+          newPanel.classList.remove("slide-in-right", "slide-in-left");
+          newPanel.classList.add("active");
+        }, 25);
+
         resultCard.classList.remove("show");
 
         if (button.dataset.panel === "historyPanel") {
@@ -2274,6 +2893,13 @@
       loginPage.style.display = "flex";
       resultCard.classList.remove("show");
       window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    
+    window.addEventListener("pointermove", (event) => {
+      if (!pointerGlow) return;
+      pointerGlow.style.left = `${event.clientX}px`;
+      pointerGlow.style.top = `${event.clientY}px`;
     });
 
     loginButton.addEventListener("click", verifyMember);
