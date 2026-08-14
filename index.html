@@ -1309,6 +1309,225 @@
       }
     }
 
+
+    /* ===== V3｜會員列＋外觀動畫強化（不動分析邏輯） ===== */
+
+    .app-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      margin: 0 2px 12px;
+      animation: topbarEnter .48s ease both;
+    }
+
+    .member-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 70%;
+      min-height: 38px;
+      padding: 7px 12px;
+      color: #6e5360;
+      border: 1px solid rgba(240, 199, 217, .88);
+      border-radius: 999px;
+      background: rgba(255,255,255,.78);
+      box-shadow:
+        0 8px 22px rgba(226,105,155,.09),
+        inset 0 1px 0 rgba(255,255,255,.9);
+      backdrop-filter: blur(14px);
+      font-size: 13px;
+      font-weight: 800;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      animation: memberGlow 4s ease-in-out infinite;
+    }
+
+    .member-pill::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      flex: 0 0 8px;
+      border-radius: 50%;
+      background: #ff78ad;
+      box-shadow: 0 0 0 4px rgba(255,120,173,.12), 0 0 12px rgba(255,120,173,.45);
+      animation: onlinePulse 2s ease-in-out infinite;
+    }
+
+    .logout-button {
+      min-height: 38px;
+      padding: 0 14px;
+      color: #e54d87;
+      border: 1px solid rgba(240, 196, 216, .9);
+      border-radius: 999px;
+      background: rgba(255,245,250,.9);
+      box-shadow: 0 8px 18px rgba(223,90,146,.07);
+      font-size: 13px;
+      font-weight: 900;
+      transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+    }
+
+    .logout-button:hover {
+      transform: translateY(-2px);
+      background: #fff;
+      box-shadow: 0 12px 24px rgba(223,90,146,.12);
+    }
+
+    .brand {
+      position: relative;
+      z-index: 2;
+    }
+
+    .brand::after {
+      content: "✦";
+      position: absolute;
+      right: 2%;
+      top: -7px;
+      color: rgba(255,120,173,.72);
+      font-size: 16px;
+      text-shadow: 0 0 14px rgba(255,120,173,.35);
+      animation: cornerSpark 2.7s ease-in-out infinite;
+    }
+
+    /* 頁面輕微景深 */
+    .page::before {
+      content: "";
+      position: fixed;
+      z-index: -1;
+      width: 280px;
+      height: 280px;
+      left: 50%;
+      top: 42%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,181,211,.16), transparent 68%);
+      animation: centerAura 7s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    /* 卡片滑過有微微浮起 */
+    .card:hover,
+    .hero:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        0 20px 52px rgba(229,92,148,.18),
+        inset 0 1px 0 rgba(255,255,255,.78);
+    }
+
+    /* 結果徽章有呼吸亮點 */
+    .result-badge::after {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      margin-left: 6px;
+      border-radius: 50%;
+      background: #ff78ad;
+      box-shadow: 0 0 10px rgba(255,120,173,.55);
+      animation: onlinePulse 1.8s ease-in-out infinite;
+      vertical-align: middle;
+    }
+
+    /* 分析按鈕加一道流動光框 */
+    .primary {
+      isolation: isolate;
+    }
+
+    .primary .btn-glow-ring {
+      position: absolute;
+      inset: 1px;
+      z-index: -1;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #ffbdd5, #fff, #efb9ff, #ffbdd5);
+      background-size: 240% 100%;
+      opacity: .3;
+      animation: buttonBorderFlow 4s linear infinite;
+      pointer-events: none;
+    }
+
+    /* 分析結果區域背景呼吸 */
+    .result-card.show .result-content {
+      animation:
+        resultSurfaceIn .5s ease both,
+        resultSurfaceGlow 4.8s ease-in-out .6s infinite;
+    }
+
+    /* 登入按鈕與主按鈕文字微光 */
+    #loginButton,
+    .primary {
+      text-shadow: 0 1px 8px rgba(255,255,255,.3);
+    }
+
+    /* 行動版會員列 */
+    @media (max-width: 560px) {
+      .app-topbar {
+        margin-bottom: 10px;
+      }
+
+      .member-pill {
+        max-width: calc(100% - 84px);
+        padding-left: 10px;
+        padding-right: 10px;
+      }
+
+      .logout-button {
+        padding: 0 12px;
+      }
+
+      .card:hover,
+      .hero:hover {
+        transform: none;
+      }
+    }
+
+    @keyframes topbarEnter {
+      from { opacity: 0; transform: translateY(-7px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes memberGlow {
+      0%,100% {
+        box-shadow: 0 8px 22px rgba(226,105,155,.08), inset 0 1px 0 rgba(255,255,255,.9);
+      }
+      50% {
+        box-shadow: 0 10px 26px rgba(226,105,155,.14), 0 0 18px rgba(255,155,194,.08), inset 0 1px 0 rgba(255,255,255,.9);
+      }
+    }
+
+    @keyframes onlinePulse {
+      0%,100% { transform: scale(.86); opacity: .62; }
+      50% { transform: scale(1.12); opacity: 1; }
+    }
+
+    @keyframes cornerSpark {
+      0%,100% { opacity: .22; transform: scale(.75) rotate(0deg); }
+      50% { opacity: 1; transform: scale(1.2) rotate(90deg); }
+    }
+
+    @keyframes centerAura {
+      0%,100% { transform: translate(-50%, -50%) scale(.9); opacity: .45; }
+      50% { transform: translate(-50%, -50%) scale(1.14); opacity: .8; }
+    }
+
+    @keyframes buttonBorderFlow {
+      to { background-position: -240% 0; }
+    }
+
+    @keyframes resultSurfaceIn {
+      from { opacity: 0; transform: translateY(8px) scale(.99); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes resultSurfaceGlow {
+      0%,100% {
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 12px 26px rgba(227,103,154,.07);
+      }
+      50% {
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 16px 34px rgba(227,103,154,.13), 0 0 24px rgba(255,181,211,.09);
+      }
+    }
+
   </style>
 </head>
 
@@ -1370,6 +1589,14 @@
   </div>
 </div>
   <main id="appPage" class="page" style="display:none;">
+
+    <div class="app-topbar">
+      <div class="member-pill" id="memberPill">
+        會員：<span id="memberDisplay">--</span>
+      </div>
+      <button class="logout-button" id="logoutButton" type="button">登出</button>
+    </div>
+
     <section class="hero">
       <div class="brand">
         <img
@@ -1511,6 +1738,7 @@
             id="submitButton"
             type="submit"
           >
+            <span class="btn-glow-ring" aria-hidden="true"></span>
             開始分析
           </button>
         </div>
@@ -1589,7 +1817,7 @@
 
           <div class="actions">
             <button class="secondary" id="continueClearButton" type="button">清除</button>
-            <button class="primary" id="continueSubmitButton" type="submit">開始續玩分析</button>
+            <button class="primary" id="continueSubmitButton" type="submit"><span class="btn-glow-ring" aria-hidden="true"></span>開始續玩分析</button>
           </div>
         </form>
       </div>
@@ -1648,6 +1876,8 @@
     const resultBadge = $("resultBadge");
     const loading = $("loading");
     const historyList = $("historyList");
+    const memberDisplay = $("memberDisplay");
+    const logoutButton = $("logoutButton");
 
     let loggedInMember = sessionStorage.getItem("memberAccount") || "";
 
@@ -1662,6 +1892,7 @@
 
     function openAnalyzer(memberAccount) {
       loggedInMember = memberAccount;
+      memberDisplay.textContent = memberAccount;
       sessionStorage.setItem("memberAccount", memberAccount);
       loginMessage.style.display = "none";
       loginPage.style.display = "none";
@@ -2031,6 +2262,18 @@
 
         window.scrollTo({ top: 0, behavior: "smooth" });
       });
+    });
+
+
+    logoutButton.addEventListener("click", () => {
+      sessionStorage.removeItem("memberAccount");
+      loggedInMember = "";
+      memberDisplay.textContent = "--";
+      memberAccountInput.value = "";
+      appPage.style.display = "none";
+      loginPage.style.display = "flex";
+      resultCard.classList.remove("show");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     });
 
     loginButton.addEventListener("click", verifyMember);
