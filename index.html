@@ -2063,10 +2063,107 @@
       .login-line-button { margin: 6px 0 0; }
     }
 
+
+    /* ===== LINE 按鈕右側定位 ===== */
+    .login-notice-line.line-contact-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .login-notice-line.line-contact-row .contact-text {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .login-notice-line.line-contact-row .login-line-button {
+      flex: 0 0 auto;
+      margin: 0;
+      min-width: 108px;
+    }
+
+    @media (max-width: 560px) {
+      .login-notice-line.line-contact-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .login-notice-line.line-contact-row .contact-text {
+        flex: 1;
+      }
+
+      .login-notice-line.line-contact-row .login-line-button {
+        margin: 0;
+        min-width: 104px;
+        padding: 0 10px;
+      }
+    }
+
+
+    /* ===== 登入後小型 LINE 按鈕 ===== */
+    .app-line-float {
+      position: fixed;
+      right: 14px;
+      bottom: calc(16px + env(safe-area-inset-bottom));
+      z-index: 40;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      min-width: 76px;
+      height: 38px;
+      padding: 0 12px;
+      border-radius: 999px;
+      color: #fff;
+      background: linear-gradient(135deg, #2bd66b, #10c85a);
+      box-shadow: 0 10px 24px rgba(18, 201, 90, .22);
+      font-size: 12px;
+      font-weight: 1000;
+      text-decoration: none;
+      transition: transform .18s ease, box-shadow .18s ease;
+      animation: appLineFloat 2.8s ease-in-out infinite;
+    }
+
+    .app-line-float:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 13px 28px rgba(18, 201, 90, .28);
+    }
+
+    .app-line-float.show {
+      display: inline-flex;
+    }
+
+    @keyframes appLineFloat {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+
+    @media (max-width: 560px) {
+      .app-line-float {
+        right: 10px;
+        bottom: calc(12px + env(safe-area-inset-bottom));
+        min-width: 70px;
+        height: 36px;
+        padding: 0 10px;
+        font-size: 11px;
+      }
+    }
+
   </style>
 </head>
 
 <body>
+
+  <a
+    class="app-line-float"
+    id="appLineFloat"
+    href="https://lin.ee/OT3Ngd6"
+    target="_blank"
+    rel="noopener noreferrer"
+  >LINE</a>
+
 <div class="screen-transition" id="screenTransition" aria-hidden="true">
     <div class="transition-core">
       <div class="transition-ring"></div>
@@ -2142,8 +2239,8 @@
         🔔 務必輸入您的【<strong>皇鼎會員帳號</strong>】
       </div>
 
-      <div class="login-notice-line">
-        ⚠️ 若無法登入，至 LINE 官方聯繫我即可
+      <div class="login-notice-line line-contact-row">
+        <span class="contact-text">⚠️ 若無法登入，至 LINE 官方聯繫我即可</span>
         <a class="login-line-button" href="https://lin.ee/OT3Ngd6" target="_blank" rel="noopener noreferrer">💬 官方LINE</a>
       </div>
 
@@ -2477,6 +2574,7 @@
     const pointerGlow = $("pointerGlow");
     const memberDisplay = $("memberDisplay");
     const logoutButton = $("logoutButton");
+    const appLineFloat = $("appLineFloat");
 
     let loggedInMember = sessionStorage.getItem("memberAccount") || "";
 
@@ -2496,6 +2594,7 @@
       loginMessage.style.display = "none";
       loginPage.style.display = "none";
       appPage.style.display = "block";
+      appLineFloat.classList.add("show");
       playLoginTransition();
       renderHistory();
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2832,6 +2931,7 @@
       if (!loggedInMember) {
         loginPage.style.display = "flex";
         appPage.style.display = "none";
+      appLineFloat.classList.remove("show");
         showLoginMessage("登入狀態已失效，請重新輸入會員帳號");
         return;
       }
