@@ -2277,6 +2277,63 @@
       }
     }
 
+
+    /* ===== LINE 聯絡文字強制單行 ===== */
+    .login-notice-line.line-contact-row {
+      grid-template-columns: minmax(0, 1fr) auto !important;
+      gap: 6px !important;
+    }
+
+    .login-notice-line.line-contact-row .contact-text {
+      white-space: nowrap !important;
+      overflow: visible !important;
+      font-size: 10.5px !important;
+      letter-spacing: -0.35px !important;
+    }
+
+    .login-notice-line.line-contact-row .login-line-button {
+      min-width: 70px !important;
+      height: 31px !important;
+      padding: 0 7px !important;
+      font-size: 9.5px !important;
+    }
+
+    @media (max-width: 390px) {
+      .login-notice-line.line-contact-row .contact-text {
+        font-size: 9.8px !important;
+        letter-spacing: -0.45px !important;
+      }
+      .login-notice-line.line-contact-row .login-line-button {
+        min-width: 66px !important;
+        padding: 0 6px !important;
+        font-size: 9px !important;
+      }
+    }
+
+
+    /* ===== 僅修正電腦版 LINE 排版 ===== */
+    @media (min-width: 561px) {
+      .login-notice-line.line-contact-row {
+        grid-template-columns: minmax(0, 1fr) auto !important;
+        gap: 10px !important;
+      }
+
+      .login-notice-line.line-contact-row .contact-text {
+        white-space: nowrap !important;
+        font-size: 13px !important;
+        letter-spacing: -0.15px !important;
+      }
+
+      .login-notice-line.line-contact-row .login-line-button {
+        min-width: 82px !important;
+        width: 82px !important;
+        height: 34px !important;
+        padding: 0 7px !important;
+        margin-left: 4px !important;
+        font-size: 10px !important;
+      }
+    }
+
   </style>
 </head>
 
