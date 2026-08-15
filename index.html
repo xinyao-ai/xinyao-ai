@@ -2029,6 +2029,85 @@
     }
     body.page-hidden .marble-float,body.page-hidden .marble-float img{animation-play-state:paused!important}
 
+
+    /* ===== V5.1｜背景彈珠可視修正 ===== */
+
+    /* 彈珠層放在背景上方、內容下方 */
+    .marble-bg {
+      z-index: 1 !important;
+    }
+
+    #loginPage,
+    #appPage {
+      position: relative;
+      z-index: 3 !important;
+    }
+
+    /* 主要卡片改成玻璃感，讓彈珠可以淡淡透出 */
+    .hero,
+    .card,
+    .mode-grid,
+    .app-topbar {
+      background: rgba(255,255,255,.78) !important;
+      backdrop-filter: blur(14px) saturate(1.08);
+      -webkit-backdrop-filter: blur(14px) saturate(1.08);
+    }
+
+    .hero {
+      background:
+        linear-gradient(
+          135deg,
+          rgba(255,255,255,.84),
+          rgba(255,239,246,.76)
+        ) !important;
+    }
+
+    .card {
+      background: rgba(255,255,255,.80) !important;
+    }
+
+    /* 三個功能按鈕外層也不要全白死蓋 */
+    .mode-grid {
+      padding: 12px;
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,.76);
+      box-shadow: 0 14px 34px rgba(229,92,148,.10);
+    }
+
+    /* 表單輸入框維持清楚，不讓彈珠干擾閱讀 */
+    input,
+    select {
+      background: rgba(255,250,253,.92) !important;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    /* 手機版彈珠稍微更明顯 */
+    @media (max-width: 700px) {
+      .marble-float {
+        opacity: .34 !important;
+      }
+
+      .hero,
+      .card,
+      .mode-grid {
+        background: rgba(255,255,255,.74) !important;
+      }
+
+      .hero {
+        background:
+          linear-gradient(
+            135deg,
+            rgba(255,255,255,.80),
+            rgba(255,239,246,.72)
+          ) !important;
+      }
+
+      .card {
+        background: rgba(255,255,255,.76) !important;
+      }
+    }
+
   </style>
 </head>
 
