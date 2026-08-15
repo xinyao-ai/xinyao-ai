@@ -2336,7 +2336,7 @@
 
   
 
-    /* ===== 登入 LOGO｜愛心版本 ===== */
+    /* ===== 登入 LOGO｜粉色 $ 金幣版本 ===== */
     .login-logo-stage {
       position: relative;
       width: 190px;
@@ -2354,17 +2354,43 @@
       box-shadow: 0 12px 28px rgba(229,92,148,.22),0 0 0 1px rgba(255,209,226,.75);
       animation: none !important;
     }
-    .heart-badge {
-      position:absolute; z-index:4; width:48px; height:48px;
+    .coin-badge {
+      position:absolute; z-index:4; width:46px; height:46px;
       display:grid; place-items:center;
-      font-size:40px; line-height:1;
-      filter: drop-shadow(0 5px 7px rgba(230,56,121,.22));
+      border-radius:50%;
+      background:radial-gradient(circle at 32% 28%,#ffd8ea 0 10%,#ff8fc1 28%,#f34f98 64%,#d92f78 100%);
+      border:3px solid #ffc1dc;
+      box-shadow:inset 0 0 0 3px rgba(255,255,255,.28),0 5px 12px rgba(218,47,120,.22);
+      color:#fff; font-size:27px; font-weight:900; line-height:1;
+      text-shadow:0 2px 2px rgba(168,30,91,.3);
       user-select:none;
+      will-change: transform;
     }
-    .heart-1 { left:4px; top:7px; transform:rotate(-9deg); }
-    .heart-2 { right:4px; top:5px; transform:rotate(8deg); }
-    .heart-3 { right:15px; bottom:0; transform:rotate(10deg) scale(.9); }
-    .heart-4 { left:15px; bottom:2px; transform:rotate(-8deg) scale(.78); opacity:.9; }
+    .coin-1 { left:4px; top:7px; animation: coinFloat1 4.8s ease-in-out infinite; }
+    .coin-2 { right:4px; top:5px; animation: coinFloat2 5.4s ease-in-out infinite .35s; }
+    .coin-3 { right:15px; bottom:0; animation: coinFloat3 5.1s ease-in-out infinite .7s; }
+    .coin-4 { left:15px; bottom:2px; opacity:.9; animation: coinFloat4 5.7s ease-in-out infinite 1s; }
+
+    @keyframes coinFloat1 {
+      0%,100% { transform: translate3d(0,0,0) rotate(-9deg) scale(1); }
+      50% { transform: translate3d(0,-7px,0) rotate(3deg) scale(1.04); }
+    }
+    @keyframes coinFloat2 {
+      0%,100% { transform: translate3d(0,0,0) rotate(8deg) scale(1); }
+      50% { transform: translate3d(0,-6px,0) rotate(-4deg) scale(1.03); }
+    }
+    @keyframes coinFloat3 {
+      0%,100% { transform: translate3d(0,0,0) rotate(10deg) scale(.9); }
+      50% { transform: translate3d(0,-6px,0) rotate(-3deg) scale(.94); }
+    }
+    @keyframes coinFloat4 {
+      0%,100% { transform: translate3d(0,0,0) rotate(-8deg) scale(.78); }
+      50% { transform: translate3d(0,-5px,0) rotate(4deg) scale(.82); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .coin-badge { animation: none !important; }
+    }
 
     /* 539 同款：品牌區在登入卡片上方，登入卡片與須知分開 */
     #loginPage { align-items:flex-start !important; padding-top:52px !important; }
@@ -2387,7 +2413,7 @@
       #loginPage { padding:34px 18px 44px !important; }
       .login-logo-stage { width:176px; height:110px; }
       .login-main-logo { width:78px !important; height:78px !important; border-radius:22px !important; }
-      .heart-badge { width:43px; height:43px; font-size:36px; }
+      .coin-badge { width:43px; height:43px; font-size:36px; }
       #loginPage h2 { font-size:27px !important; }
       .login-form-panel { padding:22px 20px; border-radius:24px; }
     }
@@ -2484,14 +2510,14 @@
   <div id="loginPage" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(135deg,#fff5fa,#fde9f4);">
   <div style="width:100%;max-width:420px;background:#fff;border:1px solid #f3d3e1;border-radius:28px;padding:32px;box-shadow:0 18px 50px rgba(229,92,148,.16);">
     <div style="text-align:center;margin-bottom:24px;">
-      <div class="login-logo-stage" aria-label="芯瑤愛心標誌">
-        <span class="heart-badge heart-1">💗</span>
-        <span class="heart-badge heart-2">💖</span>
-        <span class="heart-badge heart-3">💗</span>
-        <span class="heart-badge heart-4">💕</span>
+      <div class="login-logo-stage" aria-label="芯瑤金幣標誌">
+        <span class="coin-badge coin-1">$</span>
+        <span class="coin-badge coin-2">$</span>
+        <span class="coin-badge coin-3">$</span>
+        <span class="coin-badge coin-4">$</span>
         <img class="login-main-logo" src="./icon-192.png" alt="芯瑤" onerror="this.src='./apple-touch-icon.png'">
       </div>
-      <h2 style="margin:16px 0 8px;font-size:28px;">芯瑤💕會員登入</h2>
+      <h2 style="margin:16px 0 8px;font-size:28px;">芯瑤💕ATG</h2>
       <p style="margin:0;color:#817782;">請輸入已開通的會員帳號</p>
     </div>
 
