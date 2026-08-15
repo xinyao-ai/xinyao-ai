@@ -1956,6 +1956,113 @@
     }
 
 
+
+    /* ===== 登入須知卡片 ===== */
+    .login-notice-card {
+      margin-top: 18px;
+      padding: 18px;
+      border: 1px solid rgba(240, 196, 216, .95);
+      border-radius: 22px;
+      background: linear-gradient(145deg, rgba(255,252,253,.96), rgba(255,239,246,.92));
+      box-shadow: 0 12px 28px rgba(229,92,148,.10), inset 0 1px 0 rgba(255,255,255,.92);
+      text-align: left;
+      animation: cardEnter .55s cubic-bezier(.2,.8,.2,1) both;
+    }
+
+    .login-notice-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      color: #5d4450;
+      font-size: 17px;
+      font-weight: 1000;
+    }
+
+    .login-notice-line {
+      margin: 9px 0;
+      color: #755b68;
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.65;
+    }
+
+    .login-notice-line strong {
+      color: #e34e89;
+    }
+
+    .login-line-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 34px;
+      margin-left: 7px;
+      padding: 0 12px;
+      color: white;
+      border-radius: 999px;
+      background: linear-gradient(135deg,#32d76c,#12c95a);
+      box-shadow: 0 7px 16px rgba(18,201,90,.18);
+      font-size: 12px;
+      font-weight: 900;
+      text-decoration: none;
+      vertical-align: middle;
+      transition: transform .18s ease, box-shadow .18s ease;
+    }
+
+    .login-line-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 20px rgba(18,201,90,.24);
+    }
+
+    .register-now-button {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 52px;
+      margin-top: 14px;
+      overflow: hidden;
+      color: white;
+      border-radius: 16px;
+      background: linear-gradient(135deg,#ff8fba 0%,#ff5f9e 48%,#ef4f91 100%);
+      box-shadow: 0 11px 24px rgba(239,79,145,.22);
+      font-size: 16px;
+      font-weight: 1000;
+      text-decoration: none;
+      transition: transform .18s ease, box-shadow .18s ease;
+    }
+
+    .register-now-button::after {
+      content: '';
+      position: absolute;
+      inset: -50% auto -50% -35%;
+      width: 34%;
+      transform: skewX(-20deg);
+      background: linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);
+      animation: shine 3.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    .register-now-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 15px 30px rgba(239,79,145,.28);
+    }
+
+    .agent-empty-tip {
+      margin: 10px 0 0;
+      color: #e64260;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 1000;
+    }
+
+    @media (max-width: 560px) {
+      .login-notice-card { padding: 15px; border-radius: 18px; }
+      .login-notice-line { font-size: 12px; }
+      .login-line-button { margin: 6px 0 0; }
+    }
+
   </style>
 </head>
 
@@ -2023,6 +2130,30 @@
       id="loginMessage"
       style="display:none;margin-top:16px;padding:14px;border-radius:14px;background:#fff0f6;color:#d6296f;line-height:1.6;"
     ></div>
+
+    <div class="login-notice-card">
+      <div class="login-notice-title">📣 登入須知</div>
+
+      <div class="login-notice-line">
+        需完成 <strong>皇鼎平台註冊</strong> 才可登入分析系統
+      </div>
+
+      <div class="login-notice-line">
+        🔔 務必輸入您的【<strong>皇鼎會員帳號</strong>】
+      </div>
+
+      <div class="login-notice-line">
+        ⚠️ 若無法登入，至 LINE 官方聯繫我即可
+        <a class="login-line-button" href="https://lin.ee/OT3Ngd6" target="_blank" rel="noopener noreferrer">💬 官方LINE</a>
+      </div>
+
+      <a class="register-now-button" href="https://hd5577.com/" target="_blank" rel="noopener noreferrer">
+        ✨ 立即註冊
+      </a>
+
+      <div class="agent-empty-tip">🔴【代理帳號】留空即可</div>
+    </div>
+
   </div>
 </div>
   <main id="appPage" class="page" style="display:none;">
