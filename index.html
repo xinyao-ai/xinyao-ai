@@ -2533,11 +2533,12 @@
   font-size:18px;
   font-weight:1000;
 }
+.public-win-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px}
 .public-win-card img{
   display:block;
   width:100%;
   max-height:210px;
-  object-fit:contain;
+  object-fit:cover;
   margin-top:10px;
   border-radius:12px;
   background:#fff8fb;
@@ -2655,12 +2656,14 @@
         🏆 立即查看會員喜報
       </button>
 
-      <div id="publicWinList" class="public-win-list">
-        <div class="public-win-empty">正在讀取最新紀錄…</div>
-      </div>
+      <div id="publicWinWrap" style="display:none">
+        <div id="publicWinList" class="public-win-list">
+          <div class="public-win-empty">正在讀取最新紀錄…</div>
+        </div>
 
-      <div class="public-win-hint">
-        左右滑動可查看更多會員紀錄
+        <div class="public-win-hint">
+          左右滑動可查看更多會員紀錄
+        </div>
       </div>
     </div>
 
@@ -3015,6 +3018,7 @@
     const logoutButton = $("logoutButton");
     const appLineFloat = $("appLineFloat");
     const publicWinList = $("publicWinList");
+    const publicWinWrap = $("publicWinWrap");
     const publicWinFocusBtn = $("publicWinFocusBtn");
 
     let loggedInMember = sessionStorage.getItem("memberAccount") || "";
@@ -3051,6 +3055,20 @@
         .replace(/'/g, "&#39;");
     }
 
+    function parsePublicWinImages(value) {
+      if (!value) return [];
+
+      try {
+        const parsed = JSON.parse(value);
+
+        return Array.isArray(parsed)
+          ? parsed.filter(Boolean)
+          : [value];
+      } catch {
+        return [value];
+      }
+    }
+
     async function loadPublicWins() {
       if (!publicWinList) return;
 
@@ -3077,9 +3095,23 @@
         publicWinList.innerHTML = wins.map(win => {
           const member = escapeWinText(win.member_display || "會員");
           const amount = Number(win.amount || 0).toLocaleString("zh-TW");
-          const image = win.image_url
-            ? `<img src="${escapeWinText(win.image_url)}" alt="會員喜報照片" loading="lazy">`
-            : "";
+          const images =
+            parsePublicWinImages(
+              win.image_url
+            );
+
+          const imageHtml =
+            images.length
+              ? `<div class="public-win-gallery">
+                  ${images.map(src=>`
+                    <img
+                      src="${escapeWinText(src)}"
+                      alt="會員喜報照片"
+                      loading="lazy"
+                    >
+                  `).join("")}
+                </div>`
+              : "";
 
           return `
             <article class="public-win-card">
@@ -3087,7 +3119,7 @@
                 恭喜${member}使用此程式贏得
                 <span class="public-win-amount">${amount}</span>
               </div>
-              ${image}
+              ${imageHtml}
             </article>
           `;
         }).join("");
