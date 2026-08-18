@@ -2467,55 +2467,66 @@
 .public-win-login{
   margin-top:18px;
   padding:16px;
-  border:1px solid #f3d3e1;
+  border:1px solid #f2bfd2;
   border-radius:20px;
-  background:linear-gradient(145deg,#fffafd,#fff3f8);
-  box-shadow:0 10px 28px rgba(229,92,148,.08);
+  background:linear-gradient(145deg,#fffafd,#fff1f7);
+  box-shadow:0 10px 26px rgba(229,92,148,.10);
 }
 .public-win-head{
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap:10px;
-  margin-bottom:12px;
+  margin-bottom:10px;
 }
 .public-win-title{
-  font-weight:900;
+  color:#583f4b;
   font-size:16px;
-  color:#4b3540;
+  font-weight:1000;
 }
 .public-win-badge{
-  flex:0 0 auto;
   padding:5px 9px;
   border-radius:999px;
   background:#ffe4ef;
-  color:#e2377c;
+  color:#df3f7e;
   font-size:11px;
   font-weight:900;
+}
+.public-win-focus-btn{
+  width:100%;
+  margin:0 0 12px;
+  padding:13px 14px;
+  border:1px solid #f4b6cf;
+  border-radius:15px;
+  background:linear-gradient(90deg,#ffe7f1,#ffd7e7);
+  color:#d83f7f;
+  font-size:15px;
+  font-weight:1000;
+  cursor:pointer;
+  box-shadow:0 8px 18px rgba(229,92,148,.13);
 }
 .public-win-list{
   display:flex;
   gap:10px;
   overflow-x:auto;
   scroll-snap-type:x mandatory;
-  padding-bottom:4px;
+  padding-bottom:3px;
   scrollbar-width:none;
 }
 .public-win-list::-webkit-scrollbar{display:none}
 .public-win-card{
   flex:0 0 88%;
   scroll-snap-align:start;
+  padding:12px;
   border:1px solid #f2d9e4;
   border-radius:16px;
   background:#fff;
-  padding:12px;
-  text-align:left;
 }
 .public-win-text{
-  font-size:14px;
-  line-height:1.65;
-  font-weight:800;
   color:#402f37;
+  font-size:14px;
+  font-weight:800;
+  line-height:1.6;
 }
 .public-win-amount{
   color:#ef3f85;
@@ -2523,58 +2534,27 @@
   font-weight:1000;
 }
 .public-win-card img{
-  width:100%;
-  max-height:200px;
-  object-fit:contain;
   display:block;
+  width:100%;
+  max-height:210px;
+  object-fit:contain;
   margin-top:10px;
   border-radius:12px;
   background:#fff8fb;
 }
 .public-win-empty{
-  color:#9d858f;
+  color:#9b8590;
   font-size:13px;
-  line-height:1.6;
 }
 .public-win-hint{
   margin-top:9px;
-  color:#a18792;
+  color:#9e8791;
   font-size:11px;
   text-align:center;
 }
 @media(max-width:480px){
-  .public-win-login{padding:13px;border-radius:18px}
+  .public-win-login{padding:13px}
   .public-win-card{flex-basis:94%}
-}
-</style>
-
-
-<style id="public-win-cta-style">
-.public-win-login{
-  border:2px solid #f29abb;
-  background:linear-gradient(145deg,#fffafd,#ffeaf3);
-  box-shadow:0 14px 36px rgba(229,92,148,.14);
-}
-.public-win-focus-btn{
-  width:100%;
-  margin:0 0 12px;
-  padding:14px 16px;
-  border:0;
-  border-radius:16px;
-  background:linear-gradient(90deg,#ffe3ef,#ffd1e3);
-  color:#d83f7f;
-  border:1px solid #f4b6cf;
-  font-size:16px;
-  font-weight:1000;
-  cursor:pointer;
-  box-shadow:0 8px 20px rgba(229,92,148,.14);
-}
-.public-win-focus-btn:active{transform:translateY(1px)}
-@media(max-width:480px){
-  .public-win-focus-btn{
-    font-size:15px;
-    padding:13px 14px;
-  }
 }
 </style>
 
@@ -2660,6 +2640,7 @@
       style="display:none;margin-top:16px;padding:14px;border-radius:14px;background:#fff0f6;color:#d6296f;line-height:1.6;"
     ></div>
 
+
     <div class="public-win-login">
       <div class="public-win-head">
         <div class="public-win-title">🎉 恭喜會員紀錄</div>
@@ -2674,13 +2655,8 @@
         🏆 立即查看會員喜報
       </button>
 
-      <div
-        id="publicWinList"
-        class="public-win-list"
-      >
-        <div class="public-win-empty">
-          正在讀取最新紀錄…
-        </div>
+      <div id="publicWinList" class="public-win-list">
+        <div class="public-win-empty">正在讀取最新紀錄…</div>
       </div>
 
       <div class="public-win-hint">
@@ -2710,8 +2686,6 @@
 
       <div class="agent-empty-tip">🔴【代理帳號】留空即可</div>
     </div>
-
-    
 
   </div>
 </div>
@@ -3083,26 +3057,16 @@
       try {
         const response = await fetch(
           ADMIN_PUBLIC_API + "/public/wins",
-          {
-            method: "GET",
-            cache: "no-store"
-          }
+          { method:"GET", cache:"no-store" }
         );
 
         const data = await response.json();
 
         if (!response.ok || !data.ok) {
-          throw new Error(
-            data.message ||
-            data.error ||
-            "讀取失敗"
-          );
+          throw new Error(data.message || data.error || "讀取失敗");
         }
 
-        const wins =
-          Array.isArray(data.wins)
-            ? data.wins
-            : [];
+        const wins = Array.isArray(data.wins) ? data.wins : [];
 
         if (!wins.length) {
           publicWinList.innerHTML =
@@ -3110,33 +3074,23 @@
           return;
         }
 
-        publicWinList.innerHTML =
-          wins.map((win) => {
-            const member =
-              escapeWinText(
-                win.member_display || "會員"
-              );
+        publicWinList.innerHTML = wins.map(win => {
+          const member = escapeWinText(win.member_display || "會員");
+          const amount = Number(win.amount || 0).toLocaleString("zh-TW");
+          const image = win.image_url
+            ? `<img src="${escapeWinText(win.image_url)}" alt="會員喜報照片" loading="lazy">`
+            : "";
 
-            const amount =
-              Number(
-                win.amount || 0
-              ).toLocaleString("zh-TW");
-
-            const image =
-              win.image_url
-                ? `<img src="${escapeWinText(win.image_url)}" alt="會員喜報照片" loading="lazy">`
-                : "";
-
-            return `
-              <article class="public-win-card">
-                <div class="public-win-text">
-                  恭喜${member}使用此程式贏得
-                  <span class="public-win-amount">${amount}</span>
-                </div>
-                ${image}
-              </article>
-            `;
-          }).join("");
+          return `
+            <article class="public-win-card">
+              <div class="public-win-text">
+                恭喜${member}使用此程式贏得
+                <span class="public-win-amount">${amount}</span>
+              </div>
+              ${image}
+            </article>
+          `;
+        }).join("");
 
       } catch (error) {
         publicWinList.innerHTML =
@@ -3694,25 +3648,12 @@
 
 
   
-
     if (publicWinFocusBtn && publicWinList) {
       publicWinFocusBtn.addEventListener("click", () => {
         publicWinList.scrollIntoView({
-          behavior: "smooth",
-          block: "center"
+          behavior:"smooth",
+          block:"center"
         });
-
-        publicWinList.animate(
-          [
-            { transform: "scale(1)" },
-            { transform: "scale(1.015)" },
-            { transform: "scale(1)" }
-          ],
-          {
-            duration: 420,
-            easing: "ease-out"
-          }
-        );
       });
     }
 
