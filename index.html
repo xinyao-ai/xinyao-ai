@@ -2559,6 +2559,132 @@
 }
 </style>
 
+
+<style id="public-win-reference-style">
+.public-win-login{
+  margin-top:18px;
+  padding:16px;
+  border:1px solid #f2bfd2;
+  border-radius:22px;
+  background:linear-gradient(145deg,#fffafd,#fff2f7);
+  box-shadow:0 12px 30px rgba(229,92,148,.10);
+}
+.public-win-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:14px;
+}
+.public-win-title{
+  color:#e63b7d;
+  font-size:17px;
+  font-weight:1000;
+}
+.public-win-badge{
+  padding:5px 10px;
+  border-radius:999px;
+  background:#ffe4ef;
+  color:#df3f7e;
+  font-size:11px;
+  font-weight:900;
+}
+.public-win-list{
+  display:flex;
+  gap:12px;
+  overflow-x:auto;
+  scroll-snap-type:x mandatory;
+  padding:2px 2px 6px;
+  scrollbar-width:none;
+}
+.public-win-list::-webkit-scrollbar{display:none}
+.public-win-card{
+  flex:0 0 82%;
+  max-width:300px;
+  scroll-snap-align:start;
+  padding:14px;
+  border:1px solid #f1d4df;
+  border-radius:18px;
+  background:#fff;
+  box-shadow:0 6px 18px rgba(229,92,148,.07);
+}
+.public-win-member{
+  display:block;
+  margin-bottom:3px;
+  color:#362a30;
+  font-size:15px;
+  font-weight:1000;
+}
+.public-win-text{
+  color:#4b3941;
+  font-size:14px;
+  line-height:1.55;
+  font-weight:700;
+}
+.public-win-amount{
+  display:block;
+  margin-top:2px;
+  color:#ef3f85;
+  font-size:24px;
+  line-height:1.1;
+  font-weight:1000;
+}
+.public-win-gallery{
+  display:flex;
+  gap:8px;
+  overflow-x:auto;
+  scroll-snap-type:x mandatory;
+  margin-top:10px;
+  scrollbar-width:none;
+}
+.public-win-gallery::-webkit-scrollbar{display:none}
+.public-win-gallery img{
+  flex:0 0 100%;
+  width:100%;
+  height:150px;
+  object-fit:cover;
+  scroll-snap-align:start;
+  border-radius:13px;
+  border:1px solid #f5dce6;
+  background:#fff7fb;
+}
+.public-win-photo-count{
+  margin-top:6px;
+  color:#ad8d99;
+  font-size:11px;
+  text-align:right;
+}
+.public-win-hint{
+  margin-top:9px;
+  color:#9d8791;
+  font-size:11px;
+  text-align:center;
+}
+.public-win-empty{
+  color:#9b8590;
+  font-size:13px;
+  padding:8px 0;
+}
+@media(min-width:760px){
+  .public-win-card{
+    flex-basis:31%;
+    max-width:none;
+  }
+}
+@media(max-width:480px){
+  .public-win-login{
+    padding:13px;
+    border-radius:18px;
+  }
+  .public-win-card{
+    flex-basis:88%;
+  }
+  .public-win-gallery img{
+    height:142px;
+  }
+}
+</style>
+
 </head>
 
 <body>
@@ -2647,16 +2773,7 @@
         <div class="public-win-title">🎉 恭喜會員紀錄</div>
         <div class="public-win-badge">免登入查看</div>
       </div>
-
-      <button
-        id="publicWinFocusBtn"
-        class="public-win-focus-btn"
-        type="button"
-      >
-        🏆 立即查看會員喜報
-      </button>
-
-      <div id="publicWinWrap" style="display:none">
+<div id="publicWinWrap" style="display:none">
         <div id="publicWinList" class="public-win-list">
           <div class="public-win-empty">正在讀取最新紀錄…</div>
         </div>
@@ -3018,8 +3135,6 @@
     const logoutButton = $("logoutButton");
     const appLineFloat = $("appLineFloat");
     const publicWinList = $("publicWinList");
-    const publicWinWrap = $("publicWinWrap");
-    const publicWinFocusBtn = $("publicWinFocusBtn");
 
     let loggedInMember = sessionStorage.getItem("memberAccount") || "";
 
@@ -3075,16 +3190,26 @@
       try {
         const response = await fetch(
           ADMIN_PUBLIC_API + "/public/wins",
-          { method:"GET", cache:"no-store" }
+          {
+            method: "GET",
+            cache: "no-store"
+          }
         );
 
         const data = await response.json();
 
         if (!response.ok || !data.ok) {
-          throw new Error(data.message || data.error || "讀取失敗");
+          throw new Error(
+            data.message ||
+            data.error ||
+            "讀取失敗"
+          );
         }
 
-        const wins = Array.isArray(data.wins) ? data.wins : [];
+        const wins =
+          Array.isArray(data.wins)
+            ? data.wins
+            : [];
 
         if (!wins.length) {
           publicWinList.innerHTML =
@@ -3092,37 +3217,61 @@
           return;
         }
 
-        publicWinList.innerHTML = wins.map(win => {
-          const member = escapeWinText(win.member_display || "會員");
-          const amount = Number(win.amount || 0).toLocaleString("zh-TW");
-          const images =
-            parsePublicWinImages(
-              win.image_url
-            );
+        publicWinList.innerHTML =
+          wins.map((win) => {
+            const member =
+              escapeWinText(
+                win.member_display || "會員"
+              );
 
-          const imageHtml =
-            images.length
-              ? `<div class="public-win-gallery">
-                  ${images.map(src=>`
-                    <img
-                      src="${escapeWinText(src)}"
-                      alt="會員喜報照片"
-                      loading="lazy"
-                    >
-                  `).join("")}
-                </div>`
-              : "";
+            const amount =
+              Number(
+                win.amount || 0
+              ).toLocaleString("zh-TW");
 
-          return `
-            <article class="public-win-card">
-              <div class="public-win-text">
-                恭喜${member}使用此程式贏得
-                <span class="public-win-amount">${amount}</span>
-              </div>
-              ${imageHtml}
-            </article>
-          `;
-        }).join("");
+            const images =
+              parsePublicWinImages(
+                win.image_url
+              );
+
+            const gallery =
+              images.length
+                ? `
+                  <div class="public-win-gallery">
+                    ${images.map((src) => `
+                      <img
+                        src="${escapeWinText(src)}"
+                        alt="會員喜報照片"
+                        loading="lazy"
+                      >
+                    `).join("")}
+                  </div>
+                  ${
+                    images.length > 1
+                      ? `<div class="public-win-photo-count">
+                          共 ${images.length} 張｜左右滑動看照片
+                        </div>`
+                      : ""
+                  }
+                `
+                : "";
+
+            return `
+              <article class="public-win-card">
+                <div class="public-win-text">
+                  <span class="public-win-member">
+                    恭喜 ${member}
+                  </span>
+                  使用此程式贏得
+                  <span class="public-win-amount">
+                    ${amount}
+                  </span>
+                </div>
+
+                ${gallery}
+              </article>
+            `;
+          }).join("");
 
       } catch (error) {
         publicWinList.innerHTML =
@@ -3677,19 +3826,31 @@
     }
 
     // 停用 Service Worker，避免 GitHub Pages 長期讀到舊版快取。
+    if (publicWinFocusBtn && publicWinWrap) {
+      publicWinFocusBtn.addEventListener("click", async () => {
+        const isHidden =
+          publicWinWrap.style.display === "none" ||
+          getComputedStyle(publicWinWrap).display === "none";
 
+        if (isHidden) {
+          publicWinWrap.style.display = "block";
+          publicWinFocusBtn.textContent = "收起會員喜報";
 
-  
-    if (publicWinFocusBtn && publicWinList) {
-      publicWinFocusBtn.addEventListener("click", () => {
-        publicWinList.scrollIntoView({
-          behavior:"smooth",
-          block:"center"
-        });
+          await loadPublicWins();
+
+          setTimeout(() => {
+            publicWinWrap.scrollIntoView({
+              behavior: "smooth",
+              block: "nearest"
+            });
+          }, 50);
+
+        } else {
+          publicWinWrap.style.display = "none";
+          publicWinFocusBtn.textContent = "🏆 立即查看會員喜報";
+        }
       });
     }
-
-    loadPublicWins();
 </script>
 </body>
 </html>
