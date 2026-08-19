@@ -2685,6 +2685,66 @@
 }
 </style>
 
+
+<style id="win-lightbox-style">
+.win-lightbox{
+  position:fixed;
+  inset:0;
+  z-index:99999;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+  background:rgba(18,10,15,.88);
+  backdrop-filter:blur(5px);
+}
+.win-lightbox.show{display:flex}
+.win-lightbox-image{
+  display:block;
+  max-width:min(96vw,1100px);
+  max-height:88vh;
+  width:auto;
+  height:auto;
+  object-fit:contain;
+  border-radius:16px;
+  box-shadow:0 20px 70px rgba(0,0,0,.45);
+  background:#111;
+}
+.win-lightbox-close{
+  position:fixed;
+  top:16px;
+  right:16px;
+  width:44px;
+  height:44px;
+  border:0;
+  border-radius:50%;
+  background:rgba(255,255,255,.95);
+  color:#d83f7f;
+  font-size:24px;
+  font-weight:1000;
+  line-height:44px;
+  text-align:center;
+  cursor:pointer;
+  box-shadow:0 8px 22px rgba(0,0,0,.22);
+}
+.public-win-gallery img,
+.public-win-card img{
+  cursor:zoom-in;
+}
+@media(max-width:480px){
+  .win-lightbox{padding:10px}
+  .win-lightbox-image{
+    max-width:96vw;
+    max-height:84vh;
+    border-radius:12px;
+  }
+  .win-lightbox-close{
+    top:10px;
+    right:10px;
+  }
+}
+</style>
+
 </head>
 
 <body>
@@ -3874,6 +3934,86 @@
     document.addEventListener("DOMContentLoaded", () => {
       loadPublicWins();
     });
+
+    // =========================
+    // 喜報照片放大檢視
+    // =========================
+    const winLightbox =
+      document.getElementById("winLightbox");
+
+    const winLightboxImage =
+      document.getElementById("winLightboxImage");
+
+    const winLightboxClose =
+      document.getElementById("winLightboxClose");
+
+    function openWinLightbox(src){
+      if(
+        !winLightbox ||
+        !winLightboxImage ||
+        !src
+      ){
+        return;
+      }
+
+      winLightboxImage.src = src;
+      winLightbox.classList.add("show");
+      winLightbox.setAttribute("aria-hidden","false");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeWinLightbox(){
+      if(
+        !winLightbox ||
+        !winLightboxImage
+      ){
+        return;
+      }
+
+      winLightbox.classList.remove("show");
+      winLightbox.setAttribute("aria-hidden","true");
+      winLightboxImage.removeAttribute("src");
+      document.body.style.overflow = "";
+    }
+
+    document.addEventListener("click",(event)=>{
+      const image =
+        event.target.closest(
+          ".public-win-gallery img, .public-win-card img"
+        );
+
+      if(image){
+        event.preventDefault();
+        openWinLightbox(
+          image.currentSrc ||
+          image.src
+        );
+        return;
+      }
+
+      if(
+        event.target === winLightbox ||
+        event.target === winLightboxClose
+      ){
+        closeWinLightbox();
+      }
+    });
+
+    document.addEventListener("keydown",(event)=>{
+      if(
+        event.key === "Escape" &&
+        winLightbox?.classList.contains("show")
+      ){
+        closeWinLightbox();
+      }
+    });
+
 </script>
+
+<div id="winLightbox" class="win-lightbox" aria-hidden="true">
+  <button id="winLightboxClose" class="win-lightbox-close" type="button" aria-label="關閉">×</button>
+  <img id="winLightboxImage" class="win-lightbox-image" alt="會員喜報大圖">
+</div>
+
 </body>
 </html>
