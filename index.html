@@ -2833,14 +2833,12 @@
         <div class="public-win-title">🎉 恭喜會員紀錄</div>
         <div class="public-win-badge">免登入查看</div>
       </div>
-<div id="publicWinWrap" style="display:none">
-        <div id="publicWinList" class="public-win-list">
-          <div class="public-win-empty">正在讀取最新會員喜報…</div>
-        </div>
+<div id="publicWinList" class="public-win-list">
+        <div class="public-win-empty">正在讀取最新會員喜報…</div>
+      </div>
 
-        <div class="public-win-hint">
-          左右滑動可查看更多會員紀錄
-        </div>
+      <div class="public-win-hint">
+        左右滑動查看更多會員；同一會員多張照片也可左右滑動
       </div>
     </div>
 
@@ -3904,32 +3902,7 @@
       openAnalyzer(loggedInMember);
     }
 
-    // 停用 Service Worker，避免 GitHub Pages 長期讀到舊版快取。
-    if (publicWinFocusBtn && publicWinWrap) {
-      publicWinFocusBtn.addEventListener("click", async () => {
-        const isHidden =
-          publicWinWrap.style.display === "none" ||
-          getComputedStyle(publicWinWrap).display === "none";
-
-        if (isHidden) {
-          publicWinWrap.style.display = "block";
-          publicWinFocusBtn.textContent = "收起會員喜報";
-
-          await loadPublicWins();
-
-          setTimeout(() => {
-            publicWinWrap.scrollIntoView({
-              behavior: "smooth",
-              block: "nearest"
-            });
-          }, 50);
-
-        } else {
-          publicWinWrap.style.display = "none";
-          publicWinFocusBtn.textContent = "🏆 立即查看會員喜報";
-        }
-      });
-    }
+    // 登入頁直接顯示公開喜報
 
     document.addEventListener("DOMContentLoaded", () => {
       loadPublicWins();
