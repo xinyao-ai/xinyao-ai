@@ -2775,7 +2775,7 @@
       </div>
 <div id="publicWinWrap" style="display:none">
         <div id="publicWinList" class="public-win-list">
-          <div class="public-win-empty">正在讀取最新紀錄…</div>
+          <div class="public-win-empty">正在讀取最新會員喜報…</div>
         </div>
 
         <div class="public-win-hint">
@@ -3185,97 +3185,116 @@
     }
 
     async function loadPublicWins() {
-      if (!publicWinList) return;
+      const list = document.getElementById("publicWinList");
+      if (!list) return;
+
+      list.innerHTML =
+        '<div class="public-win-empty">正在讀取最新會員喜報…</div>';
 
       try {
         const response = await fetch(
-          ADMIN_PUBLIC_API + "/public/wins",
+          ADMIN_PUBLIC_API + "/public/wins?v=" + Date.now(),
           {
             method: "GET",
-            cache: "no-store"
+            mode: "cors",
+            cache: "no-store",
+            headers: {
+              "Accept": "application/json"
+            }
           }
         );
 
-        const data = await response.json();
+        const raw = await response.text();
+
+        let data;
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          throw new Error("公開喜報 API 回傳格式錯誤");
+        }
 
         if (!response.ok || !data.ok) {
           throw new Error(
-            data.message ||
-            data.error ||
-            "讀取失敗"
+            data?.message ||
+            data?.error ||
+            `喜報 API ${response.status}`
           );
         }
 
         const wins =
           Array.isArray(data.wins)
-            ? data.wins
+            ? data.wins.filter(x => Number(x.is_visible ?? 1) !== 0)
             : [];
 
         if (!wins.length) {
-          publicWinList.innerHTML =
-            '<div class="public-win-empty">目前尚無公開會員紀錄。</div>';
+          list.innerHTML =
+            '<div class="public-win-empty">目前尚無公開會員喜報。</div>';
           return;
         }
 
-        publicWinList.innerHTML =
-          wins.map((win) => {
-            const member =
-              escapeWinText(
-                win.member_display || "會員"
-              );
+        list.innerHTML = wins.map(win => {
+          const member =
+            escapeWinText(win.member_display || "會員");
 
-            const amount =
-              Number(
-                win.amount || 0
-              ).toLocaleString("zh-TW");
+          const amount =
+            Number(win.amount || 0).toLocaleString("zh-TW");
 
-            const images =
-              parsePublicWinImages(
-                win.image_url
-              );
+          let images = [];
+          if (win.image_url) {
+            try {
+              const parsed = JSON.parse(win.image_url);
+              images = Array.isArray(parsed)
+                ? parsed.filter(Boolean)
+                : [win.image_url];
+            } catch {
+              images = [win.image_url];
+            }
+          }
 
-            const gallery =
-              images.length
-                ? `
-                  <div class="public-win-gallery">
-                    ${images.map((src) => `
-                      <img
-                        src="${escapeWinText(src)}"
-                        alt="會員喜報照片"
-                        loading="lazy"
-                      >
-                    `).join("")}
-                  </div>
-                  ${
-                    images.length > 1
-                      ? `<div class="public-win-photo-count">
-                          共 ${images.length} 張｜左右滑動看照片
-                        </div>`
-                      : ""
-                  }
-                `
-                : "";
+          const gallery = images.length
+            ? `
+              <div class="public-win-gallery">
+                ${images.map(src => `
+                  <img
+                    src="${escapeWinText(src)}"
+                    alt="會員喜報照片"
+                    loading="lazy"
+                  >
+                `).join("")}
+              </div>
+              ${images.length > 1
+                ? `<div class="public-win-photo-count">
+                     共 ${images.length} 張｜左右滑動看照片
+                   </div>`
+                : ""
+              }
+            `
+            : "";
 
-            return `
-              <article class="public-win-card">
-                <div class="public-win-text">
-                  <span class="public-win-member">
-                    恭喜 ${member}
-                  </span>
-                  使用此程式贏得
-                  <span class="public-win-amount">
-                    ${amount}
-                  </span>
-                </div>
-
-                ${gallery}
-              </article>
-            `;
-          }).join("");
+          return `
+            <article class="public-win-card">
+              <div class="public-win-text">
+                <span class="public-win-member">
+                  恭喜 ${member}
+                </span>
+                使用此程式贏得
+                <span class="public-win-amount">
+                  ${amount}
+                </span>
+              </div>
+              ${gallery}
+            </article>
+          `;
+        }).join("");
 
       } catch (error) {
-        publicWinList.innerHTML =
-          '<div class="public-win-empty">會員紀錄暫時讀取不到，稍後重新整理即可。</div>';
+        console.error("公開喜報讀取失敗：", error);
+
+        list.innerHTML = `
+          <div class="public-win-empty" style="color:#d83f7f;font-weight:800">
+            喜報讀取失敗：${escapeWinText(error.message || "未知錯誤")}
+          </div>
+        `;
       }
     }
 
@@ -3851,6 +3870,10 @@
         }
       });
     }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      loadPublicWins();
+    });
 </script>
 </body>
 </html>
