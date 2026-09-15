@@ -2526,9 +2526,9 @@
           <div class="atg-live-help">顯示目前是否進入免費遊戲，以及剩餘次數。</div>
         </div>
         <div class="atg-live-item">
-          <div class="atg-live-label">已捕捉回合</div>
+          <div class="atg-live-label">本次已完成回合</div>
           <div id="xinyaoLiveRoundCount" class="atg-live-value">0 局</div>
-          <div class="atg-live-help">依 ATG 的 spinId 去除重複後計算；同一局重複封包不會重複計入。</div>
+          <div class="atg-live-help">每完成一局就會 +1；清空 V5 即時紀錄後會重新從 0 開始。</div>
         </div>
         <div class="atg-live-item">
           <div class="atg-live-label">最後同步 ATG 回合資料</div>
@@ -3588,7 +3588,8 @@
       maxPayout,
       freeCurrent,
       freeTriggers,
-      roundCount: rounds.length,
+      roundCount: sentClose > 0 ? sentClose : rounds.length,
+      recentVerifiedRoundCount: rounds.length,
       sentSpin,
       sentClose,
       lastReceivedAt: state?.lastReceivedAt || latest?.time || latestBalanceTime || '',
