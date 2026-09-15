@@ -2334,431 +2334,48 @@
       }
     }
 
-  
+  </style>
 
-    /* ===== 登入 LOGO｜粉色 $ 金幣版本 ===== */
-    .login-logo-stage {
-      position: relative;
-      width: 190px;
-      height: 118px;
-      margin: 0 auto 8px;
-    }
-    .login-main-logo {
-      position: absolute;
-      left: 50%; top: 50%; z-index: 3;
-      width: 84px !important; height: 84px !important;
-      transform: translate(-50%,-50%);
-      border: 3px solid rgba(255,255,255,.95);
-      border-radius: 24px !important;
-      object-fit: cover;
-      box-shadow: 0 12px 28px rgba(229,92,148,.22),0 0 0 1px rgba(255,209,226,.75);
-      animation: none !important;
-    }
-    .coin-badge {
-      position:absolute; z-index:4; width:46px; height:46px;
-      display:grid; place-items:center;
-      border-radius:50%;
-      background:radial-gradient(circle at 32% 28%,#ffd8ea 0 10%,#ff8fc1 28%,#f34f98 64%,#d92f78 100%);
-      border:3px solid #ffc1dc;
-      box-shadow:inset 0 0 0 3px rgba(255,255,255,.28),0 5px 12px rgba(218,47,120,.22);
-      color:#fff; font-size:27px; font-weight:900; line-height:1;
-      text-shadow:0 2px 2px rgba(168,30,91,.3);
-      user-select:none;
-      will-change: transform;
-    }
-    .coin-1 { left:4px; top:7px; animation: coinFloat1 4.8s ease-in-out infinite; }
-    .coin-2 { right:4px; top:5px; animation: coinFloat2 5.4s ease-in-out infinite .35s; }
-    .coin-3 { right:15px; bottom:0; animation: coinFloat3 5.1s ease-in-out infinite .7s; }
-    .coin-4 { left:15px; bottom:2px; opacity:.9; animation: coinFloat4 5.7s ease-in-out infinite 1s; }
+  <style>
+  /* ===== 登入頁改為芯瑤539同款上下分區 ===== */
+  #loginPage.login-page-539{min-height:100vh;display:flex;justify-content:center;align-items:flex-start;padding:clamp(48px,8vh,90px) 18px 60px;background:radial-gradient(circle at 15% 12%,rgba(255,190,218,.42),transparent 28%),radial-gradient(circle at 88% 18%,rgba(242,218,255,.38),transparent 30%),linear-gradient(180deg,#fff8fc 0%,#fff0f7 100%)!important;}
+  #loginPage .login-shell-539{width:min(100%,520px);background:transparent!important;border:0!important;border-radius:0!important;padding:0!important;box-shadow:none!important;overflow:visible!important;backdrop-filter:none!important;animation:none!important;}
+  #loginPage .login-shell-539::before{display:none!important;}
+  .login-brand-539{text-align:center;padding:0 10px 28px;}
+  .login-logo-wrap-539{position:relative;width:128px;height:128px;margin:0 auto 20px;display:grid;place-items:center;}
+  .login-logo-539{position:relative;z-index:2;width:108px!important;height:108px!important;border-radius:27px!important;object-fit:cover;border:4px solid rgba(255,255,255,.95);box-shadow:0 15px 32px rgba(224,88,147,.22);}
+  .login-deco-ball{position:absolute;z-index:1;width:42px;height:42px;display:grid;place-items:center;border-radius:50%;color:#fff;font-size:12px;font-weight:900;border:3px solid #fff;background:linear-gradient(135deg,#ff9bc2,#f45b9a);box-shadow:0 7px 18px rgba(223,88,145,.18);}
+  .login-deco-ball.b1{left:-2px;top:16px}.login-deco-ball.b2{right:-5px;top:7px}.login-deco-ball.b3{right:1px;bottom:3px;font-size:16px}
+  .login-main-title-539{margin:0;font-size:clamp(29px,7vw,38px);line-height:1.2;color:#332a31;font-weight:900;letter-spacing:-1px}.login-main-title-539 span{color:#e94388}
+  .login-subtitle-539{margin:10px 0 0;color:#8a7c84;font-size:16px;letter-spacing:1px}
+  .login-form-card-539,.login-notice-539{position:relative;width:100%;border:1px solid rgba(239,197,216,.9)!important;border-radius:28px!important;background:rgba(255,255,255,.9)!important;box-shadow:0 16px 42px rgba(225,94,150,.12)!important;backdrop-filter:blur(12px);}
+  .login-form-card-539{padding:27px 28px 30px;margin-bottom:20px;overflow:hidden}.login-form-card-539::after{content:"";position:absolute;width:150px;height:150px;right:-60px;top:-70px;border-radius:50%;background:rgba(255,225,238,.52);pointer-events:none}
+  .login-form-card-539 h3{position:relative;z-index:1;margin:0 0 25px;font-size:23px;color:#4a3942;font-weight:900}.login-form-card-539 label{display:block;margin:0 0 9px;padding:0;color:#66535d;font-size:15px;font-weight:800}
+  .login-input-wrap-539{position:relative}.login-input-wrap-539 input{width:100%!important;height:62px!important;padding:0 55px 0 18px!important;border:1.5px solid #efc9d9!important;border-radius:19px!important;background:#fffdfE!important;font-size:17px!important;outline:none}.login-user-icon-539{position:absolute;right:19px;top:50%;transform:translateY(-50%);font-size:21px;opacity:.72}
+  #loginPage #loginButton{width:100%!important;min-height:62px!important;margin-top:18px!important;padding:0 18px!important;border:0!important;border-radius:19px!important;color:#fff!important;background:linear-gradient(90deg,#ff72aa,#ef2f80)!important;font-size:18px!important;font-weight:900!important;box-shadow:0 13px 28px rgba(239,47,128,.22)!important;}
+  .login-message-539{display:none;margin-top:15px;padding:13px 14px;border-radius:14px;background:#fff0f6;color:#d6296f;line-height:1.6}
+  #loginPage .login-notice-539{margin:0!important;padding:24px 28px!important;}
+  #loginPage .login-notice-title{margin-bottom:16px;font-size:20px;font-weight:900;color:#4a3942}
+  #loginPage .login-notice-line{margin:0 0 14px;color:#6f5964;font-size:14px;font-weight:700;line-height:1.65}
+  #loginPage .login-notice-line strong{color:#ef4b8d}
+  #loginPage .line-contact-row{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:center!important;gap:10px!important}
+  #loginPage .contact-text{white-space:nowrap!important}
+  #loginPage .login-line-button{display:inline-flex!important;align-items:center;justify-content:center;width:auto!important;min-width:104px!important;height:40px!important;padding:0 13px!important;margin:0!important;border-radius:999px!important;color:#fff!important;background:#12ce67!important;text-decoration:none!important;font-size:13px!important;font-weight:900!important;box-shadow:0 8px 18px rgba(18,206,103,.18)}
+  #loginPage .register-now-button{display:flex!important;align-items:center;justify-content:center;width:100%;min-height:58px;margin:8px 0 13px;border-radius:18px;color:#fff!important;background:linear-gradient(90deg,#ff7bb0,#ef438a)!important;text-decoration:none;font-size:18px;font-weight:900;box-shadow:0 12px 26px rgba(239,67,138,.18)}
+  #loginPage .agent-empty-tip{text-align:center;color:#e5425d;font-size:14px;font-weight:900}
+  @media(max-width:560px){#loginPage.login-page-539{padding:56px 16px 45px}.login-brand-539{padding-bottom:24px}.login-logo-wrap-539{width:112px;height:112px;margin-bottom:17px}.login-logo-539{width:94px!important;height:94px!important;border-radius:24px!important}.login-deco-ball{width:36px;height:36px}.login-main-title-539{font-size:30px}.login-subtitle-539{font-size:15px}.login-form-card-539{padding:24px 22px 26px;border-radius:25px!important}.login-form-card-539 h3{font-size:21px;margin-bottom:22px}.login-input-wrap-539 input,#loginPage #loginButton{height:58px!important;min-height:58px!important}.login-notice-539{padding:22px 20px!important;border-radius:25px!important}#loginPage .login-notice-line{font-size:13px}#loginPage .contact-text{white-space:nowrap!important;font-size:12.5px!important;letter-spacing:-.25px}#loginPage .login-line-button{min-width:88px!important;height:36px!important;padding:0 9px!important;font-size:11px!important}.register-now-button{min-height:55px!important}}
+  @media(max-width:390px){#loginPage .line-contact-row{gap:6px!important}#loginPage .contact-text{font-size:11.5px!important}#loginPage .login-line-button{min-width:80px!important;padding:0 7px!important;font-size:10px!important}}
+  </style>
 
-    @keyframes coinFloat1 {
-      0%,100% { transform: translate3d(0,0,0) rotate(-9deg) scale(1); }
-      50% { transform: translate3d(0,-7px,0) rotate(3deg) scale(1.04); }
-    }
-    @keyframes coinFloat2 {
-      0%,100% { transform: translate3d(0,0,0) rotate(8deg) scale(1); }
-      50% { transform: translate3d(0,-6px,0) rotate(-4deg) scale(1.03); }
-    }
-    @keyframes coinFloat3 {
-      0%,100% { transform: translate3d(0,0,0) rotate(10deg) scale(.9); }
-      50% { transform: translate3d(0,-6px,0) rotate(-3deg) scale(.94); }
-    }
-    @keyframes coinFloat4 {
-      0%,100% { transform: translate3d(0,0,0) rotate(-8deg) scale(.78); }
-      50% { transform: translate3d(0,-5px,0) rotate(4deg) scale(.82); }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .coin-badge { animation: none !important; }
-    }
-
-    /* 539 同款：品牌區在登入卡片上方，登入卡片與須知分開 */
-    #loginPage { align-items:flex-start !important; padding-top:52px !important; }
-    #loginPage > div {
-      max-width:520px !important; background:transparent !important; border:0 !important;
-      box-shadow:none !important; padding:0 !important; border-radius:0 !important;
-    }
-    #loginPage > div::before { display:none !important; }
-    #loginPage > div > div:first-child { margin-bottom:28px !important; }
-    #loginPage h2 { margin:14px 0 6px !important; font-size:31px !important; }
-    #loginPage > div > div:first-child p { font-size:15px !important; }
-
-    .login-form-panel {
-      background:rgba(255,255,255,.92); border:1px solid #f2cddd; border-radius:28px;
-      padding:28px; box-shadow:0 18px 48px rgba(229,92,148,.12); margin-bottom:22px;
-    }
-    .login-form-title { margin:0 0 22px; font-size:22px; font-weight:900; color:#4b3d46; }
-
-    @media (max-width:560px) {
-      #loginPage { padding:34px 18px 44px !important; }
-      .login-logo-stage { width:176px; height:110px; }
-      .login-main-logo { width:78px !important; height:78px !important; border-radius:22px !important; }
-      .coin-badge { width:43px; height:43px; font-size:36px; }
-      #loginPage h2 { font-size:27px !important; }
-      .login-form-panel { padding:22px 20px; border-radius:24px; }
-    }
-
-      /* ===== 官方 LINE 按鈕位置：往左收進紅框位置 ===== */
-    .login-notice-line.line-contact-row {
-      position: relative !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: flex-start !important;
-      gap: 10px !important;
-    }
-
-    .login-notice-line.line-contact-row .contact-text {
-      flex: 0 1 auto !important;
-      width: auto !important;
-      min-width: 0 !important;
-      white-space: nowrap !important;
-    }
-
-    .login-notice-line.line-contact-row .login-line-button {
-      flex: 0 0 auto !important;
-      margin: 0 0 0 2px !important;
-      min-width: 70px !important;
-      width: auto !important;
-      height: 31px !important;
-      padding: 0 7px !important;
-      font-size: 9.5px !important;
-      white-space: nowrap !important;
-    }
-
-    @media (min-width: 561px) {
-      .login-notice-line.line-contact-row {
-        gap: 12px !important;
-      }
-      .login-notice-line.line-contact-row .contact-text {
-        font-size: 13px !important;
-        letter-spacing: 0 !important;
-      }
-      .login-notice-line.line-contact-row .login-line-button {
-        min-width: 82px !important;
-        height: 34px !important;
-        padding: 0 9px !important;
-        font-size: 10.5px !important;
-      }
-    }
-
-</style>
-
-<style id="public-win-login-style">
-.public-win-login{
-  margin-top:18px;
-  padding:16px;
-  border:1px solid #f2bfd2;
-  border-radius:20px;
-  background:linear-gradient(145deg,#fffafd,#fff1f7);
-  box-shadow:0 10px 26px rgba(229,92,148,.10);
-}
-.public-win-head{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  margin-bottom:10px;
-}
-.public-win-title{
-  color:#583f4b;
-  font-size:16px;
-  font-weight:1000;
-}
-.public-win-badge{
-  padding:5px 9px;
-  border-radius:999px;
-  background:#ffe4ef;
-  color:#df3f7e;
-  font-size:11px;
-  font-weight:900;
-}
-.public-win-focus-btn{
-  width:100%;
-  margin:0 0 12px;
-  padding:13px 14px;
-  border:1px solid #f4b6cf;
-  border-radius:15px;
-  background:linear-gradient(90deg,#ffe7f1,#ffd7e7);
-  color:#d83f7f;
-  font-size:15px;
-  font-weight:1000;
-  cursor:pointer;
-  box-shadow:0 8px 18px rgba(229,92,148,.13);
-}
-.public-win-list{
-  display:flex;
-  gap:10px;
-  overflow-x:auto;
-  scroll-snap-type:x mandatory;
-  padding-bottom:3px;
-  scrollbar-width:none;
-}
-.public-win-list::-webkit-scrollbar{display:none}
-.public-win-card{
-  flex:0 0 88%;
-  scroll-snap-align:start;
-  padding:12px;
-  border:1px solid #f2d9e4;
-  border-radius:16px;
-  background:#fff;
-}
-.public-win-text{
-  color:#402f37;
-  font-size:14px;
-  font-weight:800;
-  line-height:1.6;
-}
-.public-win-amount{
-  color:#ef3f85;
-  font-size:18px;
-  font-weight:1000;
-}
-.public-win-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px}
-.public-win-card img{
-  display:block;
-  width:100%;
-  max-height:210px;
-  object-fit:cover;
-  margin-top:10px;
-  border-radius:12px;
-  background:#fff8fb;
-}
-.public-win-empty{
-  color:#9b8590;
-  font-size:13px;
-}
-.public-win-hint{
-  margin-top:9px;
-  color:#9e8791;
-  font-size:11px;
-  text-align:center;
-}
-@media(max-width:480px){
-  .public-win-login{padding:13px}
-  .public-win-card{flex-basis:94%}
-}
-</style>
-
-
-<style id="public-win-reference-style">
-.public-win-login{
-  margin-top:18px;
-  padding:16px;
-  border:1px solid #f2bfd2;
-  border-radius:22px;
-  background:linear-gradient(145deg,#fffafd,#fff2f7);
-  box-shadow:0 12px 30px rgba(229,92,148,.10);
-}
-.public-win-head{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  margin-bottom:14px;
-}
-.public-win-title{
-  color:#e63b7d;
-  font-size:17px;
-  font-weight:1000;
-}
-.public-win-badge{
-  padding:5px 10px;
-  border-radius:999px;
-  background:#ffe4ef;
-  color:#df3f7e;
-  font-size:11px;
-  font-weight:900;
-}
-.public-win-list{
-  display:flex;
-  gap:12px;
-  overflow-x:auto;
-  scroll-snap-type:x mandatory;
-  padding:2px 2px 6px;
-  scrollbar-width:none;
-}
-.public-win-list::-webkit-scrollbar{display:none}
-.public-win-card{
-  flex:0 0 82%;
-  max-width:300px;
-  scroll-snap-align:start;
-  padding:14px;
-  border:1px solid #f1d4df;
-  border-radius:18px;
-  background:#fff;
-  box-shadow:0 6px 18px rgba(229,92,148,.07);
-}
-.public-win-member{
-  display:block;
-  margin-bottom:3px;
-  color:#362a30;
-  font-size:15px;
-  font-weight:1000;
-}
-.public-win-text{
-  color:#4b3941;
-  font-size:14px;
-  line-height:1.55;
-  font-weight:700;
-}
-.public-win-amount{
-  display:block;
-  margin-top:2px;
-  color:#ef3f85;
-  font-size:24px;
-  line-height:1.1;
-  font-weight:1000;
-}
-.public-win-gallery{
-  display:flex;
-  gap:8px;
-  overflow-x:auto;
-  scroll-snap-type:x mandatory;
-  margin-top:10px;
-  scrollbar-width:none;
-}
-.public-win-gallery::-webkit-scrollbar{display:none}
-.public-win-gallery img{
-  flex:0 0 100%;
-  width:100%;
-  height:150px;
-  object-fit:cover;
-  scroll-snap-align:start;
-  border-radius:13px;
-  border:1px solid #f5dce6;
-  background:#fff7fb;
-}
-.public-win-photo-count{
-  margin-top:6px;
-  color:#ad8d99;
-  font-size:11px;
-  text-align:right;
-}
-.public-win-hint{
-  margin-top:9px;
-  color:#9d8791;
-  font-size:11px;
-  text-align:center;
-}
-.public-win-empty{
-  color:#9b8590;
-  font-size:13px;
-  padding:8px 0;
-}
-@media(min-width:760px){
-  .public-win-card{
-    flex-basis:31%;
-    max-width:none;
-  }
-}
-@media(max-width:480px){
-  .public-win-login{
-    padding:13px;
-    border-radius:18px;
-  }
-  .public-win-card{
-    flex-basis:88%;
-  }
-  .public-win-gallery img{
-    height:142px;
-  }
-}
-</style>
-
-
-<style id="win-lightbox-style">
-.win-lightbox{
-  position:fixed;
-  inset:0;
-  z-index:99999;
-  display:none;
-  align-items:center;
-  justify-content:center;
-  padding:18px;
-  background:rgba(18,10,15,.88);
-  backdrop-filter:blur(5px);
-}
-.win-lightbox.show{display:flex}
-.win-lightbox-image{
-  display:block;
-  max-width:min(96vw,1100px);
-  max-height:88vh;
-  width:auto;
-  height:auto;
-  object-fit:contain;
-  border-radius:16px;
-  box-shadow:0 20px 70px rgba(0,0,0,.45);
-  background:#111;
-}
-.win-lightbox-close{
-  position:fixed;
-  top:16px;
-  right:16px;
-  width:44px;
-  height:44px;
-  border:0;
-  border-radius:50%;
-  background:rgba(255,255,255,.95);
-  color:#d83f7f;
-  font-size:24px;
-  font-weight:1000;
-  line-height:44px;
-  text-align:center;
-  cursor:pointer;
-  box-shadow:0 8px 22px rgba(0,0,0,.22);
-}
-.public-win-gallery img,
-.public-win-card img{
-  cursor:zoom-in;
-}
-@media(max-width:480px){
-  .win-lightbox{padding:10px}
-  .win-lightbox-image{
-    max-width:96vw;
-    max-height:84vh;
-    border-radius:12px;
-  }
-  .win-lightbox-close{
-    top:10px;
-    right:10px;
-  }
-}
-</style>
-
-
-<style id="win-landscape-style">
-/* 喜報圖片固定橫式縮圖 */
-.public-win-gallery img,
-.public-win-card img{
-  width:100%;
-  aspect-ratio:16 / 9;
-  height:auto !important;
-  object-fit:cover;
-  object-position:center;
-  display:block;
-  border-radius:14px;
-  cursor:zoom-in;
-}
+<style id="xinyao-live-data-style">
+  .atg-live-card{margin:16px 0;padding:18px;border:1px solid #f2cede;border-radius:24px;background:linear-gradient(135deg,#fff,#fff3f8);box-shadow:0 12px 32px rgba(226,86,145,.12)}
+  .atg-live-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .atg-live-title{font-size:18px;font-weight:900;color:#4f4149}.atg-live-badge{padding:6px 11px;border-radius:999px;background:#fff0f6;color:#cf3776;font-size:12px;font-weight:900}
+  .atg-live-badge.ok{background:#eafff0;color:#168a46}.atg-live-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.atg-live-item{padding:13px 14px;border:1px solid #f4dce7;border-radius:17px;background:rgba(255,255,255,.9)}
+  .atg-live-label{font-size:12px;color:#9a7d89;font-weight:800}.atg-live-value{margin-top:5px;font-size:17px;color:#473a41;font-weight:900;word-break:break-word}.atg-live-help{margin-top:5px;color:#88727c;font-size:11px;line-height:1.55}
+  .atg-live-confirmed{margin-top:11px;padding:12px 14px;border-radius:16px;background:#f9fff9;border:1px solid #d8f2df;display:none}.atg-live-confirmed.show{display:block}.atg-live-confirmed-title{font-size:12px;font-weight:900;color:#23894b;margin-bottom:6px}.atg-live-confirmed-row{font-size:13px;line-height:1.75;color:#4e5d52}
+  .atg-live-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.atg-live-actions button{border:0;border-radius:12px;padding:9px 13px;font-weight:900;cursor:pointer}.atg-live-refresh{background:#ef4d91;color:#fff}.atg-live-debug{display:none;background:#fff0f6;color:#d13a79}.atg-live-debug.show{display:inline-block}
+  @media(max-width:560px){.atg-live-grid{grid-template-columns:1fr}.atg-live-card{padding:15px;border-radius:20px}}
 </style>
 
 </head>
@@ -2806,83 +2423,43 @@
     <span class="ambient-sparkle"></span>
   </div>
 
-  <div id="loginPage" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(135deg,#fff5fa,#fde9f4);">
-  <div style="width:100%;max-width:420px;background:#fff;border:1px solid #f3d3e1;border-radius:28px;padding:32px;box-shadow:0 18px 50px rgba(229,92,148,.16);">
-    <div style="text-align:center;margin-bottom:24px;">
-      <div class="login-logo-stage" aria-label="芯瑤金幣標誌">
-        <span class="coin-badge coin-1">$</span>
-        <span class="coin-badge coin-2">$</span>
-        <span class="coin-badge coin-3">$</span>
-        <span class="coin-badge coin-4">$</span>
-        <img class="login-main-logo" src="./icon-192.png" alt="芯瑤" onerror="this.src='./apple-touch-icon.png'">
-      </div>
-      <h2 style="margin:16px 0 8px;font-size:28px;">芯瑤💕ATG</h2>
-      <p style="margin:0;color:#817782;">請輸入已開通的會員帳號</p>
+  <div id="loginPage" class="login-page-539">
+    <div class="login-shell-539">
+      <section class="login-brand-539">
+        <div class="login-logo-wrap-539">
+          <span class="login-deco-ball b1">07</span>
+          <span class="login-deco-ball b2">88</span>
+          <span class="login-deco-ball b3">💗</span>
+          <img src="./icon-192.png" alt="芯瑤" class="login-logo-539">
+        </div>
+        <h2 class="login-main-title-539">芯瑤💕 <span>ATG AI助手</span></h2>
+        <p class="login-subtitle-539">選房分析會員系統</p>
+      </section>
+
+      <section class="login-form-card-539">
+        <h3>✨ 會員登入</h3>
+        <label for="memberAccount">會員帳號</label>
+        <div class="login-input-wrap-539">
+          <input id="memberAccount" type="text" placeholder="請輸入會員帳號" autocomplete="username">
+          <span class="login-user-icon-539">👤</span>
+        </div>
+        <button id="loginButton" type="button">✨ 登入分析系統</button>
+        <div id="loginMessage" class="login-message-539"></div>
+      </section>
+
+      <section class="login-notice-card login-notice-539">
+        <div class="login-notice-title">📣 登入須知</div>
+        <div class="login-notice-line">需完成 <strong>皇鼎平台註冊</strong> 才可登入分析系統</div>
+        <div class="login-notice-line">🔔 務必輸入您的【<strong>皇鼎會員帳號</strong>】</div>
+        <div class="login-notice-line line-contact-row">
+          <span class="contact-text">⚠️ 若無法登入，至 LINE 官方聯繫我即可</span>
+          <a class="login-line-button" href="https://lin.ee/OT3Ngd6" target="_blank" rel="noopener noreferrer">💬 官方LINE</a>
+        </div>
+        <a class="register-now-button" href="https://hd5577.com/" target="_blank" rel="noopener noreferrer">✨ 立即註冊</a>
+        <div class="agent-empty-tip">🔴【代理帳號】留空即可</div>
+      </section>
     </div>
-
-    <label for="memberAccount" style="display:block;margin-bottom:8px;font-weight:700;">會員帳號</label>
-
-    <input
-      id="memberAccount"
-      type="text"
-      placeholder="請輸入會員帳號"
-      autocomplete="username"
-      style="width:100%;padding:16px;border:1px solid #efccdc;border-radius:16px;font-size:16px;box-sizing:border-box;outline:none;"
-    >
-
-    <button
-      id="loginButton"
-      type="button"
-      style="width:100%;margin-top:16px;padding:16px;border:0;border-radius:16px;background:linear-gradient(90deg,#ff58a0,#ef2f80);color:#fff;font-size:18px;font-weight:800;cursor:pointer;"
-    >
-      登入
-    </button>
-
-    <div
-      id="loginMessage"
-      style="display:none;margin-top:16px;padding:14px;border-radius:14px;background:#fff0f6;color:#d6296f;line-height:1.6;"
-    ></div>
-
-
-    <div class="public-win-login">
-      <div class="public-win-head">
-        <div class="public-win-title">🎉 恭喜會員紀錄</div>
-        <div class="public-win-badge">免登入查看</div>
-      </div>
-<div id="publicWinList" class="public-win-list">
-        <div class="public-win-empty">正在讀取最新會員喜報…</div>
-      </div>
-
-      <div class="public-win-hint">
-        左右滑動查看更多會員；同一會員多張照片也可左右滑動
-      </div>
-    </div>
-
-    <div class="login-notice-card">
-      <div class="login-notice-title">📣 登入須知</div>
-
-      <div class="login-notice-line">
-        需完成 <strong>皇鼎平台註冊</strong> 才可登入分析系統
-      </div>
-
-      <div class="login-notice-line">
-        🔔 務必輸入您的【<strong>皇鼎會員帳號</strong>】
-      </div>
-
-      <div class="login-notice-line line-contact-row">
-        <span class="contact-text">⚠️ 若無法登入，至 LINE 官方聯繫我即可</span>
-        <a class="login-line-button" href="https://lin.ee/OT3Ngd6" target="_blank" rel="noopener noreferrer">💬 官方LINE</a>
-      </div>
-
-      <a class="register-now-button" href="https://hd5577.com/" target="_blank" rel="noopener noreferrer">
-        ✨ 立即註冊
-      </a>
-
-      <div class="agent-empty-tip">🔴【代理帳號】留空即可</div>
-    </div>
-
   </div>
-</div>
   <main id="appPage" class="page" style="display:none;">
 
     <div class="app-topbar">
@@ -2910,6 +2487,45 @@
         </div>
       </div>
     </section>
+
+
+    <section id="xinyaoLiveDataPanel" class="atg-live-card">
+      <div class="atg-live-head">
+        <div class="atg-live-title">📡 ATG 即時真實資料</div>
+        <span id="xinyaoLiveStatus" class="atg-live-badge">等待資料</span>
+      </div>
+      <div class="atg-live-grid">
+        <div class="atg-live-item">
+          <div class="atg-live-label">目前辨識遊戲</div>
+          <div id="xinyaoLiveGame" class="atg-live-value">尚未收到</div>
+          <div class="atg-live-help">依 ATG 遊戲網址的遊戲代碼辨識。</div>
+        </div>
+        <div class="atg-live-item">
+          <div class="atg-live-label">已收到遊戲結束紀錄</div>
+          <div id="xinyaoLiveCloseCount" class="atg-live-value">0 筆</div>
+          <div class="atg-live-help">每一筆是 ATG 回傳的 closeSpin「遊戲結束資料」。這個數字不直接當成免遊次數，也不先假設等於一般轉數。</div>
+        </div>
+        <div class="atg-live-item">
+          <div class="atg-live-label">已收到遊戲開始紀錄</div>
+          <div id="xinyaoLiveSpinCount" class="atg-live-value">0 筆</div>
+          <div class="atg-live-help">每一筆是 ATG 回傳的 spin「遊戲開始資料」。</div>
+        </div>
+        <div class="atg-live-item">
+          <div class="atg-live-label">最後收到遊戲資料時間</div>
+          <div id="xinyaoLiveTime" class="atg-live-value">—</div>
+          <div class="atg-live-help">代表系統最後一次從 ATG 收到 spin / closeSpin 資料的時間。</div>
+        </div>
+      </div>
+      <div id="xinyaoLiveConfirmed" class="atg-live-confirmed">
+        <div class="atg-live-confirmed-title">✅ 已完成欄位驗證的資料</div>
+        <div id="xinyaoLiveConfirmedRows" class="atg-live-confirmed-row"></div>
+      </div>
+      <div class="atg-live-actions">
+        <button id="xinyaoLiveRefresh" class="atg-live-refresh" type="button">重新讀取即時資料</button>
+        <button id="xinyaoLiveDebug" class="atg-live-debug" type="button">複製欄位驗證資料</button>
+      </div>
+    </section>
+
 
     <section class="card" style="padding:14px;">
       <div class="mode-grid" style="margin-top:0;">
@@ -3177,9 +2793,6 @@
     const WORKER_URL =
       "https://holy-violet-41e1.love06130430.workers.dev";
 
-    const ADMIN_PUBLIC_API =
-      "https://xinyao-atg-admin-api.love06130430.workers.dev";
-
     const $ = (id) => document.getElementById(id);
     const loginPage = $("loginPage");
     const appPage = $("appPage");
@@ -3208,7 +2821,6 @@
     const memberDisplay = $("memberDisplay");
     const logoutButton = $("logoutButton");
     const appLineFloat = $("appLineFloat");
-    const publicWinList = $("publicWinList");
 
     let loggedInMember = sessionStorage.getItem("memberAccount") || "";
 
@@ -3232,144 +2844,6 @@
       playLoginTransition();
       renderHistory();
       window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-
-
-    function escapeWinText(value) {
-      return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-    }
-
-    function parsePublicWinImages(value) {
-      if (!value) return [];
-
-      try {
-        const parsed = JSON.parse(value);
-
-        return Array.isArray(parsed)
-          ? parsed.filter(Boolean)
-          : [value];
-      } catch {
-        return [value];
-      }
-    }
-
-    async function loadPublicWins() {
-      const list = document.getElementById("publicWinList");
-      if (!list) return;
-
-      list.innerHTML =
-        '<div class="public-win-empty">正在讀取最新會員喜報…</div>';
-
-      try {
-        const response = await fetch(
-          ADMIN_PUBLIC_API + "/public/wins?v=" + Date.now(),
-          {
-            method: "GET",
-            mode: "cors",
-            cache: "no-store",
-            headers: {
-              "Accept": "application/json"
-            }
-          }
-        );
-
-        const raw = await response.text();
-
-        let data;
-        try {
-          data = JSON.parse(raw);
-        } catch {
-          throw new Error("公開喜報 API 回傳格式錯誤");
-        }
-
-        if (!response.ok || !data.ok) {
-          throw new Error(
-            data?.message ||
-            data?.error ||
-            `喜報 API ${response.status}`
-          );
-        }
-
-        const wins =
-          Array.isArray(data.wins)
-            ? data.wins.filter(x => Number(x.is_visible ?? 1) !== 0)
-            : [];
-
-        if (!wins.length) {
-          list.innerHTML =
-            '<div class="public-win-empty">目前尚無公開會員喜報。</div>';
-          return;
-        }
-
-        list.innerHTML = wins.map(win => {
-          const member =
-            escapeWinText(win.member_display || "會員");
-
-          const amount =
-            Number(win.amount || 0).toLocaleString("zh-TW");
-
-          let images = [];
-          if (win.image_url) {
-            try {
-              const parsed = JSON.parse(win.image_url);
-              images = Array.isArray(parsed)
-                ? parsed.filter(Boolean)
-                : [win.image_url];
-            } catch {
-              images = [win.image_url];
-            }
-          }
-
-          const gallery = images.length
-            ? `
-              <div class="public-win-gallery">
-                ${images.map(src => `
-                  <img
-                    src="${escapeWinText(src)}"
-                    alt="會員喜報照片"
-                    loading="lazy"
-                  >
-                `).join("")}
-              </div>
-              ${images.length > 1
-                ? `<div class="public-win-photo-count">
-                     共 ${images.length} 張｜左右滑動看照片
-                   </div>`
-                : ""
-              }
-            `
-            : "";
-
-          return `
-            <article class="public-win-card">
-              <div class="public-win-text">
-                <span class="public-win-member">
-                  恭喜 ${member}
-                </span>
-                使用此程式贏得
-                <span class="public-win-amount">
-                  ${amount}
-                </span>
-              </div>
-              ${gallery}
-            </article>
-          `;
-        }).join("");
-
-      } catch (error) {
-        console.error("公開喜報讀取失敗：", error);
-
-        list.innerHTML = `
-          <div class="public-win-empty" style="color:#d83f7f;font-weight:800">
-            喜報讀取失敗：${escapeWinText(error.message || "未知錯誤")}
-          </div>
-        `;
-      }
     }
 
     async function verifyMember() {
@@ -3918,91 +3392,133 @@
       openAnalyzer(loggedInMember);
     }
 
-    // 登入頁直接顯示公開喜報
+    // 停用 Service Worker，避免 GitHub Pages 長期讀到舊版快取。
 
-    document.addEventListener("DOMContentLoaded", () => {
-      loadPublicWins();
+
+  </script>
+
+<script id="xinyao-live-data-script">
+(() => {
+  const $live = (id) => document.getElementById(id);
+  let latestLiveState = null;
+
+  function setSelectByGame(id, gameName) {
+    const el = document.getElementById(id);
+    if (!el || !gameName) return;
+    const clean = String(gameName).replace(/\s+/g, '');
+    const opt = Array.from(el.options || []).find(o => {
+      const a = String(o.value || '').replace(/\s+/g, '');
+      const b = String(o.textContent || '').replace(/\s+/g, '');
+      return a === clean || b === clean || b.includes(clean.replace(/^[^\u4e00-\u9fff]*/, ''));
     });
+    if (opt) {
+      el.value = opt.value;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
 
-    // =========================
-    // 喜報照片放大檢視
-    // =========================
-    const winLightbox =
-      document.getElementById("winLightbox");
+  function setVerifiedInput(id, item) {
+    if (!item || item.verified !== true) return;
+    const el = document.getElementById(id);
+    if (!el || item.value == null || item.value === '') return;
+    el.value = String(item.value);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
 
-    const winLightboxImage =
-      document.getElementById("winLightboxImage");
+  function timeText(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  }
 
-    const winLightboxClose =
-      document.getElementById("winLightboxClose");
+  function renderConfirmed(confirmed) {
+    const wrap = $live('xinyaoLiveConfirmed');
+    const rows = $live('xinyaoLiveConfirmedRows');
+    if (!wrap || !rows) return;
 
-    function openWinLightbox(src){
-      if(
-        !winLightbox ||
-        !winLightboxImage ||
-        !src
-      ){
-        return;
-      }
+    const labels = {
+      room: '房號', payout: '本局派彩', bet: '本局投注',
+      balance: '目前餘額', freeTriggerCount: '免費遊戲觸發次數'
+    };
+    const parts = [];
+    for (const [key, item] of Object.entries(confirmed || {})) {
+      if (!item || item.verified !== true) continue;
+      parts.push(`<div><b>${labels[key] || key}：</b>${String(item.value ?? '—')}</div>`);
+    }
+    rows.innerHTML = parts.join('');
+    wrap.classList.toggle('show', parts.length > 0);
+  }
 
-      winLightboxImage.src = src;
-      winLightbox.classList.add("show");
-      winLightbox.setAttribute("aria-hidden","false");
-      document.body.style.overflow = "hidden";
+  function applyConfirmedToForms(confirmed) {
+    setVerifiedInput('room', confirmed?.room);
+    setVerifiedInput('continueRoom', confirmed?.room);
+    setVerifiedInput('currentBalance', confirmed?.balance);
+    setVerifiedInput('maxWin', confirmed?.maxWin || confirmed?.payout);
+    setVerifiedInput('freeGameCount', confirmed?.freeTriggerCount);
+  }
+
+  function renderLive(state) {
+    latestLiveState = state || null;
+    const status = $live('xinyaoLiveStatus');
+    if (!state) {
+      if (status) { status.textContent = '等待資料'; status.classList.remove('ok'); }
+      return;
     }
 
-    function closeWinLightbox(){
-      if(
-        !winLightbox ||
-        !winLightboxImage
-      ){
-        return;
-      }
+    if (status) { status.textContent = '即時接收中'; status.classList.add('ok'); }
+    if ($live('xinyaoLiveGame')) $live('xinyaoLiveGame').textContent = state.gameName || 'ATG';
+    if ($live('xinyaoLiveCloseCount')) $live('xinyaoLiveCloseCount').textContent = `${Number(state.eventCounts?.closeSpin || 0)} 筆`;
+    if ($live('xinyaoLiveSpinCount')) $live('xinyaoLiveSpinCount').textContent = `${Number(state.eventCounts?.spin || 0)} 筆`;
+    if ($live('xinyaoLiveTime')) $live('xinyaoLiveTime').textContent = timeText(state.lastReceivedAt);
 
-      winLightbox.classList.remove("show");
-      winLightbox.setAttribute("aria-hidden","true");
-      winLightboxImage.removeAttribute("src");
-      document.body.style.overflow = "";
+    setSelectByGame('game', state.gameName);
+    setSelectByGame('continueGame', state.gameName);
+    renderConfirmed(state.confirmed || {});
+    applyConfirmedToForms(state.confirmed || {});
+  }
+
+  window.addEventListener('message', (event) => {
+    if (event.source !== window) return;
+    const m = event.data;
+    if (!m || m.source !== 'xinyao-atg-free-bridge' || m.type !== 'ATG_LIVE_STATE') return;
+    renderLive(m.state || null);
+  });
+
+  function requestState() {
+    window.postMessage({ source:'xinyao-atg-site', type:'ATG_REQUEST_STATE' }, '*');
+  }
+
+  $live('xinyaoLiveRefresh')?.addEventListener('click', requestState);
+
+  const debug = new URLSearchParams(location.search).get('debug') === '1';
+  const debugBtn = $live('xinyaoLiveDebug');
+  if (debugBtn && debug) debugBtn.classList.add('show');
+  debugBtn?.addEventListener('click', async () => {
+    const payload = latestLiveState ? {
+      gameCode: latestLiveState.gameCode,
+      gameName: latestLiveState.gameName,
+      eventCounts: latestLiveState.eventCounts,
+      lastEvent: latestLiveState.lastEvent,
+      lastReceivedAt: latestLiveState.lastReceivedAt,
+      candidates: latestLiveState.candidates,
+      recent: latestLiveState.recent
+    } : null;
+    const text = JSON.stringify(payload, null, 2);
+    try {
+      await navigator.clipboard.writeText(text);
+      debugBtn.textContent = '已複製 ✓';
+      setTimeout(() => debugBtn.textContent = '複製欄位驗證資料', 1500);
+    } catch (_) {
+      prompt('請複製以下資料：', text);
     }
+  });
 
-    document.addEventListener("click",(event)=>{
-      const image =
-        event.target.closest(
-          ".public-win-gallery img, .public-win-card img"
-        );
-
-      if(image){
-        event.preventDefault();
-        openWinLightbox(
-          image.currentSrc ||
-          image.src
-        );
-        return;
-      }
-
-      if(
-        event.target === winLightbox ||
-        event.target === winLightboxClose
-      ){
-        closeWinLightbox();
-      }
-    });
-
-    document.addEventListener("keydown",(event)=>{
-      if(
-        event.key === "Escape" &&
-        winLightbox?.classList.contains("show")
-      ){
-        closeWinLightbox();
-      }
-    });
-
+  setTimeout(requestState, 500);
+  setTimeout(requestState, 1800);
+})();
 </script>
-
-<div id="winLightbox" class="win-lightbox" aria-hidden="true">
-  <button id="winLightboxClose" class="win-lightbox-close" type="button" aria-label="關閉">×</button>
-  <img id="winLightboxImage" class="win-lightbox-image" alt="會員喜報大圖">
-</div>
 
 </body>
 </html>
