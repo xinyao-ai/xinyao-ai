@@ -2491,34 +2491,54 @@
 
     <section id="xinyaoLiveDataPanel" class="atg-live-card">
       <div class="atg-live-head">
-        <div class="atg-live-title">📡 ATG 即時真實資料</div>
+        <div class="atg-live-title">📡 ATG 即時遊戲資料</div>
         <span id="xinyaoLiveStatus" class="atg-live-badge">等待資料</span>
       </div>
       <div class="atg-live-grid">
         <div class="atg-live-item">
-          <div class="atg-live-label">目前辨識遊戲</div>
+          <div class="atg-live-label">目前遊戲</div>
           <div id="xinyaoLiveGame" class="atg-live-value">尚未收到</div>
-          <div class="atg-live-help">依 ATG 遊戲網址的遊戲代碼辨識。</div>
+          <div class="atg-live-help">依 ATG 遊戲代碼自動辨識。</div>
         </div>
         <div class="atg-live-item">
-          <div class="atg-live-label">已收到遊戲結束紀錄</div>
-          <div id="xinyaoLiveCloseCount" class="atg-live-value">0 筆</div>
-          <div class="atg-live-help">每一筆是 ATG 回傳的 closeSpin「遊戲結束資料」。這個數字不直接當成免遊次數，也不先假設等於一般轉數。</div>
+          <div class="atg-live-label">目前點數</div>
+          <div id="xinyaoLiveBalance" class="atg-live-value">—</div>
+          <div class="atg-live-help">ATG 回傳的玩家目前點數，不是自行估算。</div>
         </div>
         <div class="atg-live-item">
-          <div class="atg-live-label">已收到遊戲開始紀錄</div>
-          <div id="xinyaoLiveSpinCount" class="atg-live-value">0 筆</div>
-          <div class="atg-live-help">每一筆是 ATG 回傳的 spin「遊戲開始資料」。</div>
+          <div class="atg-live-label">目前押注</div>
+          <div id="xinyaoLiveBet" class="atg-live-value">—</div>
+          <div class="atg-live-help">本回合 ATG 回傳的實際總押注。</div>
         </div>
         <div class="atg-live-item">
-          <div class="atg-live-label">最後收到遊戲資料時間</div>
+          <div class="atg-live-label">最新一局派彩</div>
+          <div id="xinyaoLivePayout" class="atg-live-value">—</div>
+          <div class="atg-live-help">最新一個回合最後結算的派彩金額。</div>
+        </div>
+        <div class="atg-live-item">
+          <div class="atg-live-label">目前捕捉最高派彩</div>
+          <div id="xinyaoLiveMaxPayout" class="atg-live-value">—</div>
+          <div class="atg-live-help">從本次捕捉到的回合中，取最高結算派彩。</div>
+        </div>
+        <div class="atg-live-item">
+          <div class="atg-live-label">免費遊戲狀態</div>
+          <div id="xinyaoLiveFreeGame" class="atg-live-value">—</div>
+          <div class="atg-live-help">顯示目前是否進入免費遊戲，以及剩餘次數。</div>
+        </div>
+        <div class="atg-live-item">
+          <div class="atg-live-label">已捕捉回合</div>
+          <div id="xinyaoLiveRoundCount" class="atg-live-value">0 局</div>
+          <div class="atg-live-help">依 ATG 的 spinId 去除重複後計算；同一局重複封包不會重複計入。</div>
+        </div>
+        <div class="atg-live-item">
+          <div class="atg-live-label">最後同步 ATG 回合資料</div>
           <div id="xinyaoLiveTime" class="atg-live-value">—</div>
-          <div class="atg-live-help">代表系統最後一次從 ATG 收到 spin / closeSpin 資料的時間。</div>
+          <div class="atg-live-help">代表上方點數、押注、派彩等資料最後一次收到 ATG 回傳的時間。</div>
         </div>
       </div>
-      <div id="xinyaoLiveConfirmed" class="atg-live-confirmed">
-        <div class="atg-live-confirmed-title">✅ 已完成欄位驗證的資料</div>
-        <div id="xinyaoLiveConfirmedRows" class="atg-live-confirmed-row"></div>
+      <div id="xinyaoLiveConfirmed" class="atg-live-confirmed show">
+        <div class="atg-live-confirmed-title">✅ 已驗證可讀取的真實欄位</div>
+        <div id="xinyaoLiveConfirmedRows" class="atg-live-confirmed-row">目前點數、實際押注、回合派彩、免費遊戲狀態。</div>
       </div>
       <div class="atg-live-actions">
         <button id="xinyaoLiveRefresh" class="atg-live-refresh" type="button">重新讀取即時資料</button>
@@ -3401,6 +3421,17 @@
 (() => {
   const $live = (id) => document.getElementById(id);
   let latestLiveState = null;
+  let latestNormalized = null;
+
+  function finiteNumber(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function moneyText(value) {
+    const n = finiteNumber(value);
+    return n == null ? '—' : n.toFixed(2);
+  }
 
   function setSelectByGame(id, gameName) {
     const el = document.getElementById(id);
@@ -3417,11 +3448,10 @@
     }
   }
 
-  function setVerifiedInput(id, item) {
-    if (!item || item.verified !== true) return;
+  function setInputValue(id, value) {
     const el = document.getElementById(id);
-    if (!el || item.value == null || item.value === '') return;
-    el.value = String(item.value);
+    if (!el || value == null || value === '') return;
+    el.value = String(value);
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }
@@ -3433,50 +3463,191 @@
     return d.toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
   }
 
-  function renderConfirmed(confirmed) {
+  function findEnvelope(value, depth = 0, seen = new Set()) {
+    if (!value || typeof value !== 'object' || depth > 7 || seen.has(value)) return null;
+    seen.add(value);
+
+    if (value.engine && Array.isArray(value.engine.gameState)) return value;
+
+    const list = Array.isArray(value)
+      ? value.slice(0, 80)
+      : Object.values(value).slice(0, 120);
+
+    for (const child of list) {
+      if (child && typeof child === 'object') {
+        const found = findEnvelope(child, depth + 1, seen);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  function balanceFromObject(value, depth = 0, seen = new Set()) {
+    if (!value || typeof value !== 'object' || depth > 7 || seen.has(value)) return null;
+    seen.add(value);
+
+    const direct = finiteNumber(value?.platform?.player?.balance?.amount);
+    if (direct != null) return direct;
+
+    if (value.player && value.player.balance) {
+      const n = finiteNumber(value.player.balance.amount);
+      if (n != null) return n;
+    }
+
+    const list = Array.isArray(value)
+      ? value.slice(0, 80)
+      : Object.values(value).slice(0, 120);
+
+    for (const child of list) {
+      if (child && typeof child === 'object') {
+        const found = balanceFromObject(child, depth + 1, seen);
+        if (found != null) return found;
+      }
+    }
+    return null;
+  }
+
+  function resultFromRecord(record) {
+    const data = record?.data ?? record;
+    const env = findEnvelope(data);
+    if (!env) return null;
+
+    const states = Array.isArray(env?.engine?.gameState) ? env.engine.gameState : [];
+    if (!states.length) return null;
+
+    const finalState = states[states.length - 1] || {};
+    const firstWithStake = states.find(s => finiteNumber(s?.totalStake) != null) || {};
+    const payout = finiteNumber(finalState.totalWinnings) ?? finiteNumber(finalState.roundWinnings) ?? 0;
+    const stake = finiteNumber(firstWithStake.totalStake);
+    const freeCurrent = finiteNumber(finalState.freeGameCount) ?? 0;
+    const freeStarted = states.some(s => s?.startFreeGame === true);
+    const spinId = String(env?.engine?.spinId || '');
+    const balance = finiteNumber(env?.platform?.player?.balance?.amount);
+    const time = record?.time || record?.capturedAt || record?.timestamp || '';
+
+    return {
+      spinId,
+      time,
+      payout,
+      stake,
+      balance,
+      freeCurrent,
+      freeStarted,
+      stateCount: states.length
+    };
+  }
+
+  function normalizeState(state) {
+    const recent = Array.isArray(state?.recent)
+      ? state.recent
+      : Array.isArray(state?.meaningfulRecent)
+        ? state.meaningfulRecent
+        : [];
+
+    const bySpin = new Map();
+    let latestBalance = null;
+    let latestBalanceTime = '';
+
+    for (const rec of recent) {
+      const b = balanceFromObject(rec?.data ?? rec);
+      const t = rec?.time || rec?.capturedAt || '';
+      if (b != null && (!latestBalanceTime || t >= latestBalanceTime)) {
+        latestBalance = b;
+        latestBalanceTime = t;
+      }
+
+      const item = resultFromRecord(rec);
+      if (!item) continue;
+
+      const key = item.spinId || `${item.time}|${item.stake}|${item.payout}`;
+      const prev = bySpin.get(key);
+      if (!prev || item.stateCount > prev.stateCount || item.time >= prev.time) {
+        bySpin.set(key, item);
+      }
+    }
+
+    const rounds = Array.from(bySpin.values()).sort((a,b) => String(a.time).localeCompare(String(b.time)));
+    const latest = rounds.length ? rounds[rounds.length - 1] : null;
+
+    const latestBet = latest?.stake ?? finiteNumber(state?.lastSpin?.stakeValue) ?? finiteNumber(state?.latestSpinRequest?.stakeValue);
+    const latestPayout = latest?.payout ?? null;
+    const maxPayout = rounds.length ? Math.max(...rounds.map(x => finiteNumber(x.payout) ?? 0)) : null;
+    const freeTriggers = rounds.filter(x => x.freeStarted).length;
+    const freeCurrent = latest?.freeCurrent ?? 0;
+
+    const counts = state?.counts || state?.eventCounts || {};
+    const sentSpin = Number(counts.spin || 0);
+    const sentClose = Number(counts.closeSpin || 0);
+
+    return {
+      gameName: state?.gameName || 'ATG',
+      gameCode: state?.gameCode || '',
+      balance: latestBalance ?? latest?.balance ?? null,
+      bet: latestBet,
+      payout: latestPayout,
+      maxPayout,
+      freeCurrent,
+      freeTriggers,
+      roundCount: rounds.length,
+      sentSpin,
+      sentClose,
+      lastReceivedAt: state?.lastReceivedAt || latest?.time || latestBalanceTime || '',
+      rounds
+    };
+  }
+
+  function renderVerifiedSummary(n) {
     const wrap = $live('xinyaoLiveConfirmed');
     const rows = $live('xinyaoLiveConfirmedRows');
     if (!wrap || !rows) return;
 
-    const labels = {
-      room: '房號', payout: '本局派彩', bet: '本局投注',
-      balance: '目前餘額', freeTriggerCount: '免費遊戲觸發次數'
-    };
-    const parts = [];
-    for (const [key, item] of Object.entries(confirmed || {})) {
-      if (!item || item.verified !== true) continue;
-      parts.push(`<div><b>${labels[key] || key}：</b>${String(item.value ?? '—')}</div>`);
-    }
-    rows.innerHTML = parts.join('');
-    wrap.classList.toggle('show', parts.length > 0);
+    const items = [];
+    if (n.balance != null) items.push(`目前點數 ${moneyText(n.balance)}`);
+    if (n.bet != null) items.push(`目前押注 ${moneyText(n.bet)}`);
+    if (n.payout != null) items.push(`最新派彩 ${moneyText(n.payout)}`);
+    items.push(n.freeCurrent > 0 ? `免費遊戲剩餘 ${n.freeCurrent} 次` : '目前未進行免費遊戲');
+
+    rows.textContent = items.join('｜');
+    wrap.classList.add('show');
   }
 
-  function applyConfirmedToForms(confirmed) {
-    setVerifiedInput('room', confirmed?.room);
-    setVerifiedInput('continueRoom', confirmed?.room);
-    setVerifiedInput('currentBalance', confirmed?.balance);
-    setVerifiedInput('maxWin', confirmed?.maxWin || confirmed?.payout);
-    setVerifiedInput('freeGameCount', confirmed?.freeTriggerCount);
+  function applyLiveToForms(n) {
+    if (!n) return;
+    if (n.balance != null) setInputValue('currentBalance', n.balance.toFixed(2));
+    if (n.maxPayout != null) setInputValue('maxWin', n.maxPayout.toFixed(2));
+    setInputValue('freeGameCount', String(n.freeTriggers || 0));
   }
 
   function renderLive(state) {
     latestLiveState = state || null;
+    latestNormalized = state ? normalizeState(state) : null;
     const status = $live('xinyaoLiveStatus');
+
     if (!state) {
       if (status) { status.textContent = '等待資料'; status.classList.remove('ok'); }
       return;
     }
 
+    const n = latestNormalized;
     if (status) { status.textContent = '即時接收中'; status.classList.add('ok'); }
-    if ($live('xinyaoLiveGame')) $live('xinyaoLiveGame').textContent = state.gameName || 'ATG';
-    if ($live('xinyaoLiveCloseCount')) $live('xinyaoLiveCloseCount').textContent = `${Number(state.eventCounts?.closeSpin || 0)} 筆`;
-    if ($live('xinyaoLiveSpinCount')) $live('xinyaoLiveSpinCount').textContent = `${Number(state.eventCounts?.spin || 0)} 筆`;
-    if ($live('xinyaoLiveTime')) $live('xinyaoLiveTime').textContent = timeText(state.lastReceivedAt);
 
-    setSelectByGame('game', state.gameName);
-    setSelectByGame('continueGame', state.gameName);
-    renderConfirmed(state.confirmed || {});
-    applyConfirmedToForms(state.confirmed || {});
+    if ($live('xinyaoLiveGame')) $live('xinyaoLiveGame').textContent = n.gameName || 'ATG';
+    if ($live('xinyaoLiveBalance')) $live('xinyaoLiveBalance').textContent = moneyText(n.balance);
+    if ($live('xinyaoLiveBet')) $live('xinyaoLiveBet').textContent = moneyText(n.bet);
+    if ($live('xinyaoLivePayout')) $live('xinyaoLivePayout').textContent = moneyText(n.payout);
+    if ($live('xinyaoLiveMaxPayout')) $live('xinyaoLiveMaxPayout').textContent = moneyText(n.maxPayout);
+    if ($live('xinyaoLiveFreeGame')) {
+      $live('xinyaoLiveFreeGame').textContent = n.freeCurrent > 0
+        ? `進行中｜剩餘 ${n.freeCurrent} 次`
+        : '目前未進入';
+    }
+    if ($live('xinyaoLiveRoundCount')) $live('xinyaoLiveRoundCount').textContent = `${n.roundCount} 局`;
+    if ($live('xinyaoLiveTime')) $live('xinyaoLiveTime').textContent = timeText(n.lastReceivedAt);
+
+    setSelectByGame('game', n.gameName);
+    setSelectByGame('continueGame', n.gameName);
+    renderVerifiedSummary(n);
+    applyLiveToForms(n);
   }
 
   window.addEventListener('message', (event) => {
@@ -3499,11 +3670,12 @@
     const payload = latestLiveState ? {
       gameCode: latestLiveState.gameCode,
       gameName: latestLiveState.gameName,
+      counts: latestLiveState.counts,
       eventCounts: latestLiveState.eventCounts,
-      lastEvent: latestLiveState.lastEvent,
       lastReceivedAt: latestLiveState.lastReceivedAt,
-      candidates: latestLiveState.candidates,
-      recent: latestLiveState.recent
+      matches: latestLiveState.matches,
+      normalized: latestNormalized,
+      recent: latestLiveState.recent || latestLiveState.meaningfulRecent
     } : null;
     const text = JSON.stringify(payload, null, 2);
     try {
