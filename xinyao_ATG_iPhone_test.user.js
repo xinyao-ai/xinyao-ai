@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         芯瑤💕 ATG iPhone 即時資料 V3
+// @name         芯瑤💕 ATG 即時助手 V4
 // @namespace    xinyao-atg-ios
-// @version      0.3.0
-// @description  iPhone Safari + Userscripts：讀取 ATG 即時點數、押注、最終派彩與免費遊戲資料。
+// @version      0.4.0
+// @description  ATG iPhone Safari 即時資料助手
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -13,50 +13,39 @@
 (() => {
   'use strict';
 
-  if (window.__XIANYAO_ATG_IOS_V3__) return;
-  window.__XIANYAO_ATG_IOS_V3__ = true;
+  if (window.__XIANYAO_ATG_V4__) return;
+  window.__XIANYAO_ATG_V4__ = true;
 
   const nativeJSONParse = JSON.parse.bind(JSON);
 
   const state = {
-    sockets: 0,
-    incoming: 0,
-    outgoing: 0,
-    binary: 0,
-
-    spin: 0,
-    closeSpin: 0,
-
     balance: null,
     stake: null,
-
-    // 只拿 totalWinnings 當「最新派彩」
     payout: null,
-
-    // roundWinnings 只留著內部比對，不顯示成最終派彩
-    roundWinnings: null,
+    maxPayout: 0,
 
     freeGameCount: null,
     startFreeGame: null,
 
-    decoded: 0,
-    lastType: '等待 ATG 資料',
-    lastAt: ''
+    rounds: 0,
+
+    lastSpinId: '',
+    seenSpinIds: new Set(),
+
+    lastCloseText: '',
+    lastCloseAt: 0,
+
+    connected: false,
+    lastSync: ''
   };
 
-  let badge = null;
-  let expanded = true;
+  let panel = null;
+  let minimized = false;
 
-  const nowText = () =>
-    new Date().toLocaleTimeString('zh-TW', {
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-
-  function toNum(v) {
-    if (typeof v === 'number' && Number.isFinite(v)) return v;
+  function num(v) {
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      return v;
+    }
 
     if (
       typeof v === 'string' &&
@@ -69,76 +58,103 @@
     return null;
   }
 
-  function fmt(v) {
+  function money(v) {
     if (v === null || v === undefined) return '—';
 
-    if (typeof v === 'number') {
-      return (Math.round(v * 100) / 100).toFixed(2);
-    }
+    const n = Number(v);
 
-    return String(v);
+    if (!Number.isFinite(n)) return '—';
+
+    return n.toFixed(2);
   }
 
-  function touch(type) {
-    state.lastType = type;
-    state.lastAt = nowText();
-    updateBadge();
+  function now() {
+    return new Date().toLocaleTimeString(
+      'zh-TW',
+      {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      }
+    );
+  }
+
+  function sync() {
+    state.lastSync = now();
+    render();
   }
 
   function createFound() {
     return {
+      spinIds: [],
       balances: [],
       stakes: [],
       totalWinnings: [],
-      roundWinnings: [],
-      freeGameCounts: [],
+      freeCounts: [],
       startFreeGames: []
     };
   }
 
-  function walk(value, found, path = '', depth = 0, seen = new WeakSet()) {
-    if (depth > 16 || value == null) return;
+  function walk(
+    value,
+    found,
+    path = '',
+    depth = 0,
+    seen = new WeakSet()
+  ) {
+    if (
+      value == null ||
+      depth > 16 ||
+      typeof value !== 'object'
+    ) {
+      return;
+    }
 
-    if (typeof value !== 'object') return;
     if (seen.has(value)) return;
-
     seen.add(value);
 
     if (Array.isArray(value)) {
-      for (let i = 0; i < value.length; i++) {
+      value.forEach((item, i) => {
         walk(
-          value[i],
+          item,
           found,
           `${path}[${i}]`,
           depth + 1,
           seen
         );
-      }
+      });
+
       return;
     }
 
     for (const [key, val] of Object.entries(value)) {
       const k = String(key).toLowerCase();
-      const nextPath = path ? `${path}.${key}` : key;
+      const p = path ? `${path}.${key}` : key;
+
+      if (k === 'spinid' && val) {
+        found.spinIds.push(String(val));
+      }
 
       if (k === 'totalstake') {
-        const n = toNum(val);
+        const n = num(val);
         if (n !== null) found.stakes.push(n);
       }
 
       if (k === 'totalwinnings') {
-        const n = toNum(val);
-        if (n !== null) found.totalWinnings.push(n);
-      }
+        const n = num(val);
 
-      if (k === 'roundwinnings') {
-        const n = toNum(val);
-        if (n !== null) found.roundWinnings.push(n);
+        if (n !== null) {
+          found.totalWinnings.push(n);
+        }
       }
 
       if (k === 'freegamecount') {
-        const n = toNum(val);
-        if (n !== null) found.freeGameCounts.push(n);
+        const n = num(val);
+
+        if (n !== null) {
+          found.freeCounts.push(n);
+        }
       }
 
       if (
@@ -150,17 +166,23 @@
 
       if (
         k === 'amount' &&
-        nextPath.toLowerCase().includes('balance')
+        p.toLowerCase().includes('balance')
       ) {
-        const n = toNum(val);
-        if (n !== null) found.balances.push(n);
+        const n = num(val);
+
+        if (n !== null) {
+          found.balances.push(n);
+        }
       }
 
-      if (val && typeof val === 'object') {
+      if (
+        val &&
+        typeof val === 'object'
+      ) {
         walk(
           val,
           found,
-          nextPath,
+          p,
           depth + 1,
           seen
         );
@@ -168,203 +190,169 @@
     }
   }
 
-  function applyFound(found, source) {
+  function applyFound(found) {
     let changed = false;
 
     if (found.balances.length) {
-      const value =
-        found.balances[found.balances.length - 1];
+      const v =
+        found.balances[
+          found.balances.length - 1
+        ];
 
-      if (state.balance !== value) {
-        state.balance = value;
+      if (state.balance !== v) {
+        state.balance = v;
         changed = true;
       }
     }
 
     if (found.stakes.length) {
-      const value =
-        found.stakes[found.stakes.length - 1];
+      const v =
+        found.stakes[
+          found.stakes.length - 1
+        ];
 
-      if (state.stake !== value) {
-        state.stake = value;
+      if (state.stake !== v) {
+        state.stake = v;
         changed = true;
       }
     }
 
-    /*
-      關鍵修正：
-      同一個遊戲結果物件可能包含多個畫面/階段，
-      totalWinnings 通常會逐步累加。
+    let spinId = '';
 
-      所以同一批解碼資料裡，
-      取最大的 totalWinnings 當整局目前總派彩。
-    */
+    if (found.spinIds.length) {
+      spinId =
+        found.spinIds[
+          found.spinIds.length - 1
+        ];
+
+      state.lastSpinId = spinId;
+    }
+
     if (found.totalWinnings.length) {
-      const value = Math.max(
+      const payout = Math.max(
         ...found.totalWinnings
       );
 
-      if (state.payout !== value) {
-        state.payout = value;
-        changed = true;
+      state.payout = payout;
+
+      if (payout > state.maxPayout) {
+        state.maxPayout = payout;
       }
+
+      /*
+        同一個 spinId 只記錄一次，
+        避免 JSON / Decoder 重複解析造成重複局數。
+      */
+      if (
+        spinId &&
+        !state.seenSpinIds.has(spinId)
+      ) {
+        state.seenSpinIds.add(spinId);
+      }
+
+      changed = true;
     }
 
-    if (found.roundWinnings.length) {
-      const value =
-        found.roundWinnings[
-          found.roundWinnings.length - 1
+    if (found.freeCounts.length) {
+      state.freeGameCount =
+        found.freeCounts[
+          found.freeCounts.length - 1
         ];
 
-      state.roundWinnings = value;
-    }
-
-    if (found.freeGameCounts.length) {
-      const value =
-        found.freeGameCounts[
-          found.freeGameCounts.length - 1
-        ];
-
-      if (state.freeGameCount !== value) {
-        state.freeGameCount = value;
-        changed = true;
-      }
+      changed = true;
     }
 
     if (found.startFreeGames.length) {
-      const value =
+      state.startFreeGame =
         found.startFreeGames[
           found.startFreeGames.length - 1
         ];
 
-      if (state.startFreeGame !== value) {
-        state.startFreeGame = value;
-        changed = true;
-      }
+      changed = true;
     }
 
-    if (changed) {
-      state.decoded++;
-      touch(source);
-    }
-
-    return changed;
+    if (changed) sync();
   }
 
-  function inspectObject(obj, source = '解析資料') {
+  function inspectObject(obj) {
     try {
-      if (!obj || typeof obj !== 'object') return;
+      if (
+        !obj ||
+        typeof obj !== 'object'
+      ) {
+        return;
+      }
 
       const found = createFound();
 
       walk(obj, found);
-      applyFound(found, source);
+      applyFound(found);
+
     } catch (_) {}
   }
 
-  function parsePossibleJSON(text) {
+  function parseText(text) {
     const s = String(text || '').trim();
 
-    const positions = [
+    const spots = [
       s.indexOf('['),
       s.indexOf('{')
-    ].filter(i => i >= 0);
+    ].filter(x => x >= 0);
 
-    if (!positions.length) return null;
+    if (!spots.length) return;
 
-    const start = Math.min(...positions);
+    const start = Math.min(...spots);
 
     try {
-      return nativeJSONParse(s.slice(start));
-    } catch (_) {
-      return null;
-    }
+      const obj =
+        nativeJSONParse(
+          s.slice(start)
+        );
+
+      inspectObject(obj);
+
+    } catch (_) {}
   }
 
-  function detectOutgoingEvent(text) {
-    const s = String(text || '').trim();
+  /*
+    回合數：
+    只從真正送出的 closeSpin 計算，
+    不從 JSON / Decoder 重複增加。
+  */
+  function inspectOutgoing(data) {
+    if (typeof data !== 'string') return;
+
+    const s = String(data);
+
+    if (!s.includes('closeSpin')) return;
+
+    const t = Date.now();
 
     /*
-      只從真正 WebSocket.send 的 Socket.IO 指令計數，
-      不再從 Decoder / JSON / Socket.IO hook 重複計數。
+      300ms 內相同資料視為重複，
+      避免同一個 closeSpin 被算兩次。
     */
-
     if (
-      /^42\["spin"/.test(s) ||
-      /^42\['spin'/.test(s)
-    ) {
-      state.spin++;
-      touch('OUT spin');
-      return;
-    }
-
-    if (
-      /^42\["closeSpin"/.test(s) ||
-      /^42\['closeSpin'/.test(s)
-    ) {
-      state.closeSpin++;
-      touch('OUT closeSpin');
-    }
-  }
-
-  function inspectText(text, direction = '') {
-    const s = String(text || '');
-
-    if (direction === 'OUT') {
-      detectOutgoingEvent(s);
-    }
-
-    if (
-      !s.includes('totalWinnings') &&
-      !s.includes('roundWinnings') &&
-      !s.includes('totalStake') &&
-      !s.includes('freeGameCount') &&
-      !s.includes('startFreeGame') &&
-      !s.includes('balance')
+      state.lastCloseText === s &&
+      t - state.lastCloseAt < 300
     ) {
       return;
     }
 
-    const parsed = parsePossibleJSON(s);
+    state.lastCloseText = s;
+    state.lastCloseAt = t;
 
-    if (parsed) {
-      inspectObject(
-        parsed,
-        `${direction || 'TEXT'} 解碼`
-      );
-    }
-  }
-
-  function inspectData(data, direction) {
-    try {
-      if (direction === 'IN') {
-        state.incoming++;
-      } else {
-        state.outgoing++;
-      }
-
-      if (typeof data === 'string') {
-        inspectText(data, direction);
-        updateBadge();
-        return;
-      }
-
-      if (
-        data instanceof ArrayBuffer ||
-        ArrayBuffer.isView(data) ||
-        data instanceof Blob
-      ) {
-        state.binary++;
-        touch(`${direction} Binary`);
-      }
-    } catch (_) {}
+    state.rounds++;
+    sync();
   }
 
   function freeText() {
     if (state.freeGameCount !== null) {
-      return state.freeGameCount > 0
-        ? `剩 ${state.freeGameCount} 次`
-        : '0 次';
+      if (state.freeGameCount > 0) {
+        return `剩 ${state.freeGameCount} 次`;
+      }
+
+      return '未進行';
     }
 
     if (state.startFreeGame === true) {
@@ -372,97 +360,227 @@
     }
 
     if (state.startFreeGame === false) {
-      return '未觸發';
+      return '未進行';
     }
 
     return '—';
   }
 
-  function updateBadge() {
-    if (!badge) return;
+  function statusText() {
+    return state.connected
+      ? '● 即時連線中'
+      : '● 等待遊戲資料';
+  }
 
-    const head = `
-      <div style="font-weight:800;font-size:13px;">
-        芯瑤 iPhone V3 ✅
-      </div>
+  function render() {
+    if (!panel) return;
 
-      <div style="font-size:11px;margin-top:2px;">
-        WS ${state.sockets}
-        ｜IN ${state.incoming}
-        ｜BIN ${state.binary}
-      </div>
-    `;
+    if (minimized) {
+      panel.innerHTML = `
+        <div id="xinyaoHead"
+             style="
+               font-weight:800;
+               font-size:13px;
+               cursor:pointer;
+             ">
+          🌸 芯瑤即時助手
+        </div>
 
-    if (!expanded) {
-      badge.innerHTML = head;
+        <div style="
+          font-size:10px;
+          margin-top:2px;
+          opacity:.85;
+        ">
+          ${statusText()}
+        </div>
+      `;
+
+      bindHead();
       return;
     }
 
-    badge.innerHTML = `
-      ${head}
+    panel.innerHTML = `
+      <div
+        id="xinyaoHead"
+        style="
+          display:flex;
+          justify-content:space-between;
+          align-items:center;
+          gap:10px;
+          cursor:pointer;
+        "
+      >
+        <div style="
+          font-weight:800;
+          font-size:14px;
+        ">
+          🌸 芯瑤 ATG 即時助手
+        </div>
+
+        <div style="
+          font-size:12px;
+          opacity:.75;
+        ">
+          －
+        </div>
+      </div>
 
       <div style="
-        font-size:11px;
-        margin-top:6px;
-        line-height:1.55;
+        margin-top:3px;
+        font-size:10px;
+        opacity:.85;
       ">
-        點數：${fmt(state.balance)}<br>
-        押注：${fmt(state.stake)}<br>
-        最新派彩：${fmt(state.payout)}<br>
-        免費遊戲：${freeText()}<br>
-        解析命中：${state.decoded}<br>
-        已送出 spin：${state.spin}<br>
-        已送出 closeSpin：${state.closeSpin}<br>
-        最新：${state.lastType}<br>
-        時間：${state.lastAt || '—'}
+        ${statusText()}
+      </div>
+
+      <div style="
+        height:1px;
+        background:rgba(255,255,255,.15);
+        margin:7px 0;
+      "></div>
+
+      <div class="xinyaoRow">
+        <span>目前點數</span>
+        <b>${money(state.balance)}</b>
+      </div>
+
+      <div class="xinyaoRow">
+        <span>目前押注</span>
+        <b>${money(state.stake)}</b>
+      </div>
+
+      <div class="xinyaoRow">
+        <span>最新一局派彩</span>
+        <b>${money(state.payout)}</b>
+      </div>
+
+      <div class="xinyaoRow">
+        <span>本次最高派彩</span>
+        <b>${money(state.maxPayout)}</b>
+      </div>
+
+      <div class="xinyaoRow">
+        <span>免費遊戲</span>
+        <b>${freeText()}</b>
+      </div>
+
+      <div class="xinyaoRow">
+        <span>本次已完成回合</span>
+        <b>${state.rounds}</b>
+      </div>
+
+      <div style="
+        height:1px;
+        background:rgba(255,255,255,.15);
+        margin:7px 0 5px;
+      "></div>
+
+      <div style="
+        font-size:10px;
+        opacity:.65;
+        text-align:right;
+      ">
+        最後同步 ${
+          state.lastSync || '—'
+        }
       </div>
     `;
+
+    bindHead();
   }
 
-  function mountBadge() {
+  function bindHead() {
+    const head =
+      panel?.querySelector(
+        '#xinyaoHead'
+      );
+
+    if (!head) return;
+
+    head.onclick = () => {
+      minimized = !minimized;
+      render();
+    };
+  }
+
+  function mountPanel() {
     if (
-      badge ||
+      panel ||
       !document.documentElement
     ) {
       return;
     }
 
-    badge = document.createElement('div');
+    const style =
+      document.createElement('style');
 
-    Object.assign(badge.style, {
-      position: 'fixed',
-      top: '8px',
-      left: '8px',
-      zIndex: '2147483647',
-      background: 'rgba(20,20,24,.90)',
-      color: '#fff',
-      border:
-        '1px solid rgba(255,255,255,.22)',
-      borderRadius: '12px',
-      padding: '8px 10px',
-      minWidth: '155px',
-      boxShadow:
-        '0 4px 18px rgba(0,0,0,.28)',
-      fontFamily:
-        '-apple-system,BlinkMacSystemFont,"PingFang TC",sans-serif',
-      lineHeight: '1.25',
-      userSelect: 'none',
-      WebkitUserSelect: 'none'
-    });
+    style.textContent = `
+      #xinyaoATGV4 .xinyaoRow {
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:14px;
+        margin:4px 0;
+        font-size:11px;
+      }
 
-    badge.addEventListener(
-      'click',
-      () => {
-        expanded = !expanded;
-        updateBadge();
+      #xinyaoATGV4 .xinyaoRow span {
+        opacity:.8;
+      }
+
+      #xinyaoATGV4 .xinyaoRow b {
+        font-size:12px;
+        font-weight:800;
+      }
+    `;
+
+    document.documentElement.appendChild(
+      style
+    );
+
+    panel =
+      document.createElement('div');
+
+    panel.id = 'xinyaoATGV4';
+
+    Object.assign(
+      panel.style,
+      {
+        position: 'fixed',
+        top: '8px',
+        left: '8px',
+        zIndex: '2147483647',
+
+        minWidth: '175px',
+
+        background:
+          'rgba(23,20,30,.91)',
+
+        color: '#fff',
+
+        border:
+          '1px solid rgba(255,255,255,.20)',
+
+        borderRadius: '14px',
+
+        padding: '9px 11px',
+
+        boxShadow:
+          '0 5px 20px rgba(0,0,0,.30)',
+
+        fontFamily:
+          '-apple-system,BlinkMacSystemFont,"PingFang TC",sans-serif',
+
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)'
       }
     );
 
     document.documentElement.appendChild(
-      badge
+      panel
     );
 
-    updateBadge();
+    render();
   }
 
   function patchWebSocket() {
@@ -470,121 +588,139 @@
 
     if (
       !NativeWS ||
-      NativeWS.__xinyaoV3Wrapped
+      NativeWS.__xinyaoV4Wrapped
     ) {
       return;
     }
 
-    const WrappedWS = new Proxy(
-      NativeWS,
-      {
-        construct(Target, args, NewTarget) {
-          const ws = Reflect.construct(
+    const WrappedWS =
+      new Proxy(
+        NativeWS,
+        {
+          construct(
             Target,
             args,
             NewTarget
-          );
-
-          state.sockets++;
-          touch('WebSocket 已建立');
-
-          try {
-            ws.addEventListener(
-              'message',
-              e => {
-                inspectData(
-                  e.data,
-                  'IN'
-                );
-              },
-              true
-            );
-          } catch (_) {}
-
-          try {
-            const nativeSend = ws.send;
-
-            ws.send = function(data) {
-              inspectData(
-                data,
-                'OUT'
+          ) {
+            const ws =
+              Reflect.construct(
+                Target,
+                args,
+                NewTarget
               );
 
-              return nativeSend.call(
-                this,
-                data
-              );
-            };
-          } catch (_) {}
+            state.connected = true;
+            sync();
 
-          return ws;
+            try {
+              ws.addEventListener(
+                'message',
+                e => {
+                  if (
+                    typeof e.data ===
+                    'string'
+                  ) {
+                    parseText(e.data);
+                  }
+                },
+                true
+              );
+            } catch (_) {}
+
+            try {
+              const nativeSend =
+                ws.send;
+
+              ws.send =
+                function(data) {
+
+                  inspectOutgoing(data);
+
+                  return nativeSend.call(
+                    this,
+                    data
+                  );
+                };
+
+            } catch (_) {}
+
+            return ws;
+          }
         }
-      }
-    );
+      );
 
     try {
       Object.defineProperties(
         WrappedWS,
         {
           CONNECTING: {
-            value: NativeWS.CONNECTING
+            value:
+              NativeWS.CONNECTING
           },
+
           OPEN: {
-            value: NativeWS.OPEN
+            value:
+              NativeWS.OPEN
           },
+
           CLOSING: {
-            value: NativeWS.CLOSING
+            value:
+              NativeWS.CLOSING
           },
+
           CLOSED: {
-            value: NativeWS.CLOSED
+            value:
+              NativeWS.CLOSED
           },
-          __xinyaoV3Wrapped: {
+
+          __xinyaoV4Wrapped: {
             value: true
           }
         }
       );
+
     } catch (_) {
-      WrappedWS.__xinyaoV3Wrapped = true;
+      WrappedWS.__xinyaoV4Wrapped =
+        true;
     }
 
     window.WebSocket = WrappedWS;
-
-    touch('WebSocket 捕捉器已啟動');
   }
 
   function patchJSON() {
     if (
-      JSON.parse.__xinyaoV3Wrapped
+      JSON.parse.__xinyaoV4Wrapped
     ) {
       return;
     }
 
-    const wrapped = function(...args) {
-      const out =
-        nativeJSONParse(...args);
+    const wrapped =
+      function(...args) {
 
-      try {
-        inspectObject(
-          out,
-          'JSON 解碼'
-        );
-      } catch (_) {}
+        const out =
+          nativeJSONParse(...args);
 
-      return out;
-    };
+        try {
+          inspectObject(out);
+        } catch (_) {}
+
+        return out;
+      };
 
     try {
       Object.defineProperty(
         wrapped,
-        '__xinyaoV3Wrapped',
-        { value: true }
+        '__xinyaoV4Wrapped',
+        {
+          value: true
+        }
       );
     } catch (_) {}
 
     JSON.parse = wrapped;
   }
 
-  function patchTextDecoder() {
+  function patchDecoder() {
     try {
       if (!window.TextDecoder) return;
 
@@ -592,35 +728,37 @@
         TextDecoder.prototype.decode;
 
       if (
-        current.__xinyaoV3Wrapped
+        current.__xinyaoV4Wrapped
       ) {
         return;
       }
 
-      const nativeDecode = current;
+      const nativeDecode =
+        current;
 
-      const wrapped = function(...args) {
-        const text =
-          nativeDecode.apply(
-            this,
-            args
-          );
+      const wrapped =
+        function(...args) {
 
-        try {
-          inspectText(
-            text,
-            'DECODE'
-          );
-        } catch (_) {}
+          const text =
+            nativeDecode.apply(
+              this,
+              args
+            );
 
-        return text;
-      };
+          try {
+            parseText(text);
+          } catch (_) {}
+
+          return text;
+        };
 
       try {
         Object.defineProperty(
           wrapped,
-          '__xinyaoV3Wrapped',
-          { value: true }
+          '__xinyaoV4Wrapped',
+          {
+            value: true
+          }
         );
       } catch (_) {}
 
@@ -632,22 +770,21 @@
 
   function patchSocketIO() {
     try {
-      const io = window.io;
       const proto =
-        io?.Socket?.prototype;
+        window.io?.Socket?.prototype;
 
       if (
         !proto ||
-        proto.__xinyaoV3Wrapped
+        proto.__xinyaoV4Wrapped
       ) {
-        return false;
+        return;
       }
 
       if (
         typeof proto.onevent ===
         'function'
       ) {
-        const nativeOnevent =
+        const native =
           proto.onevent;
 
         proto.onevent =
@@ -655,58 +792,44 @@
 
             try {
               if (packet?.data) {
-                /*
-                  這裡只解析內容，
-                  不增加 spin / closeSpin，
-                  避免重複計數。
-                */
                 inspectObject(
-                  packet.data,
-                  'Socket.IO 解碼'
+                  packet.data
                 );
               }
             } catch (_) {}
 
-            return nativeOnevent.call(
+            return native.call(
               this,
               packet
             );
           };
       }
 
-      proto.__xinyaoV3Wrapped = true;
+      proto.__xinyaoV4Wrapped = true;
 
-      touch(
-        'Socket.IO 解碼鉤子已啟動'
-      );
-
-      return true;
-
-    } catch (_) {
-      return false;
-    }
+    } catch (_) {}
   }
 
+  mountPanel();
   patchWebSocket();
   patchJSON();
-  patchTextDecoder();
-  mountBadge();
+  patchDecoder();
 
-  const timer = setInterval(
-    () => {
-      patchWebSocket();
-      patchJSON();
-      patchTextDecoder();
-      patchSocketIO();
-      mountBadge();
-    },
-    100
-  );
+  const timer =
+    setInterval(
+      () => {
+        mountPanel();
+        patchWebSocket();
+        patchJSON();
+        patchDecoder();
+        patchSocketIO();
+      },
+      100
+    );
 
   setTimeout(
-    () => {
-      clearInterval(timer);
-    },
+    () => clearInterval(timer),
     60000
   );
+
 })();
