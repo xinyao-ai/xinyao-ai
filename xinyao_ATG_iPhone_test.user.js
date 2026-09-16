@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-ios
-// @version      1.2.0
-// @description  ATG iPhone Safari 即時資料助手
+// @version      1.3.0
+// @description  ATG iPhone Safari 即時資料助手＋雲端同步
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -13,10 +13,17 @@
 (() => {
   'use strict';
 
-  if (window.__XIANYAO_ATG_MEMBER_V120__) return;
-  window.__XIANYAO_ATG_MEMBER_V120__ = true;
+  if (window.__XIANYAO_ATG_V130__) return;
+  window.__XIANYAO_ATG_V130__ = true;
 
-  const nativeJSONParse = JSON.parse.bind(JSON);
+  const WORKER =
+    'https://xinyao-atg-live.love06130430.workers.dev';
+
+  const CHANNEL_STORAGE_KEY =
+    'xinyao_atg_sync_channel_v1';
+
+  const nativeJSONParse =
+    JSON.parse.bind(JSON);
 
   const state = {
     connected: false,
@@ -36,14 +43,22 @@
     previousSpinId: '',
     currentSpinId: '',
 
-    completedSpinIds: new Set(),
+    completedSpinIds:
+      new Set(),
 
     waitingResult: false,
 
     lastCloseText: '',
     lastCloseAt: 0,
 
-    lastSync: ''
+    lastSync: '',
+
+    cloudChannel: '',
+    cloudStatus: '等待同步',
+    cloudTime: '',
+
+    lastCloudSignature: '',
+    cloudSending: false
   };
 
   let panel = null;
@@ -60,7 +75,9 @@
     if (
       typeof value === 'string' &&
       value.trim() !== '' &&
-      Number.isFinite(Number(value))
+      Number.isFinite(
+        Number(value)
+      )
     ) {
       return Number(value);
     }
@@ -76,7 +93,8 @@
       return '—';
     }
 
-    const n = Number(value);
+    const n =
+      Number(value);
 
     return Number.isFinite(n)
       ? n.toFixed(2)
@@ -84,28 +102,110 @@
   }
 
   function nowText() {
-    return new Date().toLocaleTimeString(
-      'zh-TW',
-      {
-        hour12: false,
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      }
-    );
+    return new Date()
+      .toLocaleTimeString(
+        'zh-TW',
+        {
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        }
+      );
   }
 
   function sync() {
-    state.lastSync = nowText();
+    state.lastSync =
+      nowText();
+
     render();
   }
 
   function isObject(value) {
     return (
       value !== null &&
-      typeof value === 'object'
+      typeof value ===
+        'object'
     );
   }
+
+  // =========================
+  // 雲端同步碼
+  // =========================
+
+  function createChannel() {
+    try {
+      const saved =
+        localStorage.getItem(
+          CHANNEL_STORAGE_KEY
+        );
+
+      if (
+        saved &&
+        /^[A-Z0-9]{10}$/.test(
+          saved
+        )
+      ) {
+        return saved;
+      }
+    } catch (_) {}
+
+    const chars =
+      'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+    let result = '';
+
+    try {
+      const bytes =
+        new Uint8Array(10);
+
+      crypto.getRandomValues(
+        bytes
+      );
+
+      for (
+        const byte
+        of bytes
+      ) {
+        result +=
+          chars[
+            byte %
+            chars.length
+          ];
+      }
+
+    } catch (_) {
+      for (
+        let i = 0;
+        i < 10;
+        i++
+      ) {
+        result +=
+          chars[
+            Math.floor(
+              Math.random() *
+              chars.length
+            )
+          ];
+      }
+    }
+
+    try {
+      localStorage.setItem(
+        CHANNEL_STORAGE_KEY,
+        result
+      );
+    } catch (_) {}
+
+    return result;
+  }
+
+  state.cloudChannel =
+    createChannel();
+
+  // =========================
+  // ATG 資料解析
+  // =========================
 
   function collectEngines(
     value,
@@ -124,14 +224,22 @@
     seen.add(value);
 
     if (
-      typeof value.spinId === 'string' &&
-      Array.isArray(value.gameState)
+      typeof value.spinId ===
+        'string' &&
+      Array.isArray(
+        value.gameState
+      )
     ) {
       output.push(value);
     }
 
-    if (Array.isArray(value)) {
-      for (const item of value) {
+    if (
+      Array.isArray(value)
+    ) {
+      for (
+        const item
+        of value
+      ) {
         collectEngines(
           item,
           output,
@@ -139,9 +247,17 @@
           seen
         );
       }
+
     } else {
-      for (const child of Object.values(value)) {
-        if (isObject(child)) {
+      for (
+        const child
+        of Object.values(
+          value
+        )
+      ) {
+        if (
+          isObject(child)
+        ) {
           collectEngines(
             child,
             output,
@@ -155,17 +271,26 @@
     return output;
   }
 
-  function getViewNumber(item) {
-    const n = toNumber(
-      item?.currentView
-    );
+  function getViewNumber(
+    item
+  ) {
+    const n =
+      toNumber(
+        item?.currentView
+      );
 
-    return n === null ? -1 : n;
+    return n === null
+      ? -1
+      : n;
   }
 
-  function getFinalGameState(engine) {
+  function getFinalGameState(
+    engine
+  ) {
     if (
-      !Array.isArray(engine?.gameState) ||
+      !Array.isArray(
+        engine?.gameState
+      ) ||
       !engine.gameState.length
     ) {
       return null;
@@ -189,20 +314,31 @@
     return best;
   }
 
-  function engineScore(engine) {
+  function engineScore(
+    engine
+  ) {
     const finalState =
-      getFinalGameState(engine);
+      getFinalGameState(
+        engine
+      );
 
-    if (!finalState) return -1;
+    if (!finalState) {
+      return -1;
+    }
 
     const current =
-      toNumber(finalState.currentView);
+      toNumber(
+        finalState.currentView
+      );
 
     const total =
-      toNumber(finalState.totalViews);
+      toNumber(
+        finalState.totalViews
+      );
 
     return (
-      (current ?? -1) * 1000 +
+      (current ?? -1) *
+        1000 +
       (total ?? 0)
     );
   }
@@ -223,8 +359,13 @@
 
     seen.add(value);
 
-    if (Array.isArray(value)) {
-      for (const item of value) {
+    if (
+      Array.isArray(value)
+    ) {
+      for (
+        const item
+        of value
+      ) {
         const result =
           findBalance(
             item,
@@ -233,7 +374,9 @@
             seen
           );
 
-        if (result !== null) {
+        if (
+          result !== null
+        ) {
           return result;
         }
       }
@@ -243,7 +386,9 @@
 
     for (
       const [key, val]
-      of Object.entries(value)
+      of Object.entries(
+        value
+      )
     ) {
       const nextPath =
         path
@@ -251,22 +396,30 @@
           : key;
 
       const lowerPath =
-        nextPath.toLowerCase();
+        nextPath
+          .toLowerCase();
 
       if (
-        String(key).toLowerCase() ===
+        String(key)
+          .toLowerCase() ===
           'amount' &&
-        lowerPath.includes('balance')
+        lowerPath.includes(
+          'balance'
+        )
       ) {
         const n =
           toNumber(val);
 
-        if (n !== null) {
+        if (
+          n !== null
+        ) {
           return n;
         }
       }
 
-      if (isObject(val)) {
+      if (
+        isObject(val)
+      ) {
         const result =
           findBalance(
             val,
@@ -275,7 +428,9 @@
             seen
           );
 
-        if (result !== null) {
+        if (
+          result !== null
+        ) {
           return result;
         }
       }
@@ -284,7 +439,9 @@
     return null;
   }
 
-  function updateStake(finalState) {
+  function updateStake(
+    finalState
+  ) {
     const value =
       toNumber(
         finalState?.totalStake
@@ -292,62 +449,27 @@
 
     if (
       value !== null &&
-      value !== state.stake
+      value !==
+        state.stake
     ) {
-      state.stake = value;
+      state.stake =
+        value;
+
       return true;
     }
 
     return false;
   }
 
-  function isFinalView(finalState) {
-    if (!finalState) {
-      return false;
-    }
-
-    const totalViews =
-      toNumber(
-        finalState.totalViews
-      );
-
-    const currentView =
-      toNumber(
-        finalState.currentView
-      );
-
-    /*
-      如果 ATG 有 totalViews/currentView，
-      一定等到最後一個 view 才視為完整結果。
-    */
-    if (
-      totalViews !== null &&
-      currentView !== null &&
-      totalViews > 0
-    ) {
-      return (
-        currentView >=
-        totalViews - 1
-      );
-    }
-
-    /*
-      某些遊戲沒有 view 資訊時，
-      有 totalWinnings 就允許當結果。
-    */
-    return (
-      toNumber(
-        finalState.totalWinnings
-      ) !== null
-    );
-  }
-
-  function updateFreeGame(finalState) {
+  function updateFreeGame(
+    finalState
+  ) {
     let changed = false;
 
     const freeCount =
       toNumber(
-        finalState?.freeGameCount
+        finalState
+          ?.freeGameCount
       );
 
     if (
@@ -362,15 +484,18 @@
     }
 
     if (
-      typeof finalState?.startFreeGame ===
+      typeof finalState
+        ?.startFreeGame ===
       'boolean'
     ) {
       if (
         state.startFreeGame !==
-        finalState.startFreeGame
+        finalState
+          .startFreeGame
       ) {
         state.startFreeGame =
-          finalState.startFreeGame;
+          finalState
+            .startFreeGame;
 
         changed = true;
       }
@@ -379,16 +504,60 @@
     return changed;
   }
 
-  function processEngine(engine) {
-    if (!engine?.spinId) {
+  function isFinalView(
+    finalState
+  ) {
+    if (!finalState) {
+      return false;
+    }
+
+    const totalViews =
+      toNumber(
+        finalState.totalViews
+      );
+
+    const currentView =
+      toNumber(
+        finalState.currentView
+      );
+
+    if (
+      totalViews !== null &&
+      currentView !== null &&
+      totalViews > 0
+    ) {
+      return (
+        currentView >=
+        totalViews - 1
+      );
+    }
+
+    return (
+      toNumber(
+        finalState
+          .totalWinnings
+      ) !== null
+    );
+  }
+
+  function processEngine(
+    engine
+  ) {
+    if (
+      !engine?.spinId
+    ) {
       return false;
     }
 
     const spinId =
-      String(engine.spinId);
+      String(
+        engine.spinId
+      );
 
     const finalState =
-      getFinalGameState(engine);
+      getFinalGameState(
+        engine
+      );
 
     if (!finalState) {
       return false;
@@ -397,37 +566,33 @@
     state.lastSeenSpinId =
       spinId;
 
-    let changed = false;
+    let changed =
+      false;
 
     if (
-      updateStake(finalState)
+      updateStake(
+        finalState
+      )
     ) {
       changed = true;
     }
 
-    /*
-      免費遊戲狀態也使用目前 engine
-      最後 currentView 的資料。
-    */
     if (
-      updateFreeGame(finalState)
+      updateFreeGame(
+        finalState
+      )
     ) {
       changed = true;
     }
 
-    /*
-      尚未開始本次新局：
-      不把頁面剛載入時的舊派彩
-      算成本次最新/最高派彩。
-    */
-    if (!state.waitingResult) {
+    // 載入舊資料時
+    // 不計入本次統計
+    if (
+      !state.waitingResult
+    ) {
       return changed;
     }
 
-    /*
-      closeSpin 前最後看到的 spinId
-      是上一局，不能拿來當新局。
-    */
     if (
       !state.currentSpinId &&
       state.previousSpinId &&
@@ -437,11 +602,9 @@
       return changed;
     }
 
-    /*
-      第一次收到不同 spinId，
-      就鎖定為這次新局。
-    */
-    if (!state.currentSpinId) {
+    if (
+      !state.currentSpinId
+    ) {
       state.currentSpinId =
         spinId;
     }
@@ -453,44 +616,51 @@
       return changed;
     }
 
-    /*
-      必須等最後 currentView。
-      避免 0.75 被當成最後 3.00。
-    */
-    if (!isFinalView(finalState)) {
+    // 必須等最後一個 view
+    if (
+      !isFinalView(
+        finalState
+      )
+    ) {
       return changed;
     }
 
     let payout =
       toNumber(
-        finalState.totalWinnings
+        finalState
+          .totalWinnings
       );
 
-    /*
-      保險：
-      若最後 view 沒 totalWinnings，
-      才退回整局最大值。
-    */
-    if (payout === null) {
+    if (
+      payout === null
+    ) {
       const values =
         engine.gameState
-          .map(item =>
-            toNumber(
-              item?.totalWinnings
-            )
+          .map(
+            item =>
+              toNumber(
+                item
+                  ?.totalWinnings
+              )
           )
           .filter(
             value =>
               value !== null
           );
 
-      if (values.length) {
+      if (
+        values.length
+      ) {
         payout =
-          Math.max(...values);
+          Math.max(
+            ...values
+          );
       }
     }
 
-    if (payout !== null) {
+    if (
+      payout !== null
+    ) {
       if (
         state.latestPayout !==
         payout
@@ -502,7 +672,8 @@
       }
 
       if (
-        state.maxPayout === null ||
+        state.maxPayout ===
+          null ||
         payout >
           state.maxPayout
       ) {
@@ -513,49 +684,48 @@
       }
     }
 
-    /*
-      相同 spinId 只算一次，
-      所以 Decoder / JSON / Socket.IO
-      即使重複收到也不會重複加。
-    */
+    // 相同 spinId
+    // 只統計一次
     if (
-      !state.completedSpinIds.has(
-        spinId
-      )
+      !state
+        .completedSpinIds
+        .has(spinId)
     ) {
-      state.completedSpinIds.add(
-        spinId
-      );
+      state
+        .completedSpinIds
+        .add(spinId);
 
       state.completedSpins++;
 
       changed = true;
     }
 
-    /*
-      此局已經拿到完整結果。
-      等下一次 closeSpin
-      才開始接下一局。
-    */
-    state.waitingResult = false;
+    state.waitingResult =
+      false;
 
     return changed;
   }
 
-  function inspectObject(obj) {
+  function inspectObject(
+    obj
+  ) {
     try {
-      if (!isObject(obj)) {
+      if (
+        !isObject(obj)
+      ) {
         return;
       }
 
-      let changed = false;
+      let changed =
+        false;
 
       const balance =
         findBalance(obj);
 
       if (
         balance !== null &&
-        balance !== state.balance
+        balance !==
+          state.balance
       ) {
         state.balance =
           balance;
@@ -564,30 +734,41 @@
       }
 
       const engines =
-        collectEngines(obj);
+        collectEngines(
+          obj
+        );
 
-      /*
-        同一份資料若出現相同 spinId 多次，
-        保留 currentView 較完整的那一份。
-      */
       const bestBySpin =
         new Map();
 
-      for (const engine of engines) {
-        if (!engine?.spinId) {
+      for (
+        const engine
+        of engines
+      ) {
+        if (
+          !engine?.spinId
+        ) {
           continue;
         }
 
         const id =
-          String(engine.spinId);
+          String(
+            engine.spinId
+          );
 
         const previous =
-          bestBySpin.get(id);
+          bestBySpin.get(
+            id
+          );
 
         if (
           !previous ||
-          engineScore(engine) >=
-            engineScore(previous)
+          engineScore(
+            engine
+          ) >=
+          engineScore(
+            previous
+          )
         ) {
           bestBySpin.set(
             id,
@@ -601,9 +782,12 @@
         of bestBySpin.values()
       ) {
         if (
-          processEngine(engine)
+          processEngine(
+            engine
+          )
         ) {
-          changed = true;
+          changed =
+            true;
         }
       }
 
@@ -614,9 +798,13 @@
     } catch (_) {}
   }
 
-  function parseText(text) {
+  function parseText(
+    text
+  ) {
     const raw =
-      String(text || '').trim();
+      String(
+        text || ''
+      ).trim();
 
     if (!raw) {
       return;
@@ -630,17 +818,23 @@
         index >= 0
     );
 
-    if (!positions.length) {
+    if (
+      !positions.length
+    ) {
       return;
     }
 
     const start =
-      Math.min(...positions);
+      Math.min(
+        ...positions
+      );
 
     try {
       const parsed =
         nativeJSONParse(
-          raw.slice(start)
+          raw.slice(
+            start
+          )
         );
 
       inspectObject(
@@ -650,9 +844,12 @@
     } catch (_) {}
   }
 
-  function startNewRound(data) {
+  function startNewRound(
+    data
+  ) {
     if (
-      typeof data !== 'string'
+      typeof data !==
+      'string'
     ) {
       return;
     }
@@ -671,10 +868,6 @@
     const time =
       Date.now();
 
-    /*
-      防止同一個 closeSpin
-      在極短時間內被算兩次。
-    */
     if (
       state.lastCloseText ===
         text &&
@@ -691,10 +884,6 @@
     state.lastCloseAt =
       time;
 
-    /*
-      記住上一個 spinId。
-      接下來必須等新的 spinId。
-    */
     state.previousSpinId =
       state.lastSeenSpinId;
 
@@ -707,19 +896,167 @@
     sync();
   }
 
-  function freeGameText() {
-    /*
-      最後 view 回傳 0 時，
-      一律顯示未進行。
-      不再卡在剩 1 次。
-    */
+  // =========================
+  // Cloudflare 同步
+  // =========================
+
+  function buildCloudPayload() {
+    const hasData =
+      state.balance !== null ||
+      state.stake !== null ||
+      state.latestPayout !== null;
+
+    if (!hasData) {
+      return null;
+    }
+
+    return {
+      channel:
+        state.cloudChannel,
+
+      balance:
+        state.balance,
+
+      stake:
+        state.stake,
+
+      latestPayout:
+        state.latestPayout,
+
+      maxPayout:
+        state.maxPayout,
+
+      freeGameCount:
+        state.freeGameCount ?? 0,
+
+      freeGameActive:
+        (
+          (
+            state.freeGameCount ??
+            0
+          ) > 0 ||
+          state.startFreeGame ===
+            true
+        ),
+
+      completedSpins:
+        state.completedSpins
+    };
+  }
+
+  async function pushCloud() {
     if (
-      state.freeGameCount !== null
+      state.cloudSending
+    ) {
+      return;
+    }
+
+    const payload =
+      buildCloudPayload();
+
+    if (!payload) {
+      return;
+    }
+
+    const signature =
+      JSON.stringify(
+        payload
+      );
+
+    if (
+      signature ===
+      state.lastCloudSignature
+    ) {
+      return;
+    }
+
+    state.cloudSending =
+      true;
+
+    state.cloudStatus =
+      '同步中';
+
+    render();
+
+    try {
+      const response =
+        await fetch(
+          `${WORKER}/push`,
+          {
+            method: 'POST',
+
+            headers: {
+              'Content-Type':
+                'application/json'
+            },
+
+            body:
+              JSON.stringify(
+                payload
+              ),
+
+            credentials:
+              'omit',
+
+            cache:
+              'no-store'
+          }
+        );
+
+      const result =
+        await response
+          .json()
+          .catch(
+            () => null
+          );
+
+      if (
+        !response.ok ||
+        !result?.ok
+      ) {
+        throw new Error(
+          result?.error ||
+          `HTTP ${
+            response.status
+          }`
+        );
+      }
+
+      state.lastCloudSignature =
+        signature;
+
+      state.cloudStatus =
+        '已同步';
+
+      state.cloudTime =
+        nowText();
+
+    } catch (_) {
+      state.cloudStatus =
+        '同步失敗';
+
+    } finally {
+      state.cloudSending =
+        false;
+
+      render();
+    }
+  }
+
+  function freeGameText() {
+    if (
+      state.freeGameCount !==
+      null
     ) {
       if (
-        state.freeGameCount > 0
+        state.freeGameCount >
+        0
       ) {
-        return `剩 ${state.freeGameCount} 次`;
+        return (
+          `剩 ${
+            state.freeGameCount
+          } 次`
+        );
       }
 
       return '未進行';
@@ -747,6 +1084,45 @@
       ? '● 即時連線中'
       : '● 等待遊戲資料';
   }
+
+  function cloudText() {
+    if (
+      state.cloudStatus ===
+      '已同步'
+    ) {
+      return (
+        `☁️ 雲端已同步 ${
+          state.cloudTime
+        }`
+      );
+    }
+
+    if (
+      state.cloudStatus ===
+      '同步中'
+    ) {
+      return (
+        '☁️ 雲端同步中…'
+      );
+    }
+
+    if (
+      state.cloudStatus ===
+      '同步失敗'
+    ) {
+      return (
+        '⚠️ 雲端同步失敗'
+      );
+    }
+
+    return (
+      '☁️ 等待雲端同步'
+    );
+  }
+
+  // =========================
+  // 畫面
+  // =========================
 
   function render() {
     if (!panel) {
@@ -778,6 +1154,7 @@
       `;
 
       bindHeader();
+
       return;
     }
 
@@ -825,22 +1202,30 @@
 
       <div class="xinyaoRow">
         <span>目前點數</span>
-        <b>${money(state.balance)}</b>
+        <b>${money(
+          state.balance
+        )}</b>
       </div>
 
       <div class="xinyaoRow">
         <span>目前押注</span>
-        <b>${money(state.stake)}</b>
+        <b>${money(
+          state.stake
+        )}</b>
       </div>
 
       <div class="xinyaoRow">
         <span>最新一局派彩</span>
-        <b>${money(state.latestPayout)}</b>
+        <b>${money(
+          state.latestPayout
+        )}</b>
       </div>
 
       <div class="xinyaoRow">
         <span>本次最高派彩</span>
-        <b>${money(state.maxPayout)}</b>
+        <b>${money(
+          state.maxPayout
+        )}</b>
       </div>
 
       <div class="xinyaoRow">
@@ -850,7 +1235,47 @@
 
       <div class="xinyaoRow">
         <span>本次完成轉數</span>
-        <b>${state.completedSpins}</b>
+        <b>${
+          state.completedSpins
+        }</b>
+      </div>
+
+      <div class="xinyaoLine"></div>
+
+      <div
+        style="
+          font-size:10px;
+          opacity:.85;
+        "
+      >
+        ${cloudText()}
+      </div>
+
+      <div
+        style="
+          margin-top:4px;
+          display:flex;
+          justify-content:space-between;
+          gap:12px;
+          font-size:10px;
+        "
+      >
+        <span
+          style="
+            opacity:.62;
+          "
+        >
+          網站同步碼
+        </span>
+
+        <b
+          style="
+            font-size:11px;
+            letter-spacing:1px;
+          "
+        >
+          ${state.cloudChannel}
+        </b>
       </div>
 
       <div class="xinyaoLine"></div>
@@ -862,7 +1287,10 @@
           opacity:.62;
         "
       >
-        最後同步 ${state.lastSync || '—'}
+        最後同步 ${
+          state.lastSync ||
+          '—'
+        }
       </div>
 
       <div
@@ -890,12 +1318,13 @@
       return;
     }
 
-    header.onclick = () => {
-      minimized =
-        !minimized;
+    header.onclick =
+      () => {
+        minimized =
+          !minimized;
 
-      render();
-    };
+        render();
+      };
   }
 
   function mountPanel() {
@@ -912,7 +1341,7 @@
       );
 
     style.textContent = `
-      #xinyaoATGMemberV120 .xinyaoRow {
+      #xinyaoATGV130 .xinyaoRow {
         display:flex;
         justify-content:space-between;
         align-items:center;
@@ -921,16 +1350,16 @@
         font-size:11px;
       }
 
-      #xinyaoATGMemberV120 .xinyaoRow span {
+      #xinyaoATGV130 .xinyaoRow span {
         opacity:.78;
       }
 
-      #xinyaoATGMemberV120 .xinyaoRow b {
+      #xinyaoATGV130 .xinyaoRow b {
         font-size:12px;
         font-weight:800;
       }
 
-      #xinyaoATGMemberV120 .xinyaoLine {
+      #xinyaoATGV130 .xinyaoLine {
         height:1px;
         margin:7px 0;
         background:
@@ -947,20 +1376,25 @@
       );
 
     panel.id =
-      'xinyaoATGMemberV120';
+      'xinyaoATGV130';
 
     Object.assign(
       panel.style,
       {
-        position: 'fixed',
-        top: '8px',
-        left: '8px',
+        position:
+          'fixed',
+
+        top:
+          '8px',
+
+        left:
+          '8px',
 
         zIndex:
           '2147483647',
 
         minWidth:
-          '184px',
+          '190px',
 
         padding:
           '9px 11px',
@@ -998,10 +1432,16 @@
     );
 
     document.documentElement
-      .appendChild(panel);
+      .appendChild(
+        panel
+      );
 
     render();
   }
+
+  // =========================
+  // WebSocket / Decoder Hook
+  // =========================
 
   function patchWebSocket() {
     const NativeWS =
@@ -1009,7 +1449,8 @@
 
     if (
       !NativeWS ||
-      NativeWS.__xinyaoV120Wrapped
+      NativeWS
+        .__xinyaoV130Wrapped
     ) {
       return;
     }
@@ -1063,10 +1504,11 @@
                     data
                   );
 
-                  return nativeSend.call(
-                    this,
-                    data
-                  );
+                  return nativeSend
+                    .call(
+                      this,
+                      data
+                    );
                 };
 
             } catch (_) {}
@@ -1100,14 +1542,16 @@
               NativeWS.CLOSED
           },
 
-          __xinyaoV120Wrapped: {
-            value: true
+          __xinyaoV130Wrapped: {
+            value:
+              true
           }
         }
       );
 
     } catch (_) {
-      WrappedWS.__xinyaoV120Wrapped =
+      WrappedWS
+        .__xinyaoV130Wrapped =
         true;
     }
 
@@ -1118,7 +1562,7 @@
   function patchJSON() {
     if (
       JSON.parse
-        .__xinyaoV120Wrapped
+        .__xinyaoV130Wrapped
     ) {
       return;
     }
@@ -1143,11 +1587,12 @@
     try {
       Object.defineProperty(
         wrapped,
-        '__xinyaoV120Wrapped',
+        '__xinyaoV130Wrapped',
         {
           value: true
         }
       );
+
     } catch (_) {}
 
     JSON.parse =
@@ -1169,7 +1614,7 @@
 
       if (
         current
-          .__xinyaoV120Wrapped
+          .__xinyaoV130Wrapped
       ) {
         return;
       }
@@ -1198,11 +1643,12 @@
       try {
         Object.defineProperty(
           wrapped,
-          '__xinyaoV120Wrapped',
+          '__xinyaoV130Wrapped',
           {
             value: true
           }
         );
+
       } catch (_) {}
 
       TextDecoder
@@ -1222,7 +1668,8 @@
 
       if (
         !proto ||
-        proto.__xinyaoV120Wrapped
+        proto
+          .__xinyaoV130Wrapped
       ) {
         return;
       }
@@ -1247,25 +1694,32 @@
               }
             } catch (_) {}
 
-            return nativeOnevent.call(
-              this,
-              packet
-            );
+            return nativeOnevent
+              .call(
+                this,
+                packet
+              );
           };
       }
 
-      proto.__xinyaoV120Wrapped =
+      proto
+        .__xinyaoV130Wrapped =
         true;
 
     } catch (_) {}
   }
 
+  // =========================
+  // 啟動
+  // =========================
+
   mountPanel();
+
   patchWebSocket();
   patchJSON();
   patchTextDecoder();
 
-  const timer =
+  const patchTimer =
     setInterval(
       () => {
         mountPanel();
@@ -1277,10 +1731,20 @@
       100
     );
 
+  // 每 1.2 秒檢查一次
+  // 有新資料才送，不會一直重複寫 KV
+  const cloudTimer =
+    setInterval(
+      () => {
+        pushCloud();
+      },
+      1200
+    );
+
   setTimeout(
     () => {
       clearInterval(
-        timer
+        patchTimer
       );
     },
     60000
