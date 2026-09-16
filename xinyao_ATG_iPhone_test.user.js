@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         芯瑤💕 ATG 即時助手 V4
+// @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-ios
-// @version      0.4.0
-// @description  ATG iPhone Safari 即時資料助手
+// @version      1.0.0
+// @description  ATG iPhone Safari 即時遊戲資料助手
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -13,62 +13,79 @@
 (() => {
   'use strict';
 
-  if (window.__XIANYAO_ATG_V4__) return;
-  window.__XIANYAO_ATG_V4__ = true;
+  if (window.__XIANYAO_ATG_FINAL__) return;
+  window.__XIANYAO_ATG_FINAL__ = true;
 
   const nativeJSONParse = JSON.parse.bind(JSON);
 
   const state = {
+    connected: false,
+
     balance: null,
     stake: null,
-    payout: null,
-    maxPayout: 0,
+
+    latestPayout: null,
+    maxPayout: null,
 
     freeGameCount: null,
     startFreeGame: null,
 
     rounds: 0,
 
-    lastSpinId: '',
-    seenSpinIds: new Set(),
+    lastSeenSpinId: '',
+    currentSpinId: '',
+    previousSpinId: '',
+
+    completedSpinIds: new Set(),
+
+    waitingResult: false,
 
     lastCloseText: '',
     lastCloseAt: 0,
 
-    connected: false,
     lastSync: ''
   };
 
   let panel = null;
   let minimized = false;
 
-  function num(v) {
-    if (typeof v === 'number' && Number.isFinite(v)) {
-      return v;
+  function toNumber(value) {
+    if (
+      typeof value === 'number' &&
+      Number.isFinite(value)
+    ) {
+      return value;
     }
 
     if (
-      typeof v === 'string' &&
-      v.trim() !== '' &&
-      Number.isFinite(Number(v))
+      typeof value === 'string' &&
+      value.trim() !== '' &&
+      Number.isFinite(Number(value))
     ) {
-      return Number(v);
+      return Number(value);
     }
 
     return null;
   }
 
-  function money(v) {
-    if (v === null || v === undefined) return '—';
+  function money(value) {
+    if (
+      value === null ||
+      value === undefined
+    ) {
+      return '—';
+    }
 
-    const n = Number(v);
+    const n = Number(value);
 
-    if (!Number.isFinite(n)) return '—';
+    if (!Number.isFinite(n)) {
+      return '—';
+    }
 
     return n.toFixed(2);
   }
 
-  function now() {
+  function nowText() {
     return new Date().toLocaleTimeString(
       'zh-TW',
       {
@@ -81,7 +98,7 @@
   }
 
   function sync() {
-    state.lastSync = now();
+    state.lastSync = nowText();
     render();
   }
 
@@ -91,7 +108,7 @@
       balances: [],
       stakes: [],
       totalWinnings: [],
-      freeCounts: [],
+      freeGameCounts: [],
       startFreeGames: []
     };
   }
@@ -104,71 +121,97 @@
     seen = new WeakSet()
   ) {
     if (
-      value == null ||
-      depth > 16 ||
+      value === null ||
+      value === undefined ||
+      depth > 18 ||
       typeof value !== 'object'
     ) {
       return;
     }
 
     if (seen.has(value)) return;
+
     seen.add(value);
 
     if (Array.isArray(value)) {
-      value.forEach((item, i) => {
+      for (let i = 0; i < value.length; i++) {
         walk(
-          item,
+          value[i],
           found,
           `${path}[${i}]`,
           depth + 1,
           seen
         );
-      });
+      }
 
       return;
     }
 
-    for (const [key, val] of Object.entries(value)) {
-      const k = String(key).toLowerCase();
-      const p = path ? `${path}.${key}` : key;
+    for (
+      const [key, val]
+      of Object.entries(value)
+    ) {
+      const lowerKey =
+        String(key).toLowerCase();
 
-      if (k === 'spinid' && val) {
-        found.spinIds.push(String(val));
+      const nextPath =
+        path
+          ? `${path}.${key}`
+          : key;
+
+      if (
+        lowerKey === 'spinid' &&
+        val
+      ) {
+        found.spinIds.push(
+          String(val)
+        );
       }
 
-      if (k === 'totalstake') {
-        const n = num(val);
-        if (n !== null) found.stakes.push(n);
+      if (
+        lowerKey === 'totalstake'
+      ) {
+        const n = toNumber(val);
+
+        if (n !== null) {
+          found.stakes.push(n);
+        }
       }
 
-      if (k === 'totalwinnings') {
-        const n = num(val);
+      if (
+        lowerKey === 'totalwinnings'
+      ) {
+        const n = toNumber(val);
 
         if (n !== null) {
           found.totalWinnings.push(n);
         }
       }
 
-      if (k === 'freegamecount') {
-        const n = num(val);
+      if (
+        lowerKey === 'freegamecount'
+      ) {
+        const n = toNumber(val);
 
         if (n !== null) {
-          found.freeCounts.push(n);
+          found.freeGameCounts.push(n);
         }
       }
 
       if (
-        k === 'startfreegame' &&
+        lowerKey === 'startfreegame' &&
         typeof val === 'boolean'
       ) {
         found.startFreeGames.push(val);
       }
 
       if (
-        k === 'amount' &&
-        p.toLowerCase().includes('balance')
+        lowerKey === 'amount' &&
+        nextPath
+          .toLowerCase()
+          .includes('balance')
       ) {
-        const n = num(val);
+        const n = toNumber(val);
 
         if (n !== null) {
           found.balances.push(n);
@@ -182,7 +225,7 @@
         walk(
           val,
           found,
-          p,
+          nextPath,
           depth + 1,
           seen
         );
@@ -190,88 +233,175 @@
     }
   }
 
-  function applyFound(found) {
+  function updateGeneralFields(found) {
     let changed = false;
 
     if (found.balances.length) {
-      const v =
+      const value =
         found.balances[
           found.balances.length - 1
         ];
 
-      if (state.balance !== v) {
-        state.balance = v;
+      if (state.balance !== value) {
+        state.balance = value;
         changed = true;
       }
     }
 
     if (found.stakes.length) {
-      const v =
+      const value =
         found.stakes[
           found.stakes.length - 1
         ];
 
-      if (state.stake !== v) {
-        state.stake = v;
+      if (state.stake !== value) {
+        state.stake = value;
         changed = true;
       }
     }
 
-    let spinId = '';
-
-    if (found.spinIds.length) {
-      spinId =
-        found.spinIds[
-          found.spinIds.length - 1
+    if (found.freeGameCounts.length) {
+      const value =
+        found.freeGameCounts[
+          found.freeGameCounts.length - 1
         ];
 
-      state.lastSpinId = spinId;
-    }
-
-    if (found.totalWinnings.length) {
-      const payout = Math.max(
-        ...found.totalWinnings
-      );
-
-      state.payout = payout;
-
-      if (payout > state.maxPayout) {
-        state.maxPayout = payout;
-      }
-
-      /*
-        同一個 spinId 只記錄一次，
-        避免 JSON / Decoder 重複解析造成重複局數。
-      */
       if (
-        spinId &&
-        !state.seenSpinIds.has(spinId)
+        state.freeGameCount !== value
       ) {
-        state.seenSpinIds.add(spinId);
+        state.freeGameCount = value;
+        changed = true;
       }
-
-      changed = true;
     }
 
-    if (found.freeCounts.length) {
-      state.freeGameCount =
-        found.freeCounts[
-          found.freeCounts.length - 1
-        ];
-
-      changed = true;
-    }
-
-    if (found.startFreeGames.length) {
-      state.startFreeGame =
+    if (
+      found.startFreeGames.length
+    ) {
+      const value =
         found.startFreeGames[
           found.startFreeGames.length - 1
         ];
 
-      changed = true;
+      if (
+        state.startFreeGame !== value
+      ) {
+        state.startFreeGame = value;
+        changed = true;
+      }
     }
 
-    if (changed) sync();
+    return changed;
+  }
+
+  function processSpinIds(found) {
+    if (!found.spinIds.length) {
+      return '';
+    }
+
+    const spinId =
+      found.spinIds[
+        found.spinIds.length - 1
+      ];
+
+    state.lastSeenSpinId = spinId;
+
+    return spinId;
+  }
+
+  function processRoundResult(
+    found,
+    spinId
+  ) {
+    /*
+      尚未開始本次新回合時：
+      任何載入階段的舊 totalWinnings
+      都不列入本次派彩與最高派彩。
+    */
+    if (!state.waitingResult) {
+      return false;
+    }
+
+    if (!spinId) {
+      return false;
+    }
+
+    /*
+      closeSpin 前已存在的 spinId
+      視為舊局資料。
+    */
+    if (
+      !state.currentSpinId &&
+      state.previousSpinId &&
+      spinId === state.previousSpinId
+    ) {
+      return false;
+    }
+
+    /*
+      第一個真正的新 spinId
+      認定為這一局。
+    */
+    if (!state.currentSpinId) {
+      state.currentSpinId = spinId;
+    }
+
+    /*
+      若後面跑出其他 spinId，
+      不混到目前這局裡。
+    */
+    if (
+      spinId !== state.currentSpinId
+    ) {
+      return false;
+    }
+
+    if (
+      !found.totalWinnings.length
+    ) {
+      return false;
+    }
+
+    /*
+      同一局可能有多個畫面，
+      totalWinnings 可能逐步增加。
+
+      這裡取同批資料最大的
+      totalWinnings。
+    */
+    const payout =
+      Math.max(
+        ...found.totalWinnings
+      );
+
+    state.latestPayout = payout;
+
+    /*
+      本次最高派彩：
+      只有本次開始後的新回合才計算。
+    */
+    if (
+      state.maxPayout === null ||
+      payout > state.maxPayout
+    ) {
+      state.maxPayout = payout;
+    }
+
+    /*
+      相同 spinId 只算一個完成回合。
+    */
+    if (
+      !state.completedSpinIds.has(
+        spinId
+      )
+    ) {
+      state.completedSpinIds.add(
+        spinId
+      );
+
+      state.rounds++;
+    }
+
+    return true;
   }
 
   function inspectObject(obj) {
@@ -285,88 +415,145 @@
 
       const found = createFound();
 
-      walk(obj, found);
-      applyFound(found);
+      walk(
+        obj,
+        found
+      );
+
+      const generalChanged =
+        updateGeneralFields(found);
+
+      const spinId =
+        processSpinIds(found);
+
+      const roundChanged =
+        processRoundResult(
+          found,
+          spinId
+        );
+
+      if (
+        generalChanged ||
+        roundChanged
+      ) {
+        sync();
+      }
 
     } catch (_) {}
   }
 
   function parseText(text) {
-    const s = String(text || '').trim();
+    const raw =
+      String(text || '').trim();
 
-    const spots = [
-      s.indexOf('['),
-      s.indexOf('{')
-    ].filter(x => x >= 0);
+    if (!raw) return;
 
-    if (!spots.length) return;
+    const positions = [
+      raw.indexOf('['),
+      raw.indexOf('{')
+    ].filter(
+      index => index >= 0
+    );
 
-    const start = Math.min(...spots);
+    if (!positions.length) {
+      return;
+    }
+
+    const start =
+      Math.min(...positions);
 
     try {
-      const obj =
+      const parsed =
         nativeJSONParse(
-          s.slice(start)
+          raw.slice(start)
         );
 
-      inspectObject(obj);
+      inspectObject(parsed);
 
     } catch (_) {}
   }
 
-  /*
-    回合數：
-    只從真正送出的 closeSpin 計算，
-    不從 JSON / Decoder 重複增加。
-  */
-  function inspectOutgoing(data) {
-    if (typeof data !== 'string') return;
-
-    const s = String(data);
-
-    if (!s.includes('closeSpin')) return;
-
-    const t = Date.now();
-
-    /*
-      300ms 內相同資料視為重複，
-      避免同一個 closeSpin 被算兩次。
-    */
+  function startNewRound(data) {
     if (
-      state.lastCloseText === s &&
-      t - state.lastCloseAt < 300
+      typeof data !== 'string'
     ) {
       return;
     }
 
-    state.lastCloseText = s;
-    state.lastCloseAt = t;
+    const text =
+      String(data);
 
-    state.rounds++;
+    if (
+      !text.includes('closeSpin')
+    ) {
+      return;
+    }
+
+    const time =
+      Date.now();
+
+    /*
+      避免同一 closeSpin
+      被重複觸發。
+    */
+    if (
+      state.lastCloseText === text &&
+      time - state.lastCloseAt < 800
+    ) {
+      return;
+    }
+
+    state.lastCloseText = text;
+    state.lastCloseAt = time;
+
+    /*
+      記住上一局 spinId。
+      新結果必須跟它不同。
+    */
+    state.previousSpinId =
+      state.lastSeenSpinId;
+
+    state.currentSpinId = '';
+
+    /*
+      不在這裡增加回合數。
+      等真正收到新 spinId +
+      totalWinnings 才算完成一局。
+    */
+    state.waitingResult = true;
+
     sync();
   }
 
-  function freeText() {
-    if (state.freeGameCount !== null) {
-      if (state.freeGameCount > 0) {
+  function freeGameText() {
+    if (
+      state.freeGameCount !== null
+    ) {
+      if (
+        state.freeGameCount > 0
+      ) {
         return `剩 ${state.freeGameCount} 次`;
       }
 
       return '未進行';
     }
 
-    if (state.startFreeGame === true) {
+    if (
+      state.startFreeGame === true
+    ) {
       return '已觸發';
     }
 
-    if (state.startFreeGame === false) {
+    if (
+      state.startFreeGame === false
+    ) {
       return '未進行';
     }
 
     return '—';
   }
 
-  function statusText() {
+  function connectionText() {
     return state.connected
       ? '● 即時連線中'
       : '● 等待遊戲資料';
@@ -377,67 +564,73 @@
 
     if (minimized) {
       panel.innerHTML = `
-        <div id="xinyaoHead"
-             style="
-               font-weight:800;
-               font-size:13px;
-               cursor:pointer;
-             ">
-          🌸 芯瑤即時助手
+        <div
+          id="xinyaoHeader"
+          style="
+            cursor:pointer;
+            font-size:13px;
+            font-weight:800;
+          "
+        >
+          🌸 芯瑤 ATG
         </div>
 
-        <div style="
-          font-size:10px;
-          margin-top:2px;
-          opacity:.85;
-        ">
-          ${statusText()}
+        <div
+          style="
+            margin-top:2px;
+            font-size:10px;
+            opacity:.8;
+          "
+        >
+          ${connectionText()}
         </div>
       `;
 
-      bindHead();
+      bindHeader();
       return;
     }
 
     panel.innerHTML = `
       <div
-        id="xinyaoHead"
+        id="xinyaoHeader"
         style="
           display:flex;
-          justify-content:space-between;
           align-items:center;
-          gap:10px;
+          justify-content:space-between;
+          gap:12px;
           cursor:pointer;
         "
       >
-        <div style="
-          font-weight:800;
-          font-size:14px;
-        ">
+        <div
+          style="
+            font-size:14px;
+            font-weight:800;
+          "
+        >
           🌸 芯瑤 ATG 即時助手
         </div>
 
-        <div style="
-          font-size:12px;
-          opacity:.75;
-        ">
+        <div
+          style="
+            opacity:.7;
+            font-size:12px;
+          "
+        >
           －
         </div>
       </div>
 
-      <div style="
-        margin-top:3px;
-        font-size:10px;
-        opacity:.85;
-      ">
-        ${statusText()}
+      <div
+        style="
+          margin-top:3px;
+          font-size:10px;
+          opacity:.82;
+        "
+      >
+        ${connectionText()}
       </div>
 
-      <div style="
-        height:1px;
-        background:rgba(255,255,255,.15);
-        margin:7px 0;
-      "></div>
+      <div class="xinyaoLine"></div>
 
       <div class="xinyaoRow">
         <span>目前點數</span>
@@ -451,7 +644,7 @@
 
       <div class="xinyaoRow">
         <span>最新一局派彩</span>
-        <b>${money(state.payout)}</b>
+        <b>${money(state.latestPayout)}</b>
       </div>
 
       <div class="xinyaoRow">
@@ -461,7 +654,7 @@
 
       <div class="xinyaoRow">
         <span>免費遊戲</span>
-        <b>${freeText()}</b>
+        <b>${freeGameText()}</b>
       </div>
 
       <div class="xinyaoRow">
@@ -469,35 +662,42 @@
         <b>${state.rounds}</b>
       </div>
 
-      <div style="
-        height:1px;
-        background:rgba(255,255,255,.15);
-        margin:7px 0 5px;
-      "></div>
+      <div class="xinyaoLine"></div>
 
-      <div style="
-        font-size:10px;
-        opacity:.65;
-        text-align:right;
-      ">
-        最後同步 ${
-          state.lastSync || '—'
-        }
+      <div
+        style="
+          text-align:right;
+          font-size:10px;
+          opacity:.62;
+        "
+      >
+        最後同步 ${state.lastSync || '—'}
+      </div>
+
+      <div
+        style="
+          margin-top:2px;
+          text-align:right;
+          font-size:9px;
+          opacity:.45;
+        "
+      >
+        僅統計本次開啟遊戲後資料
       </div>
     `;
 
-    bindHead();
+    bindHeader();
   }
 
-  function bindHead() {
-    const head =
+  function bindHeader() {
+    const header =
       panel?.querySelector(
-        '#xinyaoHead'
+        '#xinyaoHeader'
       );
 
-    if (!head) return;
+    if (!header) return;
 
-    head.onclick = () => {
+    header.onclick = () => {
       minimized = !minimized;
       render();
     };
@@ -515,33 +715,40 @@
       document.createElement('style');
 
     style.textContent = `
-      #xinyaoATGV4 .xinyaoRow {
+      #xinyaoATGFinal .xinyaoRow {
         display:flex;
         justify-content:space-between;
         align-items:center;
-        gap:14px;
+        gap:15px;
         margin:4px 0;
         font-size:11px;
       }
 
-      #xinyaoATGV4 .xinyaoRow span {
-        opacity:.8;
+      #xinyaoATGFinal .xinyaoRow span {
+        opacity:.78;
       }
 
-      #xinyaoATGV4 .xinyaoRow b {
+      #xinyaoATGFinal .xinyaoRow b {
         font-size:12px;
         font-weight:800;
       }
+
+      #xinyaoATGFinal .xinyaoLine {
+        height:1px;
+        margin:7px 0;
+        background:
+          rgba(255,255,255,.14);
+      }
     `;
 
-    document.documentElement.appendChild(
-      style
-    );
+    document.documentElement
+      .appendChild(style);
 
     panel =
       document.createElement('div');
 
-    panel.id = 'xinyaoATGV4';
+    panel.id =
+      'xinyaoATGFinal';
 
     Object.assign(
       panel.style,
@@ -549,46 +756,54 @@
         position: 'fixed',
         top: '8px',
         left: '8px',
+
         zIndex: '2147483647',
 
-        minWidth: '175px',
+        minWidth: '182px',
 
-        background:
-          'rgba(23,20,30,.91)',
+        padding: '9px 11px',
 
         color: '#fff',
+
+        background:
+          'rgba(24,20,31,.92)',
 
         border:
           '1px solid rgba(255,255,255,.20)',
 
         borderRadius: '14px',
 
-        padding: '9px 11px',
-
         boxShadow:
-          '0 5px 20px rgba(0,0,0,.30)',
+          '0 5px 20px rgba(0,0,0,.32)',
 
         fontFamily:
           '-apple-system,BlinkMacSystemFont,"PingFang TC",sans-serif',
 
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)'
+        backdropFilter:
+          'blur(10px)',
+
+        WebkitBackdropFilter:
+          'blur(10px)',
+
+        userSelect: 'none',
+
+        WebkitUserSelect: 'none'
       }
     );
 
-    document.documentElement.appendChild(
-      panel
-    );
+    document.documentElement
+      .appendChild(panel);
 
     render();
   }
 
   function patchWebSocket() {
-    const NativeWS = window.WebSocket;
+    const NativeWS =
+      window.WebSocket;
 
     if (
       !NativeWS ||
-      NativeWS.__xinyaoV4Wrapped
+      NativeWS.__xinyaoFinalWrapped
     ) {
       return;
     }
@@ -615,12 +830,14 @@
             try {
               ws.addEventListener(
                 'message',
-                e => {
+                event => {
                   if (
-                    typeof e.data ===
+                    typeof event.data ===
                     'string'
                   ) {
-                    parseText(e.data);
+                    parseText(
+                      event.data
+                    );
                   }
                 },
                 true
@@ -634,7 +851,9 @@
               ws.send =
                 function(data) {
 
-                  inspectOutgoing(data);
+                  startNewRound(
+                    data
+                  );
 
                   return nativeSend.call(
                     this,
@@ -673,44 +892,49 @@
               NativeWS.CLOSED
           },
 
-          __xinyaoV4Wrapped: {
+          __xinyaoFinalWrapped: {
             value: true
           }
         }
       );
 
     } catch (_) {
-      WrappedWS.__xinyaoV4Wrapped =
+      WrappedWS.__xinyaoFinalWrapped =
         true;
     }
 
-    window.WebSocket = WrappedWS;
+    window.WebSocket =
+      WrappedWS;
   }
 
   function patchJSON() {
     if (
-      JSON.parse.__xinyaoV4Wrapped
+      JSON.parse
+        .__xinyaoFinalWrapped
     ) {
       return;
     }
 
     const wrapped =
       function(...args) {
-
-        const out =
-          nativeJSONParse(...args);
+        const result =
+          nativeJSONParse(
+            ...args
+          );
 
         try {
-          inspectObject(out);
+          inspectObject(
+            result
+          );
         } catch (_) {}
 
-        return out;
+        return result;
       };
 
     try {
       Object.defineProperty(
         wrapped,
-        '__xinyaoV4Wrapped',
+        '__xinyaoFinalWrapped',
         {
           value: true
         }
@@ -720,15 +944,20 @@
     JSON.parse = wrapped;
   }
 
-  function patchDecoder() {
+  function patchTextDecoder() {
     try {
-      if (!window.TextDecoder) return;
+      if (
+        !window.TextDecoder
+      ) {
+        return;
+      }
 
       const current =
         TextDecoder.prototype.decode;
 
       if (
-        current.__xinyaoV4Wrapped
+        current
+          .__xinyaoFinalWrapped
       ) {
         return;
       }
@@ -738,7 +967,6 @@
 
       const wrapped =
         function(...args) {
-
           const text =
             nativeDecode.apply(
               this,
@@ -755,7 +983,7 @@
       try {
         Object.defineProperty(
           wrapped,
-          '__xinyaoV4Wrapped',
+          '__xinyaoFinalWrapped',
           {
             value: true
           }
@@ -771,11 +999,13 @@
   function patchSocketIO() {
     try {
       const proto =
-        window.io?.Socket?.prototype;
+        window.io
+          ?.Socket
+          ?.prototype;
 
       if (
         !proto ||
-        proto.__xinyaoV4Wrapped
+        proto.__xinyaoFinalWrapped
       ) {
         return;
       }
@@ -784,28 +1014,31 @@
         typeof proto.onevent ===
         'function'
       ) {
-        const native =
+        const nativeOnevent =
           proto.onevent;
 
         proto.onevent =
           function(packet) {
 
             try {
-              if (packet?.data) {
+              if (
+                packet?.data
+              ) {
                 inspectObject(
                   packet.data
                 );
               }
             } catch (_) {}
 
-            return native.call(
+            return nativeOnevent.call(
               this,
               packet
             );
           };
       }
 
-      proto.__xinyaoV4Wrapped = true;
+      proto.__xinyaoFinalWrapped =
+        true;
 
     } catch (_) {}
   }
@@ -813,7 +1046,7 @@
   mountPanel();
   patchWebSocket();
   patchJSON();
-  patchDecoder();
+  patchTextDecoder();
 
   const timer =
     setInterval(
@@ -821,14 +1054,16 @@
         mountPanel();
         patchWebSocket();
         patchJSON();
-        patchDecoder();
+        patchTextDecoder();
         patchSocketIO();
       },
       100
     );
 
   setTimeout(
-    () => clearInterval(timer),
+    () => {
+      clearInterval(timer);
+    },
     60000
   );
 
