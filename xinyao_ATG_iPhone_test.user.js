@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-ios
-// @version      1.0.0
-// @description  ATG iPhone Safari 即時遊戲資料助手
+// @version      1.2.0
+// @description  ATG iPhone Safari 即時資料助手
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -13,8 +13,8 @@
 (() => {
   'use strict';
 
-  if (window.__XIANYAO_ATG_FINAL__) return;
-  window.__XIANYAO_ATG_FINAL__ = true;
+  if (window.__XIANYAO_ATG_MEMBER_V120__) return;
+  window.__XIANYAO_ATG_MEMBER_V120__ = true;
 
   const nativeJSONParse = JSON.parse.bind(JSON);
 
@@ -30,11 +30,11 @@
     freeGameCount: null,
     startFreeGame: null,
 
-    rounds: 0,
+    completedSpins: 0,
 
     lastSeenSpinId: '',
-    currentSpinId: '',
     previousSpinId: '',
+    currentSpinId: '',
 
     completedSpinIds: new Set(),
 
@@ -78,11 +78,9 @@
 
     const n = Number(value);
 
-    if (!Number.isFinite(n)) {
-      return '—';
-    }
-
-    return n.toFixed(2);
+    return Number.isFinite(n)
+      ? n.toFixed(2)
+      : '—';
   }
 
   function nowText() {
@@ -102,190 +100,278 @@
     render();
   }
 
-  function createFound() {
-    return {
-      spinIds: [],
-      balances: [],
-      stakes: [],
-      totalWinnings: [],
-      freeGameCounts: [],
-      startFreeGames: []
-    };
+  function isObject(value) {
+    return (
+      value !== null &&
+      typeof value === 'object'
+    );
   }
 
-  function walk(
+  function collectEngines(
     value,
-    found,
+    output = [],
+    depth = 0,
+    seen = new WeakSet()
+  ) {
+    if (
+      !isObject(value) ||
+      depth > 18 ||
+      seen.has(value)
+    ) {
+      return output;
+    }
+
+    seen.add(value);
+
+    if (
+      typeof value.spinId === 'string' &&
+      Array.isArray(value.gameState)
+    ) {
+      output.push(value);
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        collectEngines(
+          item,
+          output,
+          depth + 1,
+          seen
+        );
+      }
+    } else {
+      for (const child of Object.values(value)) {
+        if (isObject(child)) {
+          collectEngines(
+            child,
+            output,
+            depth + 1,
+            seen
+          );
+        }
+      }
+    }
+
+    return output;
+  }
+
+  function getViewNumber(item) {
+    const n = toNumber(
+      item?.currentView
+    );
+
+    return n === null ? -1 : n;
+  }
+
+  function getFinalGameState(engine) {
+    if (
+      !Array.isArray(engine?.gameState) ||
+      !engine.gameState.length
+    ) {
+      return null;
+    }
+
+    let best =
+      engine.gameState[0];
+
+    for (
+      const item
+      of engine.gameState
+    ) {
+      if (
+        getViewNumber(item) >=
+        getViewNumber(best)
+      ) {
+        best = item;
+      }
+    }
+
+    return best;
+  }
+
+  function engineScore(engine) {
+    const finalState =
+      getFinalGameState(engine);
+
+    if (!finalState) return -1;
+
+    const current =
+      toNumber(finalState.currentView);
+
+    const total =
+      toNumber(finalState.totalViews);
+
+    return (
+      (current ?? -1) * 1000 +
+      (total ?? 0)
+    );
+  }
+
+  function findBalance(
+    value,
     path = '',
     depth = 0,
     seen = new WeakSet()
   ) {
     if (
-      value === null ||
-      value === undefined ||
+      !isObject(value) ||
       depth > 18 ||
-      typeof value !== 'object'
+      seen.has(value)
     ) {
-      return;
+      return null;
     }
-
-    if (seen.has(value)) return;
 
     seen.add(value);
 
     if (Array.isArray(value)) {
-      for (let i = 0; i < value.length; i++) {
-        walk(
-          value[i],
-          found,
-          `${path}[${i}]`,
-          depth + 1,
-          seen
-        );
+      for (const item of value) {
+        const result =
+          findBalance(
+            item,
+            path,
+            depth + 1,
+            seen
+          );
+
+        if (result !== null) {
+          return result;
+        }
       }
 
-      return;
+      return null;
     }
 
     for (
       const [key, val]
       of Object.entries(value)
     ) {
-      const lowerKey =
-        String(key).toLowerCase();
-
       const nextPath =
         path
           ? `${path}.${key}`
           : key;
 
-      if (
-        lowerKey === 'spinid' &&
-        val
-      ) {
-        found.spinIds.push(
-          String(val)
-        );
-      }
+      const lowerPath =
+        nextPath.toLowerCase();
 
       if (
-        lowerKey === 'totalstake'
+        String(key).toLowerCase() ===
+          'amount' &&
+        lowerPath.includes('balance')
       ) {
-        const n = toNumber(val);
+        const n =
+          toNumber(val);
 
         if (n !== null) {
-          found.stakes.push(n);
+          return n;
         }
       }
 
-      if (
-        lowerKey === 'totalwinnings'
-      ) {
-        const n = toNumber(val);
+      if (isObject(val)) {
+        const result =
+          findBalance(
+            val,
+            nextPath,
+            depth + 1,
+            seen
+          );
 
-        if (n !== null) {
-          found.totalWinnings.push(n);
+        if (result !== null) {
+          return result;
         }
-      }
-
-      if (
-        lowerKey === 'freegamecount'
-      ) {
-        const n = toNumber(val);
-
-        if (n !== null) {
-          found.freeGameCounts.push(n);
-        }
-      }
-
-      if (
-        lowerKey === 'startfreegame' &&
-        typeof val === 'boolean'
-      ) {
-        found.startFreeGames.push(val);
-      }
-
-      if (
-        lowerKey === 'amount' &&
-        nextPath
-          .toLowerCase()
-          .includes('balance')
-      ) {
-        const n = toNumber(val);
-
-        if (n !== null) {
-          found.balances.push(n);
-        }
-      }
-
-      if (
-        val &&
-        typeof val === 'object'
-      ) {
-        walk(
-          val,
-          found,
-          nextPath,
-          depth + 1,
-          seen
-        );
       }
     }
+
+    return null;
   }
 
-  function updateGeneralFields(found) {
+  function updateStake(finalState) {
+    const value =
+      toNumber(
+        finalState?.totalStake
+      );
+
+    if (
+      value !== null &&
+      value !== state.stake
+    ) {
+      state.stake = value;
+      return true;
+    }
+
+    return false;
+  }
+
+  function isFinalView(finalState) {
+    if (!finalState) {
+      return false;
+    }
+
+    const totalViews =
+      toNumber(
+        finalState.totalViews
+      );
+
+    const currentView =
+      toNumber(
+        finalState.currentView
+      );
+
+    /*
+      如果 ATG 有 totalViews/currentView，
+      一定等到最後一個 view 才視為完整結果。
+    */
+    if (
+      totalViews !== null &&
+      currentView !== null &&
+      totalViews > 0
+    ) {
+      return (
+        currentView >=
+        totalViews - 1
+      );
+    }
+
+    /*
+      某些遊戲沒有 view 資訊時，
+      有 totalWinnings 就允許當結果。
+    */
+    return (
+      toNumber(
+        finalState.totalWinnings
+      ) !== null
+    );
+  }
+
+  function updateFreeGame(finalState) {
     let changed = false;
 
-    if (found.balances.length) {
-      const value =
-        found.balances[
-          found.balances.length - 1
-        ];
+    const freeCount =
+      toNumber(
+        finalState?.freeGameCount
+      );
 
-      if (state.balance !== value) {
-        state.balance = value;
-        changed = true;
-      }
-    }
+    if (
+      freeCount !== null &&
+      freeCount !==
+        state.freeGameCount
+    ) {
+      state.freeGameCount =
+        freeCount;
 
-    if (found.stakes.length) {
-      const value =
-        found.stakes[
-          found.stakes.length - 1
-        ];
-
-      if (state.stake !== value) {
-        state.stake = value;
-        changed = true;
-      }
-    }
-
-    if (found.freeGameCounts.length) {
-      const value =
-        found.freeGameCounts[
-          found.freeGameCounts.length - 1
-        ];
-
-      if (
-        state.freeGameCount !== value
-      ) {
-        state.freeGameCount = value;
-        changed = true;
-      }
+      changed = true;
     }
 
     if (
-      found.startFreeGames.length
+      typeof finalState?.startFreeGame ===
+      'boolean'
     ) {
-      const value =
-        found.startFreeGames[
-          found.startFreeGames.length - 1
-        ];
-
       if (
-        state.startFreeGame !== value
+        state.startFreeGame !==
+        finalState.startFreeGame
       ) {
-        state.startFreeGame = value;
+        state.startFreeGame =
+          finalState.startFreeGame;
+
         changed = true;
       }
     }
@@ -293,101 +379,144 @@
     return changed;
   }
 
-  function processSpinIds(found) {
-    if (!found.spinIds.length) {
-      return '';
+  function processEngine(engine) {
+    if (!engine?.spinId) {
+      return false;
     }
 
     const spinId =
-      found.spinIds[
-        found.spinIds.length - 1
-      ];
+      String(engine.spinId);
 
-    state.lastSeenSpinId = spinId;
+    const finalState =
+      getFinalGameState(engine);
 
-    return spinId;
-  }
+    if (!finalState) {
+      return false;
+    }
 
-  function processRoundResult(
-    found,
-    spinId
-  ) {
+    state.lastSeenSpinId =
+      spinId;
+
+    let changed = false;
+
+    if (
+      updateStake(finalState)
+    ) {
+      changed = true;
+    }
+
     /*
-      尚未開始本次新回合時：
-      任何載入階段的舊 totalWinnings
-      都不列入本次派彩與最高派彩。
+      免費遊戲狀態也使用目前 engine
+      最後 currentView 的資料。
+    */
+    if (
+      updateFreeGame(finalState)
+    ) {
+      changed = true;
+    }
+
+    /*
+      尚未開始本次新局：
+      不把頁面剛載入時的舊派彩
+      算成本次最新/最高派彩。
     */
     if (!state.waitingResult) {
-      return false;
-    }
-
-    if (!spinId) {
-      return false;
+      return changed;
     }
 
     /*
-      closeSpin 前已存在的 spinId
-      視為舊局資料。
+      closeSpin 前最後看到的 spinId
+      是上一局，不能拿來當新局。
     */
     if (
       !state.currentSpinId &&
       state.previousSpinId &&
-      spinId === state.previousSpinId
+      spinId ===
+        state.previousSpinId
     ) {
-      return false;
+      return changed;
     }
 
     /*
-      第一個真正的新 spinId
-      認定為這一局。
+      第一次收到不同 spinId，
+      就鎖定為這次新局。
     */
     if (!state.currentSpinId) {
-      state.currentSpinId = spinId;
-    }
-
-    /*
-      若後面跑出其他 spinId，
-      不混到目前這局裡。
-    */
-    if (
-      spinId !== state.currentSpinId
-    ) {
-      return false;
+      state.currentSpinId =
+        spinId;
     }
 
     if (
-      !found.totalWinnings.length
+      spinId !==
+      state.currentSpinId
     ) {
-      return false;
+      return changed;
     }
 
     /*
-      同一局可能有多個畫面，
-      totalWinnings 可能逐步增加。
-
-      這裡取同批資料最大的
-      totalWinnings。
+      必須等最後 currentView。
+      避免 0.75 被當成最後 3.00。
     */
-    const payout =
-      Math.max(
-        ...found.totalWinnings
+    if (!isFinalView(finalState)) {
+      return changed;
+    }
+
+    let payout =
+      toNumber(
+        finalState.totalWinnings
       );
 
-    state.latestPayout = payout;
-
     /*
-      本次最高派彩：
-      只有本次開始後的新回合才計算。
+      保險：
+      若最後 view 沒 totalWinnings，
+      才退回整局最大值。
     */
-    if (
-      state.maxPayout === null ||
-      payout > state.maxPayout
-    ) {
-      state.maxPayout = payout;
+    if (payout === null) {
+      const values =
+        engine.gameState
+          .map(item =>
+            toNumber(
+              item?.totalWinnings
+            )
+          )
+          .filter(
+            value =>
+              value !== null
+          );
+
+      if (values.length) {
+        payout =
+          Math.max(...values);
+      }
+    }
+
+    if (payout !== null) {
+      if (
+        state.latestPayout !==
+        payout
+      ) {
+        state.latestPayout =
+          payout;
+
+        changed = true;
+      }
+
+      if (
+        state.maxPayout === null ||
+        payout >
+          state.maxPayout
+      ) {
+        state.maxPayout =
+          payout;
+
+        changed = true;
+      }
     }
 
     /*
-      相同 spinId 只算一個完成回合。
+      相同 spinId 只算一次，
+      所以 Decoder / JSON / Socket.IO
+      即使重複收到也不會重複加。
     */
     if (
       !state.completedSpinIds.has(
@@ -398,44 +527,87 @@
         spinId
       );
 
-      state.rounds++;
+      state.completedSpins++;
+
+      changed = true;
     }
 
-    return true;
+    /*
+      此局已經拿到完整結果。
+      等下一次 closeSpin
+      才開始接下一局。
+    */
+    state.waitingResult = false;
+
+    return changed;
   }
 
   function inspectObject(obj) {
     try {
-      if (
-        !obj ||
-        typeof obj !== 'object'
-      ) {
+      if (!isObject(obj)) {
         return;
       }
 
-      const found = createFound();
+      let changed = false;
 
-      walk(
-        obj,
-        found
-      );
-
-      const generalChanged =
-        updateGeneralFields(found);
-
-      const spinId =
-        processSpinIds(found);
-
-      const roundChanged =
-        processRoundResult(
-          found,
-          spinId
-        );
+      const balance =
+        findBalance(obj);
 
       if (
-        generalChanged ||
-        roundChanged
+        balance !== null &&
+        balance !== state.balance
       ) {
+        state.balance =
+          balance;
+
+        changed = true;
+      }
+
+      const engines =
+        collectEngines(obj);
+
+      /*
+        同一份資料若出現相同 spinId 多次，
+        保留 currentView 較完整的那一份。
+      */
+      const bestBySpin =
+        new Map();
+
+      for (const engine of engines) {
+        if (!engine?.spinId) {
+          continue;
+        }
+
+        const id =
+          String(engine.spinId);
+
+        const previous =
+          bestBySpin.get(id);
+
+        if (
+          !previous ||
+          engineScore(engine) >=
+            engineScore(previous)
+        ) {
+          bestBySpin.set(
+            id,
+            engine
+          );
+        }
+      }
+
+      for (
+        const engine
+        of bestBySpin.values()
+      ) {
+        if (
+          processEngine(engine)
+        ) {
+          changed = true;
+        }
+      }
+
+      if (changed) {
         sync();
       }
 
@@ -446,13 +618,16 @@
     const raw =
       String(text || '').trim();
 
-    if (!raw) return;
+    if (!raw) {
+      return;
+    }
 
     const positions = [
       raw.indexOf('['),
       raw.indexOf('{')
     ].filter(
-      index => index >= 0
+      index =>
+        index >= 0
     );
 
     if (!positions.length) {
@@ -468,7 +643,9 @@
           raw.slice(start)
         );
 
-      inspectObject(parsed);
+      inspectObject(
+        parsed
+      );
 
     } catch (_) {}
   }
@@ -484,7 +661,9 @@
       String(data);
 
     if (
-      !text.includes('closeSpin')
+      !text.includes(
+        'closeSpin'
+      )
     ) {
       return;
     }
@@ -493,39 +672,47 @@
       Date.now();
 
     /*
-      避免同一 closeSpin
-      被重複觸發。
+      防止同一個 closeSpin
+      在極短時間內被算兩次。
     */
     if (
-      state.lastCloseText === text &&
-      time - state.lastCloseAt < 800
+      state.lastCloseText ===
+        text &&
+      time -
+        state.lastCloseAt <
+        800
     ) {
       return;
     }
 
-    state.lastCloseText = text;
-    state.lastCloseAt = time;
+    state.lastCloseText =
+      text;
+
+    state.lastCloseAt =
+      time;
 
     /*
-      記住上一局 spinId。
-      新結果必須跟它不同。
+      記住上一個 spinId。
+      接下來必須等新的 spinId。
     */
     state.previousSpinId =
       state.lastSeenSpinId;
 
-    state.currentSpinId = '';
+    state.currentSpinId =
+      '';
 
-    /*
-      不在這裡增加回合數。
-      等真正收到新 spinId +
-      totalWinnings 才算完成一局。
-    */
-    state.waitingResult = true;
+    state.waitingResult =
+      true;
 
     sync();
   }
 
   function freeGameText() {
+    /*
+      最後 view 回傳 0 時，
+      一律顯示未進行。
+      不再卡在剩 1 次。
+    */
     if (
       state.freeGameCount !== null
     ) {
@@ -539,13 +726,15 @@
     }
 
     if (
-      state.startFreeGame === true
+      state.startFreeGame ===
+      true
     ) {
       return '已觸發';
     }
 
     if (
-      state.startFreeGame === false
+      state.startFreeGame ===
+      false
     ) {
       return '未進行';
     }
@@ -560,16 +749,18 @@
   }
 
   function render() {
-    if (!panel) return;
+    if (!panel) {
+      return;
+    }
 
     if (minimized) {
       panel.innerHTML = `
         <div
           id="xinyaoHeader"
           style="
-            cursor:pointer;
-            font-size:13px;
             font-weight:800;
+            font-size:13px;
+            cursor:pointer;
           "
         >
           🌸 芯瑤 ATG
@@ -595,8 +786,8 @@
         id="xinyaoHeader"
         style="
           display:flex;
-          align-items:center;
           justify-content:space-between;
+          align-items:center;
           gap:12px;
           cursor:pointer;
         "
@@ -612,8 +803,8 @@
 
         <div
           style="
-            opacity:.7;
             font-size:12px;
+            opacity:.7;
           "
         >
           －
@@ -653,13 +844,13 @@
       </div>
 
       <div class="xinyaoRow">
-        <span>免費遊戲</span>
+        <span>免費遊戲狀態</span>
         <b>${freeGameText()}</b>
       </div>
 
       <div class="xinyaoRow">
-        <span>本次已完成回合</span>
-        <b>${state.rounds}</b>
+        <span>本次完成轉數</span>
+        <b>${state.completedSpins}</b>
       </div>
 
       <div class="xinyaoLine"></div>
@@ -695,10 +886,14 @@
         '#xinyaoHeader'
       );
 
-    if (!header) return;
+    if (!header) {
+      return;
+    }
 
     header.onclick = () => {
-      minimized = !minimized;
+      minimized =
+        !minimized;
+
       render();
     };
   }
@@ -712,10 +907,12 @@
     }
 
     const style =
-      document.createElement('style');
+      document.createElement(
+        'style'
+      );
 
     style.textContent = `
-      #xinyaoATGFinal .xinyaoRow {
+      #xinyaoATGMemberV120 .xinyaoRow {
         display:flex;
         justify-content:space-between;
         align-items:center;
@@ -724,16 +921,16 @@
         font-size:11px;
       }
 
-      #xinyaoATGFinal .xinyaoRow span {
+      #xinyaoATGMemberV120 .xinyaoRow span {
         opacity:.78;
       }
 
-      #xinyaoATGFinal .xinyaoRow b {
+      #xinyaoATGMemberV120 .xinyaoRow b {
         font-size:12px;
         font-weight:800;
       }
 
-      #xinyaoATGFinal .xinyaoLine {
+      #xinyaoATGMemberV120 .xinyaoLine {
         height:1px;
         margin:7px 0;
         background:
@@ -745,10 +942,12 @@
       .appendChild(style);
 
     panel =
-      document.createElement('div');
+      document.createElement(
+        'div'
+      );
 
     panel.id =
-      'xinyaoATGFinal';
+      'xinyaoATGMemberV120';
 
     Object.assign(
       panel.style,
@@ -757,13 +956,17 @@
         top: '8px',
         left: '8px',
 
-        zIndex: '2147483647',
+        zIndex:
+          '2147483647',
 
-        minWidth: '182px',
+        minWidth:
+          '184px',
 
-        padding: '9px 11px',
+        padding:
+          '9px 11px',
 
-        color: '#fff',
+        color:
+          '#fff',
 
         background:
           'rgba(24,20,31,.92)',
@@ -771,7 +974,8 @@
         border:
           '1px solid rgba(255,255,255,.20)',
 
-        borderRadius: '14px',
+        borderRadius:
+          '14px',
 
         boxShadow:
           '0 5px 20px rgba(0,0,0,.32)',
@@ -785,9 +989,11 @@
         WebkitBackdropFilter:
           'blur(10px)',
 
-        userSelect: 'none',
+        userSelect:
+          'none',
 
-        WebkitUserSelect: 'none'
+        WebkitUserSelect:
+          'none'
       }
     );
 
@@ -803,7 +1009,7 @@
 
     if (
       !NativeWS ||
-      NativeWS.__xinyaoFinalWrapped
+      NativeWS.__xinyaoV120Wrapped
     ) {
       return;
     }
@@ -824,7 +1030,9 @@
                 NewTarget
               );
 
-            state.connected = true;
+            state.connected =
+              true;
+
             sync();
 
             try {
@@ -892,14 +1100,14 @@
               NativeWS.CLOSED
           },
 
-          __xinyaoFinalWrapped: {
+          __xinyaoV120Wrapped: {
             value: true
           }
         }
       );
 
     } catch (_) {
-      WrappedWS.__xinyaoFinalWrapped =
+      WrappedWS.__xinyaoV120Wrapped =
         true;
     }
 
@@ -910,13 +1118,14 @@
   function patchJSON() {
     if (
       JSON.parse
-        .__xinyaoFinalWrapped
+        .__xinyaoV120Wrapped
     ) {
       return;
     }
 
     const wrapped =
       function(...args) {
+
         const result =
           nativeJSONParse(
             ...args
@@ -934,14 +1143,15 @@
     try {
       Object.defineProperty(
         wrapped,
-        '__xinyaoFinalWrapped',
+        '__xinyaoV120Wrapped',
         {
           value: true
         }
       );
     } catch (_) {}
 
-    JSON.parse = wrapped;
+    JSON.parse =
+      wrapped;
   }
 
   function patchTextDecoder() {
@@ -953,11 +1163,13 @@
       }
 
       const current =
-        TextDecoder.prototype.decode;
+        TextDecoder
+          .prototype
+          .decode;
 
       if (
         current
-          .__xinyaoFinalWrapped
+          .__xinyaoV120Wrapped
       ) {
         return;
       }
@@ -967,6 +1179,7 @@
 
       const wrapped =
         function(...args) {
+
           const text =
             nativeDecode.apply(
               this,
@@ -974,7 +1187,9 @@
             );
 
           try {
-            parseText(text);
+            parseText(
+              text
+            );
           } catch (_) {}
 
           return text;
@@ -983,14 +1198,16 @@
       try {
         Object.defineProperty(
           wrapped,
-          '__xinyaoFinalWrapped',
+          '__xinyaoV120Wrapped',
           {
             value: true
           }
         );
       } catch (_) {}
 
-      TextDecoder.prototype.decode =
+      TextDecoder
+        .prototype
+        .decode =
         wrapped;
 
     } catch (_) {}
@@ -1005,7 +1222,7 @@
 
       if (
         !proto ||
-        proto.__xinyaoFinalWrapped
+        proto.__xinyaoV120Wrapped
       ) {
         return;
       }
@@ -1037,7 +1254,7 @@
           };
       }
 
-      proto.__xinyaoFinalWrapped =
+      proto.__xinyaoV120Wrapped =
         true;
 
     } catch (_) {}
@@ -1062,7 +1279,9 @@
 
   setTimeout(
     () => {
-      clearInterval(timer);
+      clearInterval(
+        timer
+      );
     },
     60000
   );
