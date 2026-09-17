@@ -8,7 +8,7 @@
     'https://xinyao-atg-live.love06130430.workers.dev';
 
   const SCRIPT_URL =
-    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=200';
+    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=201';
 
   const GUIDE_IMAGES = {
     desktop: './xinyao_guide_pc.png?v=201',
