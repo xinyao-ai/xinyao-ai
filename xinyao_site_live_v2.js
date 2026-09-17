@@ -10,6 +10,12 @@
   const SCRIPT_URL =
     'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=200';
 
+  const GUIDE_IMAGES = {
+    desktop: './xinyao_guide_pc.png?v=201',
+    ios: './xinyao_guide_ios.png?v=201',
+    android: './xinyao_guide_android.png?v=201'
+  };
+
   const SESSION_KEY =
     'xinyao_atg_site_session_v2';
 
@@ -708,13 +714,51 @@
     return box;
   }
 
-  function openIOSInstallGuide() {
+  function normalizeGuidePlatform(value) {
+    if (value === 'iOS') return 'ios';
+    if (value === 'Android') return 'android';
+    return 'desktop';
+  }
+
+  function guideMeta(platformKey) {
+    const map = {
+      desktop: {
+        title: '💻 電腦安裝教學',
+        subtitle: 'Chrome＋Tampermonkey｜第一次安裝一次即可',
+        image: GUIDE_IMAGES.desktop,
+        button: '開啟共用程式'
+      },
+      ios: {
+        title: '📱 iPhone / iPad 安裝教學',
+        subtitle: 'Safari＋Userscripts｜第一次設定一次即可',
+        image: GUIDE_IMAGES.ios,
+        button: '開啟共用程式'
+      },
+      android: {
+        title: '🤖 Android 安裝教學',
+        subtitle: '請依圖片步驟完成安裝與設定',
+        image: GUIDE_IMAGES.android,
+        button: '開啟共用程式'
+      }
+    };
+
+    return map[platformKey] || map.desktop;
+  }
+
+  function openInstallGuide(
+    initialPlatform = detectPlatform()
+  ) {
     const existing =
-      $('xinyaoIOSInstallGuide');
+      $('xinyaoInstallGuideV3');
 
     if (existing) {
       existing.remove();
     }
+
+    let activePlatform =
+      normalizeGuidePlatform(
+        initialPlatform
+      );
 
     const modal =
       document.createElement(
@@ -722,7 +766,7 @@
       );
 
     modal.id =
-      'xinyaoIOSInstallGuide';
+      'xinyaoInstallGuideV3';
 
     modal.style.cssText = `
       position:fixed;
@@ -731,27 +775,28 @@
       display:flex;
       align-items:center;
       justify-content:center;
-      padding:18px;
-      background:rgba(45,30,40,.48);
-      backdrop-filter:blur(6px);
-      -webkit-backdrop-filter:blur(6px);
+      padding:14px;
+      box-sizing:border-box;
+      background:rgba(45,30,40,.52);
+      backdrop-filter:blur(7px);
+      -webkit-backdrop-filter:blur(7px);
     `;
 
     modal.innerHTML = `
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="iPhone 安裝教學"
+        aria-label="芯瑤安裝教學"
         style="
-          width:min(420px,100%);
-          max-height:88vh;
+          width:min(560px,100%);
+          max-height:94vh;
           overflow:auto;
           box-sizing:border-box;
-          padding:20px;
+          padding:16px;
           border-radius:22px;
           background:#fff;
           color:#594750;
-          box-shadow:0 18px 55px rgba(0,0,0,.2);
+          box-shadow:0 18px 55px rgba(0,0,0,.22);
           font-family:-apple-system,BlinkMacSystemFont,'PingFang TC',sans-serif;
         "
       >
@@ -763,28 +808,40 @@
             gap:12px;
           "
         >
-          <div
-            style="
-              font-size:19px;
-              font-weight:900;
-              color:#d94c89;
-            "
-          >
-            📱 iPhone 安裝教學
+          <div>
+            <div
+              id="xinyaoGuideTitle"
+              style="
+                font-size:19px;
+                font-weight:900;
+                color:#d94c89;
+              "
+            ></div>
+
+            <div
+              id="xinyaoGuideSubtitle"
+              style="
+                margin-top:3px;
+                font-size:11px;
+                line-height:1.5;
+                color:#95858c;
+              "
+            ></div>
           </div>
 
           <button
-            id="xinyaoCloseIOSGuide"
+            id="xinyaoCloseInstallGuide"
             type="button"
             aria-label="關閉"
             style="
-              width:34px;
-              height:34px;
+              flex:0 0 auto;
+              width:36px;
+              height:36px;
               border:0;
               border-radius:50%;
               background:#fff0f6;
               color:#d94c89;
-              font-size:19px;
+              font-size:20px;
               cursor:pointer;
             "
           >
@@ -794,72 +851,83 @@
 
         <div
           style="
+            display:grid;
+            grid-template-columns:repeat(3,1fr);
+            gap:7px;
             margin-top:14px;
-            padding:14px;
-            border:1px solid #ffd5e6;
-            border-radius:16px;
-            background:#fff7fb;
-            font-size:13px;
-            line-height:1.75;
           "
         >
-          <div style="font-weight:900;">
-            第一次使用只需要設定一次
-          </div>
+          <button
+            class="xinyaoGuideTab"
+            data-platform="desktop"
+            type="button"
+          >
+            💻 電腦
+          </button>
 
-          <div style="margin-top:9px;">
-            <b style="color:#d94c89;">①</b>
-            確認 iPhone 已安裝
-            <b>Userscripts</b>
-          </div>
+          <button
+            class="xinyaoGuideTab"
+            data-platform="ios"
+            type="button"
+          >
+            🍎 iOS
+          </button>
 
-          <div style="margin-top:7px;">
-            <b style="color:#d94c89;">②</b>
-            到 iPhone
-            <b>設定 → Safari → 擴充功能</b>，
-            開啟 <b>Userscripts</b>
-          </div>
-
-          <div style="margin-top:7px;">
-            <b style="color:#d94c89;">③</b>
-            按下方
-            <b>「開啟共用程式」</b>
-          </div>
-
-          <div style="margin-top:7px;">
-            <b style="color:#d94c89;">④</b>
-            程式碼頁開啟後，點 Safari 的
-            <b>擴充功能 → Userscripts → Install</b>
-          </div>
-
-          <div style="margin-top:7px;">
-            <b style="color:#d94c89;">⑤</b>
-            安裝完成後回 ATG 並重新整理，
-            就會看到
-            <b>🌸 芯瑤 ATG 即時助手</b>
-          </div>
+          <button
+            class="xinyaoGuideTab"
+            data-platform="android"
+            type="button"
+          >
+            🤖 Android
+          </button>
         </div>
 
         <div
           style="
-            margin-top:11px;
-            font-size:11px;
-            line-height:1.6;
-            color:#95858c;
+            margin-top:12px;
+            border:1px solid #ffd5e6;
+            border-radius:16px;
+            overflow:hidden;
+            background:#fff7fb;
           "
         >
-          安裝完成後不需要重複安裝；之後直接開啟 ATG 即可。
+          <img
+            id="xinyaoGuideImage"
+            alt="芯瑤安裝教學"
+            style="
+              display:block;
+              width:100%;
+              height:auto;
+              background:#fff7fb;
+            "
+          >
+        </div>
+
+        <div
+          style="
+            margin-top:10px;
+            padding:10px 12px;
+            border-radius:13px;
+            background:#fff7fb;
+            border:1px solid #ffe0ec;
+            font-size:11px;
+            line-height:1.6;
+            color:#8b7780;
+          "
+        >
+          第一次設定完成後不用重複安裝。之後直接開啟 ATG 即可。
+          如要換手機或換電腦，回到芯瑤按「更換裝置」重新綁定即可。
         </div>
 
         <button
-          id="xinyaoOpenIOSScript"
+          id="xinyaoOpenSharedScript"
           type="button"
           style="
             width:100%;
-            margin-top:14px;
-            padding:12px 15px;
+            margin-top:12px;
+            padding:13px 15px;
             border:0;
-            border-radius:13px;
+            border-radius:14px;
             background:#ff5f9e;
             color:#fff;
             font-size:14px;
@@ -867,7 +935,7 @@
             cursor:pointer;
           "
         >
-          我已準備好｜開啟共用程式
+          開啟共用程式
         </button>
       </div>
     `;
@@ -876,13 +944,109 @@
       modal
     );
 
-    $('xinyaoCloseIOSGuide')
+    const tabs =
+      Array.from(
+        modal.querySelectorAll(
+          '.xinyaoGuideTab'
+        )
+      );
+
+    tabs.forEach(tab => {
+      tab.style.cssText = `
+        border:1px solid #f3c1d5;
+        border-radius:12px;
+        padding:9px 5px;
+        background:#fff;
+        color:#d94c89;
+        font-size:12px;
+        font-weight:900;
+        cursor:pointer;
+      `;
+    });
+
+    const renderGuide = () => {
+      const meta =
+        guideMeta(
+          activePlatform
+        );
+
+      const title =
+        $('xinyaoGuideTitle');
+
+      const subtitle =
+        $('xinyaoGuideSubtitle');
+
+      const image =
+        $('xinyaoGuideImage');
+
+      const openButton =
+        $('xinyaoOpenSharedScript');
+
+      if (title) {
+        title.textContent =
+          meta.title;
+      }
+
+      if (subtitle) {
+        subtitle.textContent =
+          meta.subtitle;
+      }
+
+      if (image) {
+        image.src =
+          meta.image;
+
+        image.alt =
+          meta.title;
+      }
+
+      if (openButton) {
+        openButton.textContent =
+          `我看完教學｜${meta.button}`;
+      }
+
+      tabs.forEach(tab => {
+        const selected =
+          tab.dataset.platform ===
+          activePlatform;
+
+        tab.style.background =
+          selected
+            ? '#ff5f9e'
+            : '#fff';
+
+        tab.style.color =
+          selected
+            ? '#fff'
+            : '#d94c89';
+
+        tab.style.borderColor =
+          selected
+            ? '#ff5f9e'
+            : '#f3c1d5';
+      });
+    };
+
+    tabs.forEach(tab => {
+      tab.addEventListener(
+        'click',
+        () => {
+          activePlatform =
+            tab.dataset.platform ||
+            'desktop';
+
+          renderGuide();
+        }
+      );
+    });
+
+    $('xinyaoCloseInstallGuide')
       ?.addEventListener(
         'click',
         () => modal.remove()
       );
 
-    $('xinyaoOpenIOSScript')
+    $('xinyaoOpenSharedScript')
       ?.addEventListener(
         'click',
         () => {
@@ -907,6 +1071,8 @@
         }
       }
     );
+
+    renderGuide();
   }
 
   function renderConnectBox(
@@ -1117,7 +1283,7 @@
             font-weight:900;
           "
         >
-          ① 安裝共用程式
+          ① 安裝共用程式／查看教學
         </a>
 
         <button
@@ -1175,16 +1341,12 @@
       ?.addEventListener(
         'click',
         event => {
-          if (
-            detectPlatform() !== 'iOS'
-          ) {
-            return;
-          }
-
           event.preventDefault();
           event.stopPropagation();
 
-          openIOSInstallGuide();
+          openInstallGuide(
+            detectPlatform()
+          );
         }
       );
   }
