@@ -708,6 +708,207 @@
     return box;
   }
 
+  function openIOSInstallGuide() {
+    const existing =
+      $('xinyaoIOSInstallGuide');
+
+    if (existing) {
+      existing.remove();
+    }
+
+    const modal =
+      document.createElement(
+        'div'
+      );
+
+    modal.id =
+      'xinyaoIOSInstallGuide';
+
+    modal.style.cssText = `
+      position:fixed;
+      inset:0;
+      z-index:2147483647;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      background:rgba(45,30,40,.48);
+      backdrop-filter:blur(6px);
+      -webkit-backdrop-filter:blur(6px);
+    `;
+
+    modal.innerHTML = `
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="iPhone 安裝教學"
+        style="
+          width:min(420px,100%);
+          max-height:88vh;
+          overflow:auto;
+          box-sizing:border-box;
+          padding:20px;
+          border-radius:22px;
+          background:#fff;
+          color:#594750;
+          box-shadow:0 18px 55px rgba(0,0,0,.2);
+          font-family:-apple-system,BlinkMacSystemFont,'PingFang TC',sans-serif;
+        "
+      >
+        <div
+          style="
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:12px;
+          "
+        >
+          <div
+            style="
+              font-size:19px;
+              font-weight:900;
+              color:#d94c89;
+            "
+          >
+            📱 iPhone 安裝教學
+          </div>
+
+          <button
+            id="xinyaoCloseIOSGuide"
+            type="button"
+            aria-label="關閉"
+            style="
+              width:34px;
+              height:34px;
+              border:0;
+              border-radius:50%;
+              background:#fff0f6;
+              color:#d94c89;
+              font-size:19px;
+              cursor:pointer;
+            "
+          >
+            ×
+          </button>
+        </div>
+
+        <div
+          style="
+            margin-top:14px;
+            padding:14px;
+            border:1px solid #ffd5e6;
+            border-radius:16px;
+            background:#fff7fb;
+            font-size:13px;
+            line-height:1.75;
+          "
+        >
+          <div style="font-weight:900;">
+            第一次使用只需要設定一次
+          </div>
+
+          <div style="margin-top:9px;">
+            <b style="color:#d94c89;">①</b>
+            確認 iPhone 已安裝
+            <b>Userscripts</b>
+          </div>
+
+          <div style="margin-top:7px;">
+            <b style="color:#d94c89;">②</b>
+            到 iPhone
+            <b>設定 → Safari → 擴充功能</b>，
+            開啟 <b>Userscripts</b>
+          </div>
+
+          <div style="margin-top:7px;">
+            <b style="color:#d94c89;">③</b>
+            按下方
+            <b>「開啟共用程式」</b>
+          </div>
+
+          <div style="margin-top:7px;">
+            <b style="color:#d94c89;">④</b>
+            程式碼頁開啟後，點 Safari 的
+            <b>擴充功能 → Userscripts → Install</b>
+          </div>
+
+          <div style="margin-top:7px;">
+            <b style="color:#d94c89;">⑤</b>
+            安裝完成後回 ATG 並重新整理，
+            就會看到
+            <b>🌸 芯瑤 ATG 即時助手</b>
+          </div>
+        </div>
+
+        <div
+          style="
+            margin-top:11px;
+            font-size:11px;
+            line-height:1.6;
+            color:#95858c;
+          "
+        >
+          安裝完成後不需要重複安裝；之後直接開啟 ATG 即可。
+        </div>
+
+        <button
+          id="xinyaoOpenIOSScript"
+          type="button"
+          style="
+            width:100%;
+            margin-top:14px;
+            padding:12px 15px;
+            border:0;
+            border-radius:13px;
+            background:#ff5f9e;
+            color:#fff;
+            font-size:14px;
+            font-weight:900;
+            cursor:pointer;
+          "
+        >
+          我已準備好｜開啟共用程式
+        </button>
+      </div>
+    `;
+
+    document.body.appendChild(
+      modal
+    );
+
+    $('xinyaoCloseIOSGuide')
+      ?.addEventListener(
+        'click',
+        () => modal.remove()
+      );
+
+    $('xinyaoOpenIOSScript')
+      ?.addEventListener(
+        'click',
+        () => {
+          const opened =
+            window.open(
+              SCRIPT_URL,
+              '_blank'
+            );
+
+          if (!opened) {
+            window.location.href =
+              SCRIPT_URL;
+          }
+        }
+      );
+
+    modal.addEventListener(
+      'click',
+      event => {
+        if (event.target === modal) {
+          modal.remove();
+        }
+      }
+    );
+  }
+
   function renderConnectBox(
     status = {}
   ) {
@@ -901,6 +1102,7 @@
         "
       >
         <a
+          id="xinyaoInstallProgramV2"
           href="${SCRIPT_URL}"
           target="_blank"
           rel="noopener noreferrer"
@@ -967,6 +1169,23 @@
       ?.addEventListener(
         'click',
         copyPairCode
+      );
+
+    $('xinyaoInstallProgramV2')
+      ?.addEventListener(
+        'click',
+        event => {
+          if (
+            detectPlatform() !== 'iOS'
+          ) {
+            return;
+          }
+
+          event.preventDefault();
+          event.stopPropagation();
+
+          openIOSInstallGuide();
+        }
       );
   }
 
