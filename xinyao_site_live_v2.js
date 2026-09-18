@@ -21,6 +21,12 @@
   const USERSCRIPTS_APP_STORE_URL =
     'https://apps.apple.com/tw/app/userscripts/id1463298887';
 
+  const FIREFOX_PLAY_URL =
+    'https://play.google.com/store/apps/details?id=org.mozilla.firefox';
+
+  const FIREFOX_TAMPERMONKEY_URL =
+    'https://addons.mozilla.org/zh-TW/android/addon/tampermonkey/';
+
   const DESKTOP_GUIDE_STEPS = [
     {
       stepNumber: 1,
@@ -162,6 +168,69 @@
       `,
       images: [
         './ios_step6.png?v=204'
+      ]
+    }
+  ];
+
+  const ANDROID_GUIDE_STEPS = [
+    {
+      stepNumber: 1,
+      title: '安裝 Firefox 瀏覽器',
+      bodyHtml: `
+        <p>先安裝 <b>Firefox</b>，之後娛樂城與芯瑤都會使用 Firefox 開啟。</p>
+        <p>點下方按鈕可以直接前往 Google Play 的 Firefox 官方安裝頁，不需要自己搜尋。</p>
+      `,
+      images: [
+        './android_step1.png?v=205'
+      ],
+      openFirefoxPlay: true
+    },
+    {
+      stepNumber: 2,
+      title: '娛樂城與芯瑤程式要使用同一個 Firefox',
+      bodyHtml: `
+        <p>請確認 <b>HD 皇鼎娛樂城</b> 與 <b>芯瑤💕 ATG AI助手</b> 都使用 <b>同一個 Firefox 瀏覽器</b> 開啟。</p>
+        <p>不要一個用 Chrome、另一個用 Firefox，否則後面的安裝、配對與同步可能無法正常運作。</p>
+      `,
+      images: [
+        './android_step2.png?v=205'
+      ]
+    },
+    {
+      stepNumber: 3,
+      title: '安裝 Tampermonkey 擴充功能',
+      bodyHtml: `
+        <p>點下方 <b>【安裝 Tampermonkey】</b>，進入 Firefox 擴充套件頁。</p>
+        <p>依序點擊 <b>【新增至 Firefox】→【允許／新增】</b>，完成 Tampermonkey 安裝。</p>
+      `,
+      images: [
+        './android_step3.png?v=205'
+      ],
+      openFirefoxTampermonkey: true
+    },
+    {
+      stepNumber: 4,
+      title: '回到芯瑤頁面，安裝共用程式',
+      bodyHtml: `
+        <p>回到 <b>【芯瑤💕 ATG AI助手】</b>。</p>
+        <p>依序操作：<b>【安裝共用程式／查看教學】→ 往下滑 →【我看完教學｜開啟共用程式】→【安裝】</b>。</p>
+        <p>安裝完成後，再回到這個教學頁繼續下一步。</p>
+      `,
+      images: [
+        './android_step4.png?v=205'
+      ],
+      openSharedScript: true
+    },
+    {
+      stepNumber: 5,
+      title: '產生配對碼並完成綁定',
+      bodyHtml: `
+        <p>回到 <b>【芯瑤💕 ATG AI助手】</b>，點擊 <b>【產生配對碼】→【複製配對碼】</b>。</p>
+        <p>再回到 ATG：<b>重新整理頁面</b> → 左上角出現 <b>【芯瑤 ATG 即時助手】</b> → 貼上剛剛複製的 <b>配對碼</b> → 點擊 <b>【綁定】</b>。</p>
+        <p>看到綁定成功後，就可以開始遊戲了 ✅</p>
+      `,
+      images: [
+        './android_step5.png?v=205'
       ]
     }
   ];
@@ -383,7 +452,7 @@
     if (
       platform === 'Android'
     ) {
-      return 'Android：使用支援 UserScript 的瀏覽器／擴充功能，第一次安裝一次即可。';
+      return 'Android：使用 Firefox＋Tampermonkey，第一次安裝一次即可。';
     }
 
     return '電腦：使用 Tampermonkey 安裝一次即可。';
@@ -882,9 +951,7 @@
       },
       android: {
         title: '🤖 Android 安裝教學',
-        subtitle: '請依圖片步驟完成安裝與設定',
-        image: GUIDE_IMAGES.android,
-        button: '開啟共用程式'
+        subtitle: 'Firefox＋Tampermonkey｜共 5 步，一面一個步驟'
       }
     };
 
@@ -930,6 +997,7 @@
 
     let desktopStepIndex = 0;
     let iosStepIndex = 0;
+    let androidStepIndex = 0;
 
     const modal =
       document.createElement(
@@ -1672,6 +1740,330 @@
         );
     };
 
+    const renderAndroidStep = () => {
+      const body =
+        $('xinyaoGuideBody');
+
+      if (!body) return;
+
+      const step =
+        ANDROID_GUIDE_STEPS[
+          androidStepIndex
+        ];
+
+      const total =
+        ANDROID_GUIDE_STEPS.length;
+
+      const imageHtml =
+        step.images
+          .map((src, index) => `
+            <div
+              style="
+                margin-top:${index === 0 ? 12 : 10}px;
+                border:1px solid #ffd5e6;
+                border-radius:15px;
+                overflow:hidden;
+                background:#fff7fb;
+              "
+            >
+              <img
+                src="${src}"
+                alt="Android 安裝教學第 ${step.stepNumber} 步圖片 ${index + 1}"
+                style="
+                  display:block;
+                  width:100%;
+                  height:auto;
+                  background:#fff;
+                "
+              >
+            </div>
+          `)
+          .join('');
+
+      body.innerHTML = `
+        <div
+          style="
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:10px;
+            margin-bottom:10px;
+          "
+        >
+          <div
+            style="
+              display:inline-flex;
+              align-items:center;
+              gap:7px;
+              padding:7px 11px;
+              border-radius:999px;
+              background:#fff0f6;
+              color:#d94c89;
+              font-size:12px;
+              font-weight:900;
+            "
+          >
+            步驟 ${step.stepNumber} / ${total}
+          </div>
+
+          <div
+            style="
+              flex:1;
+              height:7px;
+              overflow:hidden;
+              border-radius:999px;
+              background:#ffe5ef;
+            "
+          >
+            <div
+              style="
+                width:${((androidStepIndex + 1) / total) * 100}%;
+                height:100%;
+                border-radius:999px;
+                background:#ff5f9e;
+                transition:width .2s ease;
+              "
+            ></div>
+          </div>
+        </div>
+
+        <div
+          style="
+            padding:15px;
+            border:1px solid #ffd5e6;
+            border-radius:16px;
+            background:#fff9fc;
+          "
+        >
+          <div
+            style="
+              font-size:18px;
+              font-weight:950;
+              line-height:1.45;
+              color:#d94c89;
+            "
+          >
+            ${step.stepNumber}. ${step.title}
+          </div>
+
+          <div
+            style="
+              margin-top:10px;
+              font-size:13px;
+              line-height:1.8;
+              color:#604e57;
+            "
+          >
+            ${step.bodyHtml}
+          </div>
+
+          ${
+            step.openFirefoxPlay
+              ? `
+                <button
+                  id="xinyaoOpenFirefoxPlay"
+                  type="button"
+                  style="
+                    width:100%;
+                    margin-top:12px;
+                    padding:12px 14px;
+                    border:0;
+                    border-radius:12px;
+                    background:#ff5f9e;
+                    color:#fff;
+                    font-size:13px;
+                    font-weight:900;
+                    cursor:pointer;
+                  "
+                >
+                  📱 前往 Google Play 下載 Firefox
+                </button>
+              `
+              : ''
+          }
+
+          ${
+            step.openFirefoxTampermonkey
+              ? `
+                <button
+                  id="xinyaoOpenFirefoxTampermonkey"
+                  type="button"
+                  style="
+                    width:100%;
+                    margin-top:12px;
+                    padding:12px 14px;
+                    border:0;
+                    border-radius:12px;
+                    background:#ff5f9e;
+                    color:#fff;
+                    font-size:13px;
+                    font-weight:900;
+                    cursor:pointer;
+                  "
+                >
+                  🧩 安裝 Tampermonkey
+                </button>
+              `
+              : ''
+          }
+
+          ${
+            step.openSharedScript
+              ? `
+                <button
+                  id="xinyaoOpenSharedScriptAndroid"
+                  type="button"
+                  style="
+                    width:100%;
+                    margin-top:12px;
+                    padding:12px 14px;
+                    border:0;
+                    border-radius:12px;
+                    background:#ff5f9e;
+                    color:#fff;
+                    font-size:13px;
+                    font-weight:900;
+                    cursor:pointer;
+                  "
+                >
+                  我看完教學｜開啟共用程式
+                </button>
+              `
+              : ''
+          }
+        </div>
+
+        ${imageHtml}
+
+        <div
+          style="
+            display:flex;
+            gap:9px;
+            margin-top:14px;
+          "
+        >
+          <button
+            id="xinyaoAndroidGuidePrev"
+            type="button"
+            ${androidStepIndex === 0 ? 'disabled' : ''}
+            style="
+              flex:1;
+              padding:11px 12px;
+              border:1px solid #f2bfd3;
+              border-radius:12px;
+              background:#fff;
+              color:${androidStepIndex === 0 ? '#c9bcc2' : '#d94c89'};
+              font-size:13px;
+              font-weight:900;
+              cursor:${androidStepIndex === 0 ? 'default' : 'pointer'};
+            "
+          >
+            ← 上一步
+          </button>
+
+          <button
+            id="xinyaoAndroidGuideNext"
+            type="button"
+            style="
+              flex:1.35;
+              padding:11px 12px;
+              border:0;
+              border-radius:12px;
+              background:#ff5f9e;
+              color:#fff;
+              font-size:13px;
+              font-weight:900;
+              cursor:pointer;
+            "
+          >
+            ${androidStepIndex === total - 1 ? '完成教學 ✓' : '下一步 →'}
+          </button>
+        </div>
+      `;
+
+      $('xinyaoOpenFirefoxPlay')
+        ?.addEventListener(
+          'click',
+          () => {
+            const opened =
+              window.open(
+                FIREFOX_PLAY_URL,
+                '_blank'
+              );
+
+            if (!opened) {
+              window.location.href =
+                FIREFOX_PLAY_URL;
+            }
+          }
+        );
+
+      $('xinyaoOpenFirefoxTampermonkey')
+        ?.addEventListener(
+          'click',
+          () => {
+            const opened =
+              window.open(
+                FIREFOX_TAMPERMONKEY_URL,
+                '_blank'
+              );
+
+            if (!opened) {
+              window.location.href =
+                FIREFOX_TAMPERMONKEY_URL;
+            }
+          }
+        );
+
+      $('xinyaoOpenSharedScriptAndroid')
+        ?.addEventListener(
+          'click',
+          () => {
+            const opened =
+              window.open(
+                SCRIPT_URL,
+                '_blank'
+              );
+
+            if (!opened) {
+              window.location.href =
+                SCRIPT_URL;
+            }
+          }
+        );
+
+      $('xinyaoAndroidGuidePrev')
+        ?.addEventListener(
+          'click',
+          () => {
+            if (androidStepIndex <= 0) return;
+            androidStepIndex -= 1;
+            renderAndroidStep();
+            const scroll = $('xinyaoGuideScroll');
+            if (scroll) scroll.scrollTop = 0;
+          }
+        );
+
+      $('xinyaoAndroidGuideNext')
+        ?.addEventListener(
+          'click',
+          () => {
+            if (
+              androidStepIndex <
+              total - 1
+            ) {
+              androidStepIndex += 1;
+              renderAndroidStep();
+              const scroll = $('xinyaoGuideScroll');
+              if (scroll) scroll.scrollTop = 0;
+              return;
+            }
+
+            modal.remove();
+          }
+        );
+    };
+
     const renderSimpleGuide = () => {
       const meta =
         guideMeta(
@@ -1818,6 +2210,11 @@
         'ios'
       ) {
         renderIOSStep();
+      } else if (
+        activePlatform ===
+        'android'
+      ) {
+        renderAndroidStep();
       } else {
         renderSimpleGuide();
       }
@@ -1837,6 +2234,10 @@
 
           if (activePlatform === 'ios') {
             iosStepIndex = 0;
+          }
+
+          if (activePlatform === 'android') {
+            androidStepIndex = 0;
           }
 
           renderGuide();
