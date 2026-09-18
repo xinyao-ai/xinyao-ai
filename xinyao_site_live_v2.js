@@ -11,10 +11,80 @@
     'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=202';
 
   const GUIDE_IMAGES = {
-    desktop: './xinyao_guide_pc.png?v=201',
-    ios: './xinyao_guide_ios.png?v=201',
-    android: './xinyao_guide_android.png?v=201'
+    ios: './xinyao_guide_ios.png?v=203',
+    android: './xinyao_guide_android.png?v=203'
   };
+
+  const TAMPERMONKEY_URL =
+    'https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=zh-TW';
+
+  const DESKTOP_GUIDE_STEPS = [
+    {
+      stepNumber: 1,
+      title: '先確認：娛樂城與芯瑤程式使用同一個瀏覽器',
+      bodyHtml: `
+        <p>請先確認 <b>HD 皇鼎娛樂城</b> 與 <b>芯瑤💕 ATG AI助手</b> 都使用 <b>同一個 Chrome 瀏覽器</b> 開啟。</p>
+        <p>不要一個用 Chrome、另一個用其他瀏覽器，否則後面的安裝與綁定可能無法正常運作。</p>
+      `,
+      images: [
+        './pc_step1.png?v=203'
+      ]
+    },
+    {
+      stepNumber: 2,
+      title: '安裝 Tampermonkey 擴充功能',
+      bodyHtml: `
+        <p>先按下方按鈕複製 Tampermonkey 安裝網址，再貼到 <b>Google Chrome 網址列</b> 開啟。</p>
+        <p>進入商店後依序點擊：<b>【加到 Chrome】→【新增擴充功能】</b>。</p>
+      `,
+      images: [
+        './pc_step2.png?v=203'
+      ],
+      copyTampermonkey: true
+    },
+    {
+      stepNumber: 3,
+      title: '安裝芯瑤 ATG 共用程式',
+      bodyHtml: `
+        <p>回到 <b>【芯瑤💕 ATG AI助手】</b>。</p>
+        <p>依序操作：<b>【安裝共用程式／查看教學】→ 往下滑 →【我看完教學｜開啟共用程式】→【安裝】</b>。</p>
+        <p>安裝完成後再回到這個教學頁，繼續下一步。</p>
+      `,
+      images: [
+        './pc_step3_1.png?v=203',
+        './pc_step3_2.png?v=203',
+        './pc_step3_3.png?v=203'
+      ],
+      openSharedScript: true
+    },
+    {
+      stepNumber: 4,
+      title: '開啟「允許使用者指令碼」',
+      bodyHtml: `
+        <p>登入 <b>ATG</b> 後，依序點擊：</p>
+        <p><b>右上【⋮】→【擴充功能】→【管理擴充功能】→【Tampermonkey／竄改猴】→【詳細資料】</b></p>
+        <p>最後把 <b>【允許使用者指令碼】</b> 的開關打開。這一步一定要完成，不然芯瑤助手不會在 ATG 頁面執行。</p>
+      `,
+      images: [
+        './pc_step4_1.png?v=203',
+        './pc_step4_2.png?v=203',
+        './pc_step4_3.png?v=203'
+      ]
+    },
+    {
+      stepNumber: 5,
+      title: '產生配對碼並完成綁定',
+      bodyHtml: `
+        <p>回到 <b>【芯瑤💕 ATG AI助手】</b>，點擊 <b>【產生配對碼】→【複製配對碼】</b>。</p>
+        <p>再回到 ATG：<b>重新整理頁面</b> → 左上角出現 <b>【芯瑤 ATG 即時助手】</b> → 貼上配對碼 → 點擊 <b>【綁定】</b>。</p>
+        <p>看到綁定成功後，就可以開始遊戲了 ✅</p>
+      `,
+      images: [
+        './pc_step5_1.png?v=203',
+        './pc_step5_2.png?v=203'
+      ]
+    }
+  ];
 
   const SESSION_KEY =
     'xinyao_atg_site_session_v2';
@@ -724,9 +794,7 @@
     const map = {
       desktop: {
         title: '💻 電腦安裝教學',
-        subtitle: 'Chrome＋Tampermonkey｜第一次安裝一次即可',
-        image: GUIDE_IMAGES.desktop,
-        button: '開啟共用程式'
+        subtitle: 'Chrome＋Tampermonkey｜共 5 步，一面一個步驟'
       },
       ios: {
         title: '📱 iPhone / iPad 安裝教學',
@@ -745,6 +813,28 @@
     return map[platformKey] || map.desktop;
   }
 
+  async function copyTextWithFallback(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (_) {
+      try {
+        const area = document.createElement('textarea');
+        area.value = text;
+        area.style.position = 'fixed';
+        area.style.opacity = '0';
+        document.body.appendChild(area);
+        area.focus();
+        area.select();
+        const ok = document.execCommand('copy');
+        area.remove();
+        return ok;
+      } catch (_) {
+        return false;
+      }
+    }
+  }
+
   function openInstallGuide(
     initialPlatform = detectPlatform()
   ) {
@@ -759,6 +849,8 @@
       normalizeGuidePlatform(
         initialPlatform
       );
+
+    let desktopStepIndex = 0;
 
     const modal =
       document.createElement(
@@ -784,15 +876,17 @@
 
     modal.innerHTML = `
       <div
+        id="xinyaoGuideDialog"
         role="dialog"
         aria-modal="true"
         aria-label="芯瑤安裝教學"
         style="
-          width:min(560px,100%);
+          width:min(620px,100%);
           max-height:94vh;
-          overflow:auto;
+          display:flex;
+          flex-direction:column;
+          overflow:hidden;
           box-sizing:border-box;
-          padding:16px;
           border-radius:22px;
           background:#fff;
           color:#594750;
@@ -800,91 +894,437 @@
           font-family:-apple-system,BlinkMacSystemFont,'PingFang TC',sans-serif;
         "
       >
+        <div style="padding:16px 16px 0;">
+          <div
+            style="
+              display:flex;
+              align-items:center;
+              justify-content:space-between;
+              gap:12px;
+            "
+          >
+            <div>
+              <div
+                id="xinyaoGuideTitle"
+                style="
+                  font-size:19px;
+                  font-weight:900;
+                  color:#d94c89;
+                "
+              ></div>
+
+              <div
+                id="xinyaoGuideSubtitle"
+                style="
+                  margin-top:3px;
+                  font-size:11px;
+                  line-height:1.5;
+                  color:#95858c;
+                "
+              ></div>
+            </div>
+
+            <button
+              id="xinyaoCloseInstallGuide"
+              type="button"
+              aria-label="關閉"
+              style="
+                flex:0 0 auto;
+                width:36px;
+                height:36px;
+                border:0;
+                border-radius:50%;
+                background:#fff0f6;
+                color:#d94c89;
+                font-size:20px;
+                cursor:pointer;
+              "
+            >
+              ×
+            </button>
+          </div>
+
+          <div
+            style="
+              display:grid;
+              grid-template-columns:repeat(3,1fr);
+              gap:7px;
+              margin-top:14px;
+            "
+          >
+            <button class="xinyaoGuideTab" data-platform="desktop" type="button">💻 電腦</button>
+            <button class="xinyaoGuideTab" data-platform="ios" type="button">🍎 iOS</button>
+            <button class="xinyaoGuideTab" data-platform="android" type="button">🤖 Android</button>
+          </div>
+        </div>
+
+        <div
+          id="xinyaoGuideScroll"
+          style="
+            flex:1 1 auto;
+            min-height:0;
+            overflow:auto;
+            padding:12px 16px 16px;
+            -webkit-overflow-scrolling:touch;
+          "
+        >
+          <div id="xinyaoGuideBody"></div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(
+      modal
+    );
+
+    const tabs =
+      Array.from(
+        modal.querySelectorAll(
+          '.xinyaoGuideTab'
+        )
+      );
+
+    tabs.forEach(tab => {
+      tab.style.cssText = `
+        border:1px solid #f3c1d5;
+        border-radius:12px;
+        padding:9px 5px;
+        background:#fff;
+        color:#d94c89;
+        font-size:12px;
+        font-weight:900;
+        cursor:pointer;
+      `;
+    });
+
+    const renderDesktopStep = () => {
+      const body =
+        $('xinyaoGuideBody');
+
+      if (!body) return;
+
+      const step =
+        DESKTOP_GUIDE_STEPS[
+          desktopStepIndex
+        ];
+
+      const total =
+        DESKTOP_GUIDE_STEPS.length;
+
+      const imageHtml =
+        step.images
+          .map((src, index) => `
+            <div
+              style="
+                margin-top:${index === 0 ? 12 : 10}px;
+                border:1px solid #ffd5e6;
+                border-radius:15px;
+                overflow:hidden;
+                background:#fff7fb;
+              "
+            >
+              <img
+                src="${src}"
+                alt="電腦安裝教學第 ${step.stepNumber} 步圖片 ${index + 1}"
+                style="
+                  display:block;
+                  width:100%;
+                  height:auto;
+                  background:#fff;
+                "
+              >
+            </div>
+          `)
+          .join('');
+
+      body.innerHTML = `
         <div
           style="
             display:flex;
             align-items:center;
             justify-content:space-between;
-            gap:12px;
+            gap:10px;
+            margin-bottom:10px;
           "
         >
-          <div>
-            <div
-              id="xinyaoGuideTitle"
-              style="
-                font-size:19px;
-                font-weight:900;
-                color:#d94c89;
-              "
-            ></div>
+          <div
+            id="xinyaoGuideProgress"
+            style="
+              display:inline-flex;
+              align-items:center;
+              gap:7px;
+              padding:7px 11px;
+              border-radius:999px;
+              background:#fff0f6;
+              color:#d94c89;
+              font-size:12px;
+              font-weight:900;
+            "
+          >
+            步驟 ${step.stepNumber} / ${total}
+          </div>
 
+          <div
+            style="
+              flex:1;
+              height:7px;
+              overflow:hidden;
+              border-radius:999px;
+              background:#ffe5ef;
+            "
+          >
             <div
-              id="xinyaoGuideSubtitle"
               style="
-                margin-top:3px;
-                font-size:11px;
-                line-height:1.5;
-                color:#95858c;
+                width:${((desktopStepIndex + 1) / total) * 100}%;
+                height:100%;
+                border-radius:999px;
+                background:#ff5f9e;
+                transition:width .2s ease;
               "
             ></div>
           </div>
-
-          <button
-            id="xinyaoCloseInstallGuide"
-            type="button"
-            aria-label="關閉"
-            style="
-              flex:0 0 auto;
-              width:36px;
-              height:36px;
-              border:0;
-              border-radius:50%;
-              background:#fff0f6;
-              color:#d94c89;
-              font-size:20px;
-              cursor:pointer;
-            "
-          >
-            ×
-          </button>
         </div>
 
         <div
           style="
-            display:grid;
-            grid-template-columns:repeat(3,1fr);
-            gap:7px;
+            padding:15px;
+            border:1px solid #ffd5e6;
+            border-radius:16px;
+            background:#fff9fc;
+          "
+        >
+          <div
+            style="
+              font-size:18px;
+              font-weight:950;
+              line-height:1.45;
+              color:#d94c89;
+            "
+          >
+            ${step.stepNumber}. ${step.title}
+          </div>
+
+          <div
+            style="
+              margin-top:10px;
+              font-size:13px;
+              line-height:1.8;
+              color:#604e57;
+            "
+          >
+            ${step.bodyHtml}
+          </div>
+
+          ${
+            step.copyTampermonkey
+              ? `
+                <button
+                  id="xinyaoCopyTampermonkeyUrl"
+                  type="button"
+                  style="
+                    width:100%;
+                    margin-top:12px;
+                    padding:12px 14px;
+                    border:0;
+                    border-radius:12px;
+                    background:#ff5f9e;
+                    color:#fff;
+                    font-size:13px;
+                    font-weight:900;
+                    cursor:pointer;
+                  "
+                >
+                  📋 複製 Tampermonkey 安裝網址
+                </button>
+
+                <div
+                  style="
+                    margin-top:7px;
+                    padding:8px 10px;
+                    border-radius:10px;
+                    background:#fff;
+                    border:1px dashed #f2bfd3;
+                    color:#9b7e8a;
+                    font-size:10px;
+                    line-height:1.5;
+                    word-break:break-all;
+                  "
+                >
+                  ${TAMPERMONKEY_URL}
+                </div>
+              `
+              : ''
+          }
+
+          ${
+            step.openSharedScript
+              ? `
+                <button
+                  id="xinyaoOpenSharedScriptDesktop"
+                  type="button"
+                  style="
+                    width:100%;
+                    margin-top:12px;
+                    padding:12px 14px;
+                    border:0;
+                    border-radius:12px;
+                    background:#ff5f9e;
+                    color:#fff;
+                    font-size:13px;
+                    font-weight:900;
+                    cursor:pointer;
+                  "
+                >
+                  我看完教學｜開啟共用程式
+                </button>
+              `
+              : ''
+          }
+        </div>
+
+        ${imageHtml}
+
+        <div
+          style="
+            display:flex;
+            gap:9px;
             margin-top:14px;
           "
         >
           <button
-            class="xinyaoGuideTab"
-            data-platform="desktop"
+            id="xinyaoGuidePrev"
             type="button"
+            ${desktopStepIndex === 0 ? 'disabled' : ''}
+            style="
+              flex:1;
+              padding:11px 12px;
+              border:1px solid #f2bfd3;
+              border-radius:12px;
+              background:#fff;
+              color:${desktopStepIndex === 0 ? '#c9bcc2' : '#d94c89'};
+              font-size:13px;
+              font-weight:900;
+              cursor:${desktopStepIndex === 0 ? 'default' : 'pointer'};
+            "
           >
-            💻 電腦
+            ← 上一步
           </button>
 
           <button
-            class="xinyaoGuideTab"
-            data-platform="ios"
+            id="xinyaoGuideNext"
             type="button"
+            style="
+              flex:1.35;
+              padding:11px 12px;
+              border:0;
+              border-radius:12px;
+              background:#ff5f9e;
+              color:#fff;
+              font-size:13px;
+              font-weight:900;
+              cursor:pointer;
+            "
           >
-            🍎 iOS
-          </button>
-
-          <button
-            class="xinyaoGuideTab"
-            data-platform="android"
-            type="button"
-          >
-            🤖 Android
+            ${desktopStepIndex === total - 1 ? '完成教學 ✓' : '下一步 →'}
           </button>
         </div>
+      `;
 
+      $('xinyaoCopyTampermonkeyUrl')
+        ?.addEventListener(
+          'click',
+          async event => {
+            const button =
+              event.currentTarget;
+
+            const ok =
+              await copyTextWithFallback(
+                TAMPERMONKEY_URL
+              );
+
+            button.textContent = ok
+              ? '✅ 已複製！請貼到 Chrome 網址列開啟'
+              : '請長按下方網址複製';
+
+            setTimeout(
+              () => {
+                if (
+                  document.body.contains(
+                    button
+                  )
+                ) {
+                  button.textContent =
+                    '📋 複製 Tampermonkey 安裝網址';
+                }
+              },
+              2200
+            );
+          }
+        );
+
+      $('xinyaoOpenSharedScriptDesktop')
+        ?.addEventListener(
+          'click',
+          () => {
+            const opened =
+              window.open(
+                SCRIPT_URL,
+                '_blank'
+              );
+
+            if (!opened) {
+              window.location.href =
+                SCRIPT_URL;
+            }
+          }
+        );
+
+      $('xinyaoGuidePrev')
+        ?.addEventListener(
+          'click',
+          () => {
+            if (desktopStepIndex <= 0) return;
+            desktopStepIndex -= 1;
+            renderDesktopStep();
+            const scroll = $('xinyaoGuideScroll');
+            if (scroll) scroll.scrollTop = 0;
+          }
+        );
+
+      $('xinyaoGuideNext')
+        ?.addEventListener(
+          'click',
+          () => {
+            if (
+              desktopStepIndex <
+              total - 1
+            ) {
+              desktopStepIndex += 1;
+              renderDesktopStep();
+              const scroll = $('xinyaoGuideScroll');
+              if (scroll) scroll.scrollTop = 0;
+              return;
+            }
+
+            modal.remove();
+          }
+        );
+    };
+
+    const renderSimpleGuide = () => {
+      const meta =
+        guideMeta(
+          activePlatform
+        );
+
+      const body =
+        $('xinyaoGuideBody');
+
+      if (!body) return;
+
+      body.innerHTML = `
         <div
           style="
-            margin-top:12px;
             border:1px solid #ffd5e6;
             border-radius:16px;
             overflow:hidden;
@@ -892,8 +1332,8 @@
           "
         >
           <img
-            id="xinyaoGuideImage"
-            alt="芯瑤安裝教學"
+            src="${meta.image}"
+            alt="${meta.title}"
             style="
               display:block;
               width:100%;
@@ -935,34 +1375,27 @@
             cursor:pointer;
           "
         >
-          開啟共用程式
+          我看完教學｜${meta.button}
         </button>
-      </div>
-    `;
-
-    document.body.appendChild(
-      modal
-    );
-
-    const tabs =
-      Array.from(
-        modal.querySelectorAll(
-          '.xinyaoGuideTab'
-        )
-      );
-
-    tabs.forEach(tab => {
-      tab.style.cssText = `
-        border:1px solid #f3c1d5;
-        border-radius:12px;
-        padding:9px 5px;
-        background:#fff;
-        color:#d94c89;
-        font-size:12px;
-        font-weight:900;
-        cursor:pointer;
       `;
-    });
+
+      $('xinyaoOpenSharedScript')
+        ?.addEventListener(
+          'click',
+          () => {
+            const opened =
+              window.open(
+                SCRIPT_URL,
+                '_blank'
+              );
+
+            if (!opened) {
+              window.location.href =
+                SCRIPT_URL;
+            }
+          }
+        );
+    };
 
     const renderGuide = () => {
       const meta =
@@ -976,12 +1409,6 @@
       const subtitle =
         $('xinyaoGuideSubtitle');
 
-      const image =
-        $('xinyaoGuideImage');
-
-      const openButton =
-        $('xinyaoOpenSharedScript');
-
       if (title) {
         title.textContent =
           meta.title;
@@ -990,19 +1417,6 @@
       if (subtitle) {
         subtitle.textContent =
           meta.subtitle;
-      }
-
-      if (image) {
-        image.src =
-          meta.image;
-
-        image.alt =
-          meta.title;
-      }
-
-      if (openButton) {
-        openButton.textContent =
-          `我看完教學｜${meta.button}`;
       }
 
       tabs.forEach(tab => {
@@ -1025,6 +1439,22 @@
             ? '#ff5f9e'
             : '#f3c1d5';
       });
+
+      const scroll =
+        $('xinyaoGuideScroll');
+
+      if (scroll) {
+        scroll.scrollTop = 0;
+      }
+
+      if (
+        activePlatform ===
+        'desktop'
+      ) {
+        renderDesktopStep();
+      } else {
+        renderSimpleGuide();
+      }
     };
 
     tabs.forEach(tab => {
@@ -1044,23 +1474,6 @@
       ?.addEventListener(
         'click',
         () => modal.remove()
-      );
-
-    $('xinyaoOpenSharedScript')
-      ?.addEventListener(
-        'click',
-        () => {
-          const opened =
-            window.open(
-              SCRIPT_URL,
-              '_blank'
-            );
-
-          if (!opened) {
-            window.location.href =
-              SCRIPT_URL;
-          }
-        }
       );
 
     modal.addEventListener(
