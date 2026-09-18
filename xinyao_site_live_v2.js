@@ -18,6 +18,9 @@
   const TAMPERMONKEY_URL =
     'https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=zh-TW';
 
+  const USERSCRIPTS_APP_STORE_URL =
+    'https://apps.apple.com/tw/app/userscripts/id1463298887';
+
   const DESKTOP_GUIDE_STEPS = [
     {
       stepNumber: 1,
@@ -82,6 +85,83 @@
       images: [
         './pc_step5_1.png?v=203',
         './pc_step5_2.png?v=203'
+      ]
+    }
+  ];
+
+
+  const IOS_GUIDE_STEPS = [
+    {
+      stepNumber: 1,
+      title: '先確認：娛樂城與芯瑤程式使用同一個 Safari',
+      bodyHtml: `
+        <p>請先確認 <b>HD 皇鼎娛樂城</b> 與 <b>芯瑤💕 ATG AI助手</b> 都使用 <b>同一個 Safari 瀏覽器</b> 開啟。</p>
+        <p>不要一個用 Safari、另一個用其他瀏覽器，否則後面的安裝、配對與同步可能無法正常運作。</p>
+      `,
+      images: [
+        './ios_step1.png?v=204'
+      ]
+    },
+    {
+      stepNumber: 2,
+      title: '到 App Store 安裝 Userscripts',
+      bodyHtml: `
+        <p>點下方按鈕可直接前往 App Store 的 <b>Userscripts</b> 安裝頁，不需要自己搜尋。</p>
+        <p>進入 App Store 後，點擊 <b>【取得】／下載圖示</b> 完成安裝。</p>
+      `,
+      images: [
+        './ios_step2.png?v=204'
+      ],
+      openUserscriptsAppStore: true
+    },
+    {
+      stepNumber: 3,
+      title: '開啟 Userscripts 的 Safari 延伸功能權限',
+      bodyHtml: `
+        <p>到 iPhone 的 <b>【設定】→【App】→【Safari】→【延伸功能】→【Userscripts】</b>。</p>
+        <p>進去後請打開 <b>【允許延伸功能】</b> 與 <b>【在「私密瀏覽」中允許】</b>。</p>
+        <p>如果下方有網站權限，也請確認相關網站設定為 <b>允許</b>。</p>
+      `,
+      images: [
+        './ios_step3.png?v=204'
+      ]
+    },
+    {
+      stepNumber: 4,
+      title: '回到芯瑤頁面，開啟共用程式',
+      bodyHtml: `
+        <p>回到 <b>【芯瑤💕 ATG AI助手】</b>。</p>
+        <p>點擊 <b>【安裝共用程式／查看教學】</b> → 將教學往下滑 → 點擊 <b>【我看完教學｜開啟共用程式】</b>。</p>
+        <p>開啟共用程式頁面後，請繼續下一步安裝。</p>
+      `,
+      images: [
+        './ios_step4.png?v=204'
+      ],
+      openSharedScript: true
+    },
+    {
+      stepNumber: 5,
+      title: '用 Userscripts 安裝芯瑤共用程式',
+      bodyHtml: `
+        <p>在共用程式頁面，依序操作：</p>
+        <p><b>網址左側【拼圖／延伸功能符號】→【Userscripts】→ 黃色提示列【Tap to install】→【Install】</b>。</p>
+        <p>看到綠色 <b>【Userscript Installed】</b> 後，再把上方右側的腳本開關打開。</p>
+      `,
+      images: [
+        './ios_step5_1.png?v=204',
+        './ios_step5_2.png?v=204'
+      ]
+    },
+    {
+      stepNumber: 6,
+      title: '產生配對碼並完成綁定',
+      bodyHtml: `
+        <p>回到 <b>【芯瑤💕 ATG AI助手】</b>，點擊 <b>【產生配對碼】→【複製配對碼】</b>。</p>
+        <p>再回到 ATG：<b>重新整理頁面</b> → 左上角出現 <b>【芯瑤 ATG 即時助手】</b> → 貼上剛剛複製的 <b>配對碼</b> → 點擊 <b>【綁定】</b>。</p>
+        <p>看到綁定成功後，就可以開始遊戲了 ✅</p>
+      `,
+      images: [
+        './ios_step6.png?v=204'
       ]
     }
   ];
@@ -798,9 +878,7 @@
       },
       ios: {
         title: '📱 iPhone / iPad 安裝教學',
-        subtitle: 'Safari＋Userscripts｜第一次設定一次即可',
-        image: GUIDE_IMAGES.ios,
-        button: '開啟共用程式'
+        subtitle: 'Safari＋Userscripts｜共 6 步，一面一個步驟'
       },
       android: {
         title: '🤖 Android 安裝教學',
@@ -851,6 +929,7 @@
       );
 
     let desktopStepIndex = 0;
+    let iosStepIndex = 0;
 
     const modal =
       document.createElement(
@@ -1311,6 +1390,288 @@
         );
     };
 
+    const renderIOSStep = () => {
+      const body =
+        $('xinyaoGuideBody');
+
+      if (!body) return;
+
+      const step =
+        IOS_GUIDE_STEPS[
+          iosStepIndex
+        ];
+
+      const total =
+        IOS_GUIDE_STEPS.length;
+
+      const imageHtml =
+        step.images
+          .map((src, index) => `
+            <div
+              style="
+                margin-top:${index === 0 ? 12 : 10}px;
+                border:1px solid #ffd5e6;
+                border-radius:15px;
+                overflow:hidden;
+                background:#fff7fb;
+              "
+            >
+              <img
+                src="${src}"
+                alt="iOS 安裝教學第 ${step.stepNumber} 步圖片 ${index + 1}"
+                style="
+                  display:block;
+                  width:100%;
+                  height:auto;
+                  background:#fff;
+                "
+              >
+            </div>
+          `)
+          .join('');
+
+      body.innerHTML = `
+        <div
+          style="
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:10px;
+            margin-bottom:10px;
+          "
+        >
+          <div
+            style="
+              display:inline-flex;
+              align-items:center;
+              gap:7px;
+              padding:7px 11px;
+              border-radius:999px;
+              background:#fff0f6;
+              color:#d94c89;
+              font-size:12px;
+              font-weight:900;
+            "
+          >
+            步驟 ${step.stepNumber} / ${total}
+          </div>
+
+          <div
+            style="
+              flex:1;
+              height:7px;
+              overflow:hidden;
+              border-radius:999px;
+              background:#ffe5ef;
+            "
+          >
+            <div
+              style="
+                width:${((iosStepIndex + 1) / total) * 100}%;
+                height:100%;
+                border-radius:999px;
+                background:#ff5f9e;
+                transition:width .2s ease;
+              "
+            ></div>
+          </div>
+        </div>
+
+        <div
+          style="
+            padding:15px;
+            border:1px solid #ffd5e6;
+            border-radius:16px;
+            background:#fff9fc;
+          "
+        >
+          <div
+            style="
+              font-size:18px;
+              font-weight:950;
+              line-height:1.45;
+              color:#d94c89;
+            "
+          >
+            ${step.stepNumber}. ${step.title}
+          </div>
+
+          <div
+            style="
+              margin-top:10px;
+              font-size:13px;
+              line-height:1.8;
+              color:#604e57;
+            "
+          >
+            ${step.bodyHtml}
+          </div>
+
+          ${
+            step.openUserscriptsAppStore
+              ? `
+                <button
+                  id="xinyaoOpenUserscriptsAppStore"
+                  type="button"
+                  style="
+                    width:100%;
+                    margin-top:12px;
+                    padding:12px 14px;
+                    border:0;
+                    border-radius:12px;
+                    background:#ff5f9e;
+                    color:#fff;
+                    font-size:13px;
+                    font-weight:900;
+                    cursor:pointer;
+                  "
+                >
+                  📱 前往 App Store 安裝 Userscripts
+                </button>
+              `
+              : ''
+          }
+
+          ${
+            step.openSharedScript
+              ? `
+                <button
+                  id="xinyaoOpenSharedScriptIOS"
+                  type="button"
+                  style="
+                    width:100%;
+                    margin-top:12px;
+                    padding:12px 14px;
+                    border:0;
+                    border-radius:12px;
+                    background:#ff5f9e;
+                    color:#fff;
+                    font-size:13px;
+                    font-weight:900;
+                    cursor:pointer;
+                  "
+                >
+                  我看完教學｜開啟共用程式
+                </button>
+              `
+              : ''
+          }
+        </div>
+
+        ${imageHtml}
+
+        <div
+          style="
+            display:flex;
+            gap:9px;
+            margin-top:14px;
+          "
+        >
+          <button
+            id="xinyaoIOSGuidePrev"
+            type="button"
+            ${iosStepIndex === 0 ? 'disabled' : ''}
+            style="
+              flex:1;
+              padding:11px 12px;
+              border:1px solid #f2bfd3;
+              border-radius:12px;
+              background:#fff;
+              color:${iosStepIndex === 0 ? '#c9bcc2' : '#d94c89'};
+              font-size:13px;
+              font-weight:900;
+              cursor:${iosStepIndex === 0 ? 'default' : 'pointer'};
+            "
+          >
+            ← 上一步
+          </button>
+
+          <button
+            id="xinyaoIOSGuideNext"
+            type="button"
+            style="
+              flex:1.35;
+              padding:11px 12px;
+              border:0;
+              border-radius:12px;
+              background:#ff5f9e;
+              color:#fff;
+              font-size:13px;
+              font-weight:900;
+              cursor:pointer;
+            "
+          >
+            ${iosStepIndex === total - 1 ? '完成教學 ✓' : '下一步 →'}
+          </button>
+        </div>
+      `;
+
+      $('xinyaoOpenUserscriptsAppStore')
+        ?.addEventListener(
+          'click',
+          () => {
+            const opened =
+              window.open(
+                USERSCRIPTS_APP_STORE_URL,
+                '_blank'
+              );
+
+            if (!opened) {
+              window.location.href =
+                USERSCRIPTS_APP_STORE_URL;
+            }
+          }
+        );
+
+      $('xinyaoOpenSharedScriptIOS')
+        ?.addEventListener(
+          'click',
+          () => {
+            const opened =
+              window.open(
+                SCRIPT_URL,
+                '_blank'
+              );
+
+            if (!opened) {
+              window.location.href =
+                SCRIPT_URL;
+            }
+          }
+        );
+
+      $('xinyaoIOSGuidePrev')
+        ?.addEventListener(
+          'click',
+          () => {
+            if (iosStepIndex <= 0) return;
+            iosStepIndex -= 1;
+            renderIOSStep();
+            const scroll = $('xinyaoGuideScroll');
+            if (scroll) scroll.scrollTop = 0;
+          }
+        );
+
+      $('xinyaoIOSGuideNext')
+        ?.addEventListener(
+          'click',
+          () => {
+            if (
+              iosStepIndex <
+              total - 1
+            ) {
+              iosStepIndex += 1;
+              renderIOSStep();
+              const scroll = $('xinyaoGuideScroll');
+              if (scroll) scroll.scrollTop = 0;
+              return;
+            }
+
+            modal.remove();
+          }
+        );
+    };
+
     const renderSimpleGuide = () => {
       const meta =
         guideMeta(
@@ -1452,6 +1813,11 @@
         'desktop'
       ) {
         renderDesktopStep();
+      } else if (
+        activePlatform ===
+        'ios'
+      ) {
+        renderIOSStep();
       } else {
         renderSimpleGuide();
       }
@@ -1464,6 +1830,14 @@
           activePlatform =
             tab.dataset.platform ||
             'desktop';
+
+          if (activePlatform === 'desktop') {
+            desktopStepIndex = 0;
+          }
+
+          if (activePlatform === 'ios') {
+            iosStepIndex = 0;
+          }
 
           renderGuide();
         }
