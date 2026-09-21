@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 全房分析
 // @namespace    xinyao-atg-room-scanner
-// @version      2.1.0
+// @version      2.1.1
 // @description  一鍵掃描 ATG 全房、整理房號統計，並可將非敏感房號快照同步到芯瑤 ATG AI助手。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -1283,7 +1283,6 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;">
         <button id="xinyao-scan-all" style="${buttonStyle()}">${state.scanRunning ? '掃描中…' : '一鍵掃描 4100 房'}</button>
         <button id="xinyao-stop" style="${secondaryButtonStyle()}">停止掃描</button>
-        <button id="xinyao-room-copy" style="${secondaryButtonStyle()}">複製結果</button>
         <button id="xinyao-expand" style="${secondaryButtonStyle()}">${ui.expanded ? '收合分析' : '完整分析'}</button>
         <button id="xinyao-sync-site" style="${buttonStyle('grid-column:1 / -1;')}">🌸 同步到芯瑤</button>
         <button id="xinyao-calibrate" style="${secondaryButtonStyle('grid-column:1 / -1;')}">${state.pageCalibration ? '重新校準頁碼' : '校準頁碼位置'}</button>
