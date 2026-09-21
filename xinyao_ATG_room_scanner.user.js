@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 全房分析
 // @namespace    xinyao-atg-room-scanner
-// @version      1.0.0
+// @version      1.0.1
 // @description  一鍵掃描 ATG 全房、整理房號狀態與歷史統計、提供資料排行；資料只保留在本機，不自動上傳。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -708,22 +708,127 @@
     };
   }
 
-  function fallbackCopy(text) {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    ta.remove();
-    flash('✅ 已複製');
+  function closeCopyDialog() {
+    document.getElementById('xinyao-copy-modal')?.remove();
+  }
+
+  function openCopyDialog(text) {
+    closeCopyDialog();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'xinyao-copy-modal';
+    overlay.style.cssText = `
+      position:fixed;
+      inset:0;
+      z-index:2147483647;
+      background:rgba(0,0,0,.72);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      font-family:Arial,"Microsoft JhengHei",sans-serif;
+    `;
+
+    overlay.innerHTML = `
+      <div style="
+        width:min(760px,94vw);
+        height:min(680px,86vh);
+        background:#17131d;
+        color:#fff;
+        border:1px solid rgba(255,255,255,.15);
+        border-radius:16px;
+        padding:16px;
+        box-shadow:0 18px 60px rgba(0,0,0,.5);
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+      ">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <div>
+            <div style="font-size:16px;font-weight:800;">📋 ATG 偵測結果</div>
+            <div style="font-size:11px;opacity:.7;margin-top:3px;">
+              如果自動複製失敗，按「全選文字」後再按 Ctrl + C
+            </div>
+          </div>
+          <button id="xinyao-copy-close" style="
+            border:0;border-radius:8px;background:rgba(255,255,255,.1);
+            color:#fff;padding:7px 11px;cursor:pointer;
+          ">✕</button>
+        </div>
+
+        <textarea id="xinyao-copy-text" readonly style="
+          flex:1;width:100%;min-height:0;resize:none;box-sizing:border-box;
+          border:1px solid rgba(255,255,255,.15);border-radius:10px;
+          background:#0d0b11;color:#fff;padding:12px;font-size:11px;
+          line-height:1.5;outline:none;white-space:pre;
+        "></textarea>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <button id="xinyao-copy-select" style="
+            border:0;border-radius:10px;padding:10px;cursor:pointer;
+            background:#ff5a9d;color:#fff;font-weight:800;
+          ">全選文字</button>
+
+          <button id="xinyao-copy-direct" style="
+            border:1px solid rgba(255,255,255,.18);border-radius:10px;
+            padding:10px;cursor:pointer;background:rgba(255,255,255,.08);
+            color:#fff;font-weight:800;
+          ">複製文字</button>
+        </div>
+
+        <div id="xinyao-copy-status" style="
+          min-height:18px;font-size:11px;text-align:center;opacity:.8;
+        "></div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const textarea = document.getElementById('xinyao-copy-text');
+    const status = document.getElementById('xinyao-copy-status');
+    textarea.value = text;
+
+    function selectText() {
+      textarea.focus();
+      textarea.select();
+      textarea.setSelectionRange(0, textarea.value.length);
+    }
+
+    document.getElementById('xinyao-copy-select')?.addEventListener('click', () => {
+      selectText();
+      status.textContent = '✅ 已全選，現在按 Ctrl + C';
+    });
+
+    document.getElementById('xinyao-copy-direct')?.addEventListener('click', () => {
+      selectText();
+
+      let copied = false;
+      try {
+        copied = document.execCommand('copy');
+      } catch {
+        copied = false;
+      }
+
+      status.textContent = copied
+        ? '✅ 已複製，可以直接貼到 ChatGPT'
+        : '⚠️ 瀏覽器未允許自動複製，請直接按 Ctrl + C';
+    });
+
+    document.getElementById('xinyao-copy-close')?.addEventListener('click', closeCopyDialog);
+
+    overlay.addEventListener('click', event => {
+      if (event.target === overlay) closeCopyDialog();
+    });
+
+    setTimeout(() => {
+      selectText();
+      status.textContent = '文字已全選，可直接按 Ctrl + C';
+    }, 50);
   }
 
   function copyResults() {
     const text = JSON.stringify(exportData(), null, 2);
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(text).then(() => flash('✅ 已複製')).catch(() => fallbackCopy(text));
-    } else fallbackCopy(text);
+    openCopyDialog(text);
   }
 
   function clearResults() {
