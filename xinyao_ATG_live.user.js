@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      2.0.1
+// @version      2.0.2
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -13,8 +13,8 @@
 (() => {
   'use strict';
 
-  if (window.__XIANYAO_ATG_LIVE_V201__) return;
-  window.__XIANYAO_ATG_LIVE_V201__ = true;
+  if (window.__XIANYAO_ATG_LIVE_V202__) return;
+  window.__XIANYAO_ATG_LIVE_V202__ = true;
 
   const WORKER = 'https://xinyao-atg-live.love06130430.workers.dev';
   const TOKEN_KEY = 'xinyao_atg_device_token_v2';
@@ -29,6 +29,9 @@
     maxPayout: null,
     freeGameCount: null,
     startFreeGame: null,
+    freeGameActive: false,
+    freeGameLastPositiveSpinId: '',
+    freeGameZeroSpinId: '',
     completedSpins: 0,
     lastSeenSpinId: '',
     previousSpinId: '',
@@ -160,6 +163,109 @@
     return current >= total - 1;
   }
 
+  function readFreeGameSignal(engine) {
+    const states = Array.isArray(engine?.gameState) ? engine.gameState : [];
+    let sawExplicit = false;
+    let startSignal = false;
+    let positiveCount = null;
+    let lastCount = null;
+
+    for (const item of states) {
+      if (!item || typeof item !== 'object') continue;
+
+      if (typeof item.startFreeGame === 'boolean') {
+        sawExplicit = true;
+        if (item.startFreeGame) startSignal = true;
+      }
+
+      const count = toNumber(item.freeGameCount);
+      if (count !== null) {
+        sawExplicit = true;
+        lastCount = Math.max(0, count);
+        if (count > 0) positiveCount = count;
+      }
+    }
+
+    const count = positiveCount !== null ? positiveCount : lastCount;
+    return {
+      sawExplicit,
+      startSignal,
+      count,
+      activeSignal: startSignal || (count !== null && count > 0)
+    };
+  }
+
+  function computeFreeGameState(previous, engine, spinId) {
+    const prev = previous || {};
+    const next = {
+      active: Boolean(prev.active),
+      count: prev.count ?? null,
+      start: prev.start ?? null,
+      lastPositiveSpinId: String(prev.lastPositiveSpinId || ''),
+      zeroSpinId: String(prev.zeroSpinId || '')
+    };
+
+    const signal = readFreeGameSignal(engine);
+    if (!signal.sawExplicit) return next;
+
+    if (signal.activeSignal) {
+      next.active = true;
+      next.start = Boolean(signal.startSignal);
+      if (signal.count !== null && signal.count > 0) {
+        next.count = signal.count;
+      } else if (next.count === null) {
+        next.count = 0;
+      }
+      next.lastPositiveSpinId = String(spinId || '');
+      next.zeroSpinId = '';
+      return next;
+    }
+
+    if (!next.active) {
+      next.count = signal.count ?? 0;
+      next.start = false;
+      next.zeroSpinId = '';
+      return next;
+    }
+
+    const currentSpinId = String(spinId || '');
+
+    // 觸發免遊的同一個 spin 內，最後一個 view 可能又回報 0 / false。
+    // 同一 spin 不可因此把剛偵測到的免遊狀態清掉。
+    if (!currentSpinId || currentSpinId === next.lastPositiveSpinId) {
+      return next;
+    }
+
+    // ATG 偶爾會有一個零值封包夾在免遊流程中。
+    // 連續兩個不同 spin 都明確回報 0 / false，才確認免遊已結束。
+    if (!next.zeroSpinId) {
+      next.zeroSpinId = currentSpinId;
+      return next;
+    }
+
+    if (next.zeroSpinId !== currentSpinId) {
+      next.active = false;
+      next.count = 0;
+      next.start = false;
+      next.lastPositiveSpinId = '';
+      next.zeroSpinId = '';
+    }
+
+    return next;
+  }
+
+  function freeGameTextFor(snapshot) {
+    const active = Boolean(snapshot?.active);
+    const count = toNumber(snapshot?.count);
+
+    if (active) {
+      return count !== null && count > 0 ? `剩 ${count} 次` : '進行中';
+    }
+
+    if (count === null && snapshot?.start == null) return '—';
+    return '未進行';
+  }
+
   function findBalance(value, path = '', depth = 0, seen = new WeakSet()) {
     if (!safeObject(value) || depth > 18 || seen.has(value)) return null;
     seen.add(value);
@@ -187,24 +293,47 @@
     return null;
   }
 
-  function updateGeneralFromEngine(finalState) {
+  function updateGeneralFromEngine(engine, finalState, spinId) {
     let changed = false;
-    if (!finalState) return changed;
 
-    const stake = toNumber(finalState.totalStake);
-    if (stake !== null && state.stake !== stake) {
-      state.stake = stake;
-      changed = true;
+    if (finalState) {
+      const stake = toNumber(finalState.totalStake);
+      if (stake !== null && state.stake !== stake) {
+        state.stake = stake;
+        changed = true;
+      }
     }
 
-    const freeCount = toNumber(finalState.freeGameCount);
-    if (freeCount !== null && state.freeGameCount !== freeCount) {
-      state.freeGameCount = freeCount;
+    const nextFreeGame = computeFreeGameState(
+      {
+        active: state.freeGameActive,
+        count: state.freeGameCount,
+        start: state.startFreeGame,
+        lastPositiveSpinId: state.freeGameLastPositiveSpinId,
+        zeroSpinId: state.freeGameZeroSpinId
+      },
+      engine,
+      spinId
+    );
+
+    if (state.freeGameActive !== nextFreeGame.active) {
+      state.freeGameActive = nextFreeGame.active;
       changed = true;
     }
-
-    if (typeof finalState.startFreeGame === 'boolean' && state.startFreeGame !== finalState.startFreeGame) {
-      state.startFreeGame = finalState.startFreeGame;
+    if (state.freeGameCount !== nextFreeGame.count) {
+      state.freeGameCount = nextFreeGame.count;
+      changed = true;
+    }
+    if (state.startFreeGame !== nextFreeGame.start) {
+      state.startFreeGame = nextFreeGame.start;
+      changed = true;
+    }
+    if (state.freeGameLastPositiveSpinId !== nextFreeGame.lastPositiveSpinId) {
+      state.freeGameLastPositiveSpinId = nextFreeGame.lastPositiveSpinId;
+      changed = true;
+    }
+    if (state.freeGameZeroSpinId !== nextFreeGame.zeroSpinId) {
+      state.freeGameZeroSpinId = nextFreeGame.zeroSpinId;
       changed = true;
     }
 
@@ -218,7 +347,7 @@
     const finalState = getFinalGameState(engine);
     state.lastSeenSpinId = spinId;
 
-    let changed = updateGeneralFromEngine(finalState);
+    let changed = updateGeneralFromEngine(engine, finalState, spinId);
     if (!state.waitingResult) return changed;
 
     if (!state.currentSpinId && state.previousSpinId && spinId === state.previousSpinId) {
@@ -369,12 +498,11 @@
   }
 
   function freeGameText() {
-    if (state.freeGameCount !== null) {
-      return state.freeGameCount > 0 ? `剩 ${state.freeGameCount} 次` : '未進行';
-    }
-    if (state.startFreeGame === true) return '已觸發';
-    if (state.startFreeGame === false) return '未進行';
-    return '—';
+    return freeGameTextFor({
+      active: state.freeGameActive,
+      count: state.freeGameCount,
+      start: state.startFreeGame
+    });
   }
 
   function connectionText() {
@@ -394,7 +522,7 @@
       latestPayout: state.latestPayout,
       maxPayout: state.maxPayout,
       freeGameCount: state.freeGameCount,
-      freeGameActive: Boolean((state.freeGameCount || 0) > 0 || state.startFreeGame === true),
+      freeGameActive: state.freeGameActive,
       completedSpins: state.completedSpins
     };
   }
@@ -706,6 +834,15 @@
       }
       proto.__xinyaoLiveV200Wrapped = true;
     } catch (_) {}
+  }
+
+
+  if (window.__XIANYAO_ATG_TEST_MODE__) {
+    window.__XIANYAO_ATG_LIVE_TEST__ = {
+      readFreeGameSignal,
+      computeFreeGameState,
+      freeGameTextFor
+    };
   }
 
   mountPanel();
