@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 全房分析
 // @namespace    xinyao-atg-room-scanner
-// @version      1.1.0
-// @description  一鍵掃描 ATG 全房、整理房號狀態與歷史統計、提供資料排行；資料只保留在本機，不自動上傳。
+// @version      2.0.0
+// @description  一鍵掃描 ATG 全房、支援遊戲內頁碼校準、整理房號狀態與歷史統計；資料只保留在本機。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -119,7 +119,40 @@
     return Array.from({ length: total }, (_, i) => ((start + i) % total) + 1);
   }
 
-  const SCRIPT_VERSION = '1.1.0';
+  function buildPageCalibration(samples) {
+    const unique = new Map();
+    for (const sample of samples || []) {
+      const page = finiteNumber(sample?.page);
+      const x = finiteNumber(sample?.x);
+      const y = finiteNumber(sample?.y);
+      if (page === null || x === null || y === null) continue;
+      if (page < 1 || page > 99 || x < 0 || x > 1 || y < 0 || y > 1) continue;
+      unique.set(page, { page, x, y });
+    }
+    const rows = [...unique.values()].sort((a, b) => a.page - b.page);
+    if (rows.length < 2) return null;
+    const a = rows[0];
+    const b = rows[rows.length - 1];
+    if (a.page === b.page) return null;
+    const stepX = (b.x - a.x) / (b.page - a.page);
+    if (!Number.isFinite(stepX) || Math.abs(stepX) < 0.002) return null;
+    const startX = a.x - stepX * (a.page - 1);
+    const y = (a.y + b.y) / 2;
+    return { startX, stepX, y, samplePages: [a.page, b.page] };
+  }
+
+  function pagePoint(calibration, page) {
+    if (!calibration) return null;
+    const p = finiteNumber(page);
+    if (p === null) return null;
+    const x = finiteNumber(calibration.startX);
+    const stepX = finiteNumber(calibration.stepX);
+    const y = finiteNumber(calibration.y);
+    if (x === null || stepX === null || y === null) return null;
+    return { x: x + stepX * (p - 1), y };
+  }
+
+  const SCRIPT_VERSION = '2.0.0';
 
   function getVersion() {
     return SCRIPT_VERSION;
@@ -133,7 +166,8 @@
       'xinyao-expand': 'expand',
       'xinyao-room-hide': 'hide',
       'xinyao-prev': 'prev',
-      'xinyao-next': 'next'
+      'xinyao-next': 'next',
+      'xinyao-calibrate': 'calibrate'
     };
     return actions[id] || null;
   }
@@ -145,7 +179,9 @@
     countNumberedRooms,
     buildScanSequence,
     getVersion,
-    resolvePanelAction
+    resolvePanelAction,
+    buildPageCalibration,
+    pagePoint
   };
 
   if (typeof globalThis !== 'undefined' && globalThis.__XIANYAO_ATG_TEST__) {
@@ -153,8 +189,8 @@
     return;
   }
 
-  if (window.__XIANYAO_ATG_ROOM_SCANNER_V110__) return;
-  window.__XIANYAO_ATG_ROOM_SCANNER_V110__ = true;
+  if (window.__XIANYAO_ATG_ROOM_SCANNER_V200__) return;
+  window.__XIANYAO_ATG_ROOM_SCANNER_V200__ = true;
 
   const VERSION = SCRIPT_VERSION;
   const SENSITIVE_KEY = /(token|cookie|authorization|password|passwd|secret|username|userid|user_id|email|phone|login|session|ticket|credential|access[_-]?key|^t$)/i;
@@ -195,6 +231,11 @@
     learningStartPage: null,
     learningEvents: [],
     learningResult: [],
+    pageCalibration: null,
+    calibrationActive: false,
+    calibrationSamples: [],
+    calibrationPendingPointer: null,
+    calibrationThenScan: false,
     autoTimer: null,
     renderTimer: null
   };
@@ -207,6 +248,69 @@
   });
 
   const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+  const CALIBRATION_KEY = 'xinyao_atg_page_calibration_v2';
+
+  function loadPageCalibration() {
+    try {
+      const raw = localStorage.getItem(CALIBRATION_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      const test = pagePoint(parsed, 1);
+      return test && test.x >= 0 && test.x <= 1 && test.y >= 0 && test.y <= 1 ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function savePageCalibration(calibration) {
+    state.pageCalibration = calibration || null;
+    try {
+      if (calibration) localStorage.setItem(CALIBRATION_KEY, JSON.stringify(calibration));
+      else localStorage.removeItem(CALIBRATION_KEY);
+    } catch {}
+  }
+
+  state.pageCalibration = loadPageCalibration();
+
+  function startPageCalibration({ thenScan = false } = {}) {
+    state.calibrationActive = true;
+    state.calibrationSamples = [];
+    state.calibrationPendingPointer = null;
+    state.calibrationThenScan = thenScan;
+    state.scanError = '';
+    state.scanMessage = '🧭 校準頁碼：請手動點兩個不同頁碼（建議 1 再 9），之後會自動掃描。';
+    scheduleRender();
+  }
+
+  function finishPageCalibrationIfReady() {
+    const calibration = buildPageCalibration(state.calibrationSamples);
+    if (!calibration) return false;
+    savePageCalibration(calibration);
+    state.calibrationActive = false;
+    state.calibrationPendingPointer = null;
+    state.scanMessage = `✅ 頁碼校準完成（${calibration.samplePages.join('、')}），準備自動掃描…`;
+    scheduleRender();
+    if (state.calibrationThenScan) {
+      state.calibrationThenScan = false;
+      setTimeout(() => scanAllPages(), 500);
+    }
+    return true;
+  }
+
+  function captureCalibrationPointer(event) {
+    if (!state.calibrationActive) return;
+    const target = event.target;
+    if (target?.closest?.('#xinyao-atg-room-scanner,#xinyao-room-mini,#xinyao-copy-modal')) return;
+    if (!window.innerWidth || !window.innerHeight) return;
+    state.calibrationPendingPointer = {
+      x: event.clientX / window.innerWidth,
+      y: event.clientY / window.innerHeight,
+      ts: Date.now()
+    };
+  }
+
+  document.addEventListener('pointerdown', captureCalibrationPointer, true);
 
   function scheduleRender() {
     if (state.renderTimer) return;
@@ -320,6 +424,18 @@
     if (currentPage !== null) {
       state.currentPage = currentPage;
       state.pagesSeen.add(currentPage);
+
+      if (state.calibrationActive && previousPage !== null && currentPage !== previousPage) {
+        const pointer = state.calibrationPendingPointer;
+        if (pointer && Date.now() - pointer.ts < 3000) {
+          state.calibrationSamples = state.calibrationSamples.filter(s => s.page !== currentPage);
+          state.calibrationSamples.push({ page: currentPage, x: pointer.x, y: pointer.y });
+          state.calibrationPendingPointer = null;
+          const pages = state.calibrationSamples.map(s => s.page).sort((a, b) => a - b);
+          state.scanMessage = `🧭 已記錄頁碼 ${pages.join('、')}｜還需要 ${Math.max(0, 2 - pages.length)} 個不同頁碼`;
+          finishPageCalibrationIfReady();
+        }
+      }
 
       if (state.learningPageNav && previousPage !== null && currentPage !== previousPage) {
         state.learningPageNav = false;
@@ -576,6 +692,39 @@
     return out;
   }
 
+  function dispatchPagePoint(page) {
+    const point = pagePoint(state.pageCalibration, page);
+    if (!point) return false;
+    const x = Math.round(point.x * window.innerWidth);
+    const y = Math.round(point.y * window.innerHeight);
+    if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) return false;
+    const target = document.elementFromPoint(x, y);
+    if (!target) return false;
+
+    const pointerInit = {
+      bubbles: true, cancelable: true, composed: true,
+      clientX: x, clientY: y, screenX: x, screenY: y,
+      pointerId: 1, pointerType: 'mouse', isPrimary: true, button: 0
+    };
+    try { target.dispatchEvent(new PointerEvent('pointermove', { ...pointerInit, buttons: 0 })); } catch {}
+    try { target.dispatchEvent(new PointerEvent('pointerdown', { ...pointerInit, buttons: 1 })); } catch {}
+    try { target.dispatchEvent(new MouseEvent('mousedown', { ...pointerInit, buttons: 1 })); } catch {}
+    try { target.dispatchEvent(new PointerEvent('pointerup', { ...pointerInit, buttons: 0 })); } catch {}
+    try { target.dispatchEvent(new MouseEvent('mouseup', { ...pointerInit, buttons: 0 })); } catch {}
+    try { target.dispatchEvent(new MouseEvent('click', { ...pointerInit, buttons: 0 })); } catch {}
+    return true;
+  }
+
+  function goToPage(page) {
+    const pager = findPagerButtons();
+    const btn = pager?.get(page);
+    if (btn) {
+      try { btn.click(); return true; } catch {}
+    }
+    if (state.pageCalibration) return dispatchPagePoint(page);
+    return false;
+  }
+
   function waitForPage(page, beforeSeq, timeout = 8000) {
     return new Promise(resolve => {
       const started = Date.now();
@@ -597,18 +746,12 @@
   async function scanAllPages({ auto = false } = {}) {
     if (state.scanRunning) return;
     const pager = findPagerButtons();
-    if (!pager) {
-      state.learningPageNav = true;
-      state.learningStartPage = finiteNumber(state.currentPage);
-      state.learningEvents = [];
-      state.learningResult = [];
-      state.scanError = '';
-      state.scanMessage = '頁碼是遊戲內元件：請手動點另一頁一次，我會自動學習翻頁通訊。';
-      scheduleRender();
+    if (!pager && !state.pageCalibration) {
+      startPageCalibration({ thenScan: true });
       return;
     }
 
-    const totalPages = state.totalPages || pager.size || 9;
+    const totalPages = state.totalPages || pager?.size || 9;
     const startPage = finiteNumber(state.currentPage) || 1;
     const sequence = buildScanSequence(startPage, totalPages);
 
@@ -621,21 +764,18 @@
 
     for (const page of sequence) {
       if (state.scanAbort) break;
-      const freshPager = findPagerButtons();
-      const btn = freshPager?.get(page);
-      if (!btn) {
-        state.scanError = `找不到第 ${page} 頁按鈕。`;
-        break;
-      }
-
       const beforeSeq = state.pageLoadSeq;
       state.scanMessage = `掃描第 ${page} / ${totalPages} 頁…`;
       scheduleRender();
 
-      try { btn.click(); } catch {}
+      const moved = goToPage(page);
+      if (!moved) {
+        state.scanError = `無法切換到第 ${page} 頁，請按「重新校準頁碼」。`;
+        break;
+      }
       const loaded = await waitForPage(page, beforeSeq, 8000);
       if (!loaded) {
-        state.scanError = `第 ${page} 頁載入逾時，請再按一次「一鍵掃描」。`;
+        state.scanError = `第 ${page} 頁未自動切換，請按「重新校準頁碼」後再試。`;
         break;
       }
       state.scanVisited.add(page);
@@ -672,7 +812,7 @@
     }
     if (minutes > 0) {
       state.autoTimer = setInterval(() => {
-        if (!state.scanRunning && findPagerButtons()) scanAllPages({ auto: true });
+        if (!state.scanRunning && (findPagerButtons() || state.pageCalibration)) scanAllPages({ auto: true });
       }, minutes * 60 * 1000);
     }
     scheduleRender();
@@ -744,6 +884,8 @@
         totalPages: state.totalPages,
         scanMessage: state.scanMessage,
         learningPageNav: state.learningPageNav,
+        pageCalibrationReady: !!state.pageCalibration,
+        calibrationActive: state.calibrationActive,
         learningStartPage: state.learningStartPage
       },
       note: '觀察分數僅依目前已取得的歷史統計排序，不代表未來結果或獲利保證。',
@@ -1060,6 +1202,7 @@
         <span>${state.enabled ? '🟢 偵測中' : '⚪ 已暫停'}</span><br>
         已抓房號：<b>${count}</b> / ${expected}　頁數：<b>${pageKnown}</b> / ${pages}<br>
         目前頁：${state.currentPage ?? '—'}　已看頁：${escapeHtml(pageList)}<br>
+        頁碼校準：${state.pageCalibration ? '✅ 已完成' : (state.calibrationActive ? `🧭 進行中 ${state.calibrationSamples.length}/2` : '尚未校準')}<br>
         <span style="${state.scanError ? 'color:#ff9a9a;' : 'color:#a7f3d0;'}">${escapeHtml(state.scanError || state.scanMessage)}</span>
       </div>
 
@@ -1070,6 +1213,7 @@
         <button id="xinyao-stop" style="${secondaryButtonStyle()}">停止掃描</button>
         <button id="xinyao-room-copy" style="${secondaryButtonStyle()}">複製結果</button>
         <button id="xinyao-expand" style="${secondaryButtonStyle()}">${ui.expanded ? '收合分析' : '完整分析'}</button>
+        <button id="xinyao-calibrate" style="${secondaryButtonStyle('grid-column:1 / -1;')}">${state.pageCalibration ? '重新校準頁碼' : '校準頁碼位置'}</button>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 120px;gap:6px;margin-top:6px;align-items:center;">
@@ -1149,6 +1293,9 @@
       } else if (action === 'next') {
         ui.roomListPage += 1;
         scheduleRender();
+      } else if (action === 'calibrate') {
+        savePageCalibration(null);
+        startPageCalibration({ thenScan: false });
       }
     }, true);
 
