@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 全房分析
 // @namespace    xinyao-atg-room-scanner
-// @version      2.0.0
-// @description  一鍵掃描 ATG 全房、支援遊戲內頁碼校準、整理房號狀態與歷史統計；資料只保留在本機。
+// @version      2.1.0
+// @description  一鍵掃描 ATG 全房、整理房號統計，並可將非敏感房號快照同步到芯瑤 ATG AI助手。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -152,10 +152,42 @@
     return { x: x + stepX * (p - 1), y };
   }
 
-  const SCRIPT_VERSION = '2.0.0';
+  const SCRIPT_VERSION = '2.1.0';
 
   function getVersion() {
     return SCRIPT_VERSION;
+  }
+
+  function buildSyncPayload(rooms, summary = {}) {
+    const safeRooms = (Array.isArray(rooms) ? rooms : [])
+      .map(normalizeRoom)
+      .filter(Boolean)
+      .map(room => ({
+        roomId: room.roomId,
+        number: room.number,
+        status: room.status,
+        today: {
+          bet: room.today?.bet ?? null,
+          win: room.today?.win ?? null
+        },
+        bet: room.bet ?? null,
+        win: room.win ?? null
+      }));
+
+    return {
+      type: 'XIANYAO_ATG_ROOM_SNAPSHOT_V1',
+      version: SCRIPT_VERSION,
+      capturedAt: new Date().toISOString(),
+      summary: {
+        roomsKnown: safeRooms.length,
+        totalTableCount: finiteNumber(summary.totalTableCount) ?? safeRooms.length,
+        totalPages: finiteNumber(summary.totalPages),
+        pagesSeen: summary.pagesSeen instanceof Set
+          ? [...summary.pagesSeen].sort((a, b) => a - b)
+          : (Array.isArray(summary.pagesSeen) ? summary.pagesSeen.slice() : [])
+      },
+      rooms: safeRooms
+    };
   }
 
   function resolvePanelAction(id) {
@@ -167,7 +199,8 @@
       'xinyao-room-hide': 'hide',
       'xinyao-prev': 'prev',
       'xinyao-next': 'next',
-      'xinyao-calibrate': 'calibrate'
+      'xinyao-calibrate': 'calibrate',
+      'xinyao-sync-site': 'sync'
     };
     return actions[id] || null;
   }
@@ -181,7 +214,8 @@
     getVersion,
     resolvePanelAction,
     buildPageCalibration,
-    pagePoint
+    pagePoint,
+    buildSyncPayload
   };
 
   if (typeof globalThis !== 'undefined' && globalThis.__XIANYAO_ATG_TEST__) {
@@ -896,6 +930,44 @@
     };
   }
 
+  function syncToXinyaoSite() {
+    const rooms = numberedRooms();
+    if (!rooms.length) {
+      state.scanError = '目前沒有可同步的房號資料，請先完成全房掃描。';
+      scheduleRender();
+      return;
+    }
+
+    const payload = buildSyncPayload(rooms, state);
+    const siteUrl = 'https://xinyao-ai.github.io/xinyao-ai/?atgRooms=1';
+    const targetOrigin = 'https://xinyao-ai.github.io';
+    const target = window.open(siteUrl, 'xinyao-atg-ai');
+
+    if (!target) {
+      state.scanError = '瀏覽器阻擋開啟芯瑤頁面，請允許彈出式視窗後再按一次。';
+      scheduleRender();
+      return;
+    }
+
+    state.scanError = '';
+    state.scanMessage = `正在同步 ${payload.rooms.length} 房到芯瑤…`;
+    scheduleRender();
+
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      try {
+        target.postMessage(payload, targetOrigin);
+      } catch (_) {}
+
+      if (tries >= 16) {
+        clearInterval(timer);
+        state.scanMessage = `✅ 已送出 ${payload.rooms.length} 房｜請到芯瑤「全房推薦」查看`;
+        scheduleRender();
+      }
+    }, 500);
+  }
+
   function closeCopyDialog() {
     document.getElementById('xinyao-copy-modal')?.remove();
   }
@@ -1213,6 +1285,7 @@
         <button id="xinyao-stop" style="${secondaryButtonStyle()}">停止掃描</button>
         <button id="xinyao-room-copy" style="${secondaryButtonStyle()}">複製結果</button>
         <button id="xinyao-expand" style="${secondaryButtonStyle()}">${ui.expanded ? '收合分析' : '完整分析'}</button>
+        <button id="xinyao-sync-site" style="${buttonStyle('grid-column:1 / -1;')}">🌸 同步到芯瑤</button>
         <button id="xinyao-calibrate" style="${secondaryButtonStyle('grid-column:1 / -1;')}">${state.pageCalibration ? '重新校準頁碼' : '校準頁碼位置'}</button>
       </div>
 
@@ -1228,7 +1301,7 @@
 
       ${expanded}
 
-      <div style="margin-top:8px;font-size:9px;opacity:.55;line-height:1.45;">僅整理房號、狀態、投注與派彩統計；不輸出帳密、Cookie 或 Token，也不自動上傳。歷史統計不保證未來結果。</div>
+      <div style="margin-top:8px;font-size:9px;opacity:.55;line-height:1.45;">僅整理房號、狀態、投注與派彩統計；不輸出帳密、Cookie 或 Token，同步功能只會傳送房號、狀態、投注與派彩統計到芯瑤頁面，不包含帳密、Cookie 或 Token。歷史統計不保證未來結果。</div>
     `;
 
     bindUiEvents();
@@ -1296,6 +1369,8 @@
       } else if (action === 'calibrate') {
         savePageCalibration(null);
         startPageCalibration({ thenScan: false });
+      } else if (action === 'sync') {
+        syncToXinyaoSite();
       }
     }, true);
 
