@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 全房分析
 // @namespace    xinyao-atg-room-scanner
-// @version      1.0.1
+// @version      1.1.0
 // @description  一鍵掃描 ATG 全房、整理房號狀態與歷史統計、提供資料排行；資料只保留在本機，不自動上傳。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -119,12 +119,33 @@
     return Array.from({ length: total }, (_, i) => ((start + i) % total) + 1);
   }
 
+  const SCRIPT_VERSION = '1.1.0';
+
+  function getVersion() {
+    return SCRIPT_VERSION;
+  }
+
+  function resolvePanelAction(id) {
+    const actions = {
+      'xinyao-scan-all': 'scan',
+      'xinyao-stop': 'stop',
+      'xinyao-room-copy': 'copy',
+      'xinyao-expand': 'expand',
+      'xinyao-room-hide': 'hide',
+      'xinyao-prev': 'prev',
+      'xinyao-next': 'next'
+    };
+    return actions[id] || null;
+  }
+
   const core = {
     normalizeRoom,
     calculateMetrics,
     rankRooms,
     countNumberedRooms,
-    buildScanSequence
+    buildScanSequence,
+    getVersion,
+    resolvePanelAction
   };
 
   if (typeof globalThis !== 'undefined' && globalThis.__XIANYAO_ATG_TEST__) {
@@ -132,10 +153,10 @@
     return;
   }
 
-  if (window.__XIANYAO_ATG_ROOM_SCANNER_V100__) return;
-  window.__XIANYAO_ATG_ROOM_SCANNER_V100__ = true;
+  if (window.__XIANYAO_ATG_ROOM_SCANNER_V110__) return;
+  window.__XIANYAO_ATG_ROOM_SCANNER_V110__ = true;
 
-  const VERSION = '1.0.0';
+  const VERSION = SCRIPT_VERSION;
   const SENSITIVE_KEY = /(token|cookie|authorization|password|passwd|secret|username|userid|user_id|email|phone|login|session|ticket|credential|access[_-]?key|^t$)/i;
   const INTERESTING_TEXT = /(room|table|page|lobby|slotTableUpdated|tableMeta|totalTableCount)/i;
   const nativeJSONParse = JSON.parse.bind(JSON);
@@ -170,6 +191,10 @@
     scanVisited: new Set(),
     scanMessage: '尚未開始全房掃描',
     scanError: '',
+    learningPageNav: false,
+    learningStartPage: null,
+    learningEvents: [],
+    learningResult: [],
     autoTimer: null,
     renderTimer: null
   };
@@ -220,8 +245,14 @@
 
   function recordEvent(type, payload = {}) {
     if (!state.enabled) return;
-    state.events.push({ time: now(), type, ...payload });
+    const entry = { ts: Date.now(), time: now(), type, ...payload };
+    state.events.push(entry);
     if (state.events.length > 500) state.events.shift();
+
+    if (state.learningPageNav && ['fetch→', 'XHR→', 'WS→'].includes(type)) {
+      state.learningEvents.push(entry);
+      if (state.learningEvents.length > 40) state.learningEvents.shift();
+    }
     scheduleRender();
   }
 
@@ -275,6 +306,7 @@
   function ingestMeta(meta, source = 'tableMeta') {
     if (!meta || typeof meta !== 'object') return false;
 
+    const previousPage = finiteNumber(state.currentPage);
     const totalTableCount = finiteNumber(meta.totalTableCount);
     const currentPage = finiteNumber(meta.currentPage);
     const tablePerPage = finiteNumber(meta.tablePerPage);
@@ -288,6 +320,13 @@
     if (currentPage !== null) {
       state.currentPage = currentPage;
       state.pagesSeen.add(currentPage);
+
+      if (state.learningPageNav && previousPage !== null && currentPage !== previousPage) {
+        state.learningPageNav = false;
+        state.learningResult = state.learningEvents.slice(-20);
+        state.scanError = '';
+        state.scanMessage = `✅ 已捕捉翻頁 ${previousPage} → ${currentPage}｜通訊 ${state.learningResult.length} 筆`;
+      }
     }
 
     state.lastSource = source;
@@ -460,7 +499,7 @@
       const nativeSend = ws.send.bind(ws);
 
       ws.send = function (data) {
-        if (typeof data === 'string' && INTERESTING_TEXT.test(data)) {
+        if (typeof data === 'string' && (state.learningPageNav || INTERESTING_TEXT.test(data))) {
           recordEvent('WS→', { url: safeUrl, preview: sanitizeText(data).slice(0, 1800) });
         }
         return nativeSend(data);
@@ -559,8 +598,12 @@
     if (state.scanRunning) return;
     const pager = findPagerButtons();
     if (!pager) {
-      state.scanError = '找不到 1～9 頁選房按鈕，請先開啟「選擇機台」畫面。';
-      state.scanMessage = '掃描未開始';
+      state.learningPageNav = true;
+      state.learningStartPage = finiteNumber(state.currentPage);
+      state.learningEvents = [];
+      state.learningResult = [];
+      state.scanError = '';
+      state.scanMessage = '頁碼是遊戲內元件：請手動點另一頁一次，我會自動學習翻頁通訊。';
       scheduleRender();
       return;
     }
@@ -699,11 +742,14 @@
         currentPage: state.currentPage,
         tablePerPage: state.tablePerPage,
         totalPages: state.totalPages,
-        scanMessage: state.scanMessage
+        scanMessage: state.scanMessage,
+        learningPageNav: state.learningPageNav,
+        learningStartPage: state.learningStartPage
       },
       note: '觀察分數僅依目前已取得的歷史統計排序，不代表未來結果或獲利保證。',
       topEmptyRooms: topRooms(),
       rooms,
+      pageNavigationDiagnostics: state.learningResult,
       recentEvents: state.events.slice(-250)
     };
   }
@@ -827,8 +873,16 @@
   }
 
   function copyResults() {
-    const text = JSON.stringify(exportData(), null, 2);
-    openCopyDialog(text);
+    try {
+      const text = JSON.stringify(exportData(), null, 2);
+      openCopyDialog(text);
+    } catch (error) {
+      openCopyDialog(JSON.stringify({
+        version: VERSION,
+        error: '建立匯出資料失敗',
+        message: String(error?.message || error)
+      }, null, 2));
+    }
   }
 
   function clearResults() {
@@ -845,6 +899,10 @@
     state.scanVisited.clear();
     state.scanMessage = '已清空，等待新資料';
     state.scanError = '';
+    state.learningPageNav = false;
+    state.learningStartPage = null;
+    state.learningEvents = [];
+    state.learningResult = [];
     ui.roomListPage = 1;
     scheduleRender();
   }
@@ -974,7 +1032,18 @@
               <button id="xinyao-next" style="${secondaryButtonStyle('padding:5px 9px;')}">下一頁</button>
             </div>
           </div>
-        </div>`;
+        </div>
+
+        ${(state.learningPageNav || state.learningResult.length) ? `
+        <div style="margin-top:10px;padding-top:9px;border-top:1px solid rgba(255,255,255,.12);">
+          <b style="font-size:13px;">🧪 翻頁診斷</b>
+          <div style="margin-top:6px;font-size:10px;line-height:1.55;opacity:.8;">
+            ${state.learningPageNav
+              ? '正在等待妳手動切換到另一頁，只需要點一次。'
+              : `已捕捉 ${state.learningResult.length} 筆翻頁前送出的通訊。`}
+          </div>
+          ${state.learningResult.length ? `<pre style="margin-top:6px;max-height:170px;overflow:auto;white-space:pre-wrap;word-break:break-all;background:#0d0b11;border-radius:8px;padding:8px;font-size:9.5px;line-height:1.4;">${escapeHtml(JSON.stringify(state.learningResult.slice(-8), null, 2))}</pre>` : ''}
+        </div>` : ''}`;
     }
 
     state.panel.style.width = ui.expanded ? '520px' : '330px';
@@ -983,7 +1052,7 @@
 
     state.panel.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px;">
-        <div style="font-weight:800;font-size:14px;">🔎 芯瑤 ATG 全房分析 <span style="font-size:10px;opacity:.65;">v1.0 Final</span></div>
+        <div style="font-weight:800;font-size:14px;">🔎 芯瑤 ATG 全房分析 <span style="font-size:10px;opacity:.65;">v${VERSION}</span></div>
         <button id="xinyao-room-hide" style="${secondaryButtonStyle('padding:4px 8px;')}">縮小</button>
       </div>
 
@@ -1030,14 +1099,6 @@
   }
 
   function bindUiEvents() {
-    document.getElementById('xinyao-scan-all')?.addEventListener('click', () => scanAllPages());
-    document.getElementById('xinyao-stop')?.addEventListener('click', stopScan);
-    document.getElementById('xinyao-room-copy')?.addEventListener('click', copyResults);
-    document.getElementById('xinyao-expand')?.addEventListener('click', () => { ui.expanded = !ui.expanded; scheduleRender(); });
-    document.getElementById('xinyao-room-hide')?.addEventListener('click', () => {
-      state.panel.style.display = 'none';
-      mini.style.display = 'block';
-    });
     document.getElementById('xinyao-auto')?.addEventListener('change', e => setAutoRefresh(Number(e.target.value) || 0));
     document.getElementById('xinyao-rank-mode')?.addEventListener('change', e => { ui.rankMode = e.target.value; scheduleRender(); });
     document.getElementById('xinyao-filter')?.addEventListener('change', e => { ui.filter = e.target.value; ui.roomListPage = 1; scheduleRender(); });
@@ -1048,8 +1109,6 @@
       clearTimeout(e.target.__xinyaoTimer);
       e.target.__xinyaoTimer = setTimeout(scheduleRender, 180);
     });
-    document.getElementById('xinyao-prev')?.addEventListener('click', () => { ui.roomListPage = Math.max(1, ui.roomListPage - 1); scheduleRender(); });
-    document.getElementById('xinyao-next')?.addEventListener('click', () => { ui.roomListPage += 1; scheduleRender(); });
   }
 
   function createPanel() {
@@ -1059,6 +1118,39 @@
     panel.style.cssText = 'position:fixed;top:12px;right:12px;width:330px;z-index:2147483647;background:rgba(22,18,28,.97);color:#fff;padding:12px;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.38);font-family:Arial,"Microsoft JhengHei",sans-serif;box-sizing:border-box;';
     document.body.appendChild(panel);
     state.panel = panel;
+
+    // 使用固定在 panel 本體上的 pointerdown 事件代理。
+    // ATG 即時資料很頻繁，render() 會重建 panel 內容；若把 click 綁在每顆
+    // 臨時按鈕上，按下與放開之間節點可能已被替換，造成看起來「沒反應」。
+    panel.addEventListener('pointerdown', event => {
+      const button = event.target?.closest?.('button[id]');
+      if (!button || !panel.contains(button)) return;
+      const action = resolvePanelAction(button.id);
+      if (!action) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (action === 'scan') {
+        scanAllPages();
+      } else if (action === 'stop') {
+        stopScan();
+      } else if (action === 'copy') {
+        copyResults();
+      } else if (action === 'expand') {
+        ui.expanded = !ui.expanded;
+        scheduleRender();
+      } else if (action === 'hide') {
+        panel.style.display = 'none';
+        mini.style.display = 'block';
+      } else if (action === 'prev') {
+        ui.roomListPage = Math.max(1, ui.roomListPage - 1);
+        scheduleRender();
+      } else if (action === 'next') {
+        ui.roomListPage += 1;
+        scheduleRender();
+      }
+    }, true);
 
     mini.id = 'xinyao-room-mini';
     mini.textContent = '🔎 全房分析';
