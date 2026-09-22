@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      2.2.0
+// @version      2.2.1
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -1611,7 +1611,7 @@
     }
 
     const viable = [...groups.entries()]
-      .filter(([, map]) => [1,2,3,4,5,6,7,8,9].every(n => map.has(n)))
+      .filter(([, map]) => map.size >= 8)
       .map(([ancestor, map]) => {
         const r = ancestor.getBoundingClientRect();
         return { ancestor, map, area: r.width * r.height };
