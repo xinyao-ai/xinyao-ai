@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      2.3.0
+// @version      2.3.1
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -870,7 +870,7 @@
 })();
 
 
-/* ===== 芯瑤 ATG 全房分析 v2.1.4｜配對成功後自動顯示 ===== */
+/* ===== 芯瑤 ATG 全房分析 v2.3.1｜DOM 換頁確認 ===== */
 (() => {
   'use strict';
 
@@ -1127,7 +1127,33 @@
     return pages;
   }
 
-  const SCRIPT_VERSION = '2.3.0';
+  function acceptPageTransitionEvidence({
+    targetPage,
+    currentPage,
+    beforeSignature,
+    afterSignature,
+    beforeSeq,
+    afterSeq,
+    dataPageSeen
+  } = {}) {
+    const target = finiteNumber(targetPage);
+    const current = finiteNumber(currentPage);
+    const oldSeq = finiteNumber(beforeSeq) || 0;
+    const newSeq = finiteNumber(afterSeq) || 0;
+    if (target === null) return false;
+
+    const stateConfirmed = current === target && Boolean(dataPageSeen);
+    const domChanged = Boolean(
+      beforeSignature &&
+      afterSignature &&
+      String(beforeSignature) !== String(afterSignature)
+    );
+    const dataConfirmed = newSeq > oldSeq && (current === target || Boolean(dataPageSeen));
+
+    return stateConfirmed || domChanged || dataConfirmed;
+  }
+
+  const SCRIPT_VERSION = '2.3.1';
 
   function getVersion() {
     return SCRIPT_VERSION;
@@ -1199,6 +1225,7 @@
     computeGameViewportRect,
     pagePointFromGameLayout,
     buildAutoPagerSequence,
+    acceptPageTransitionEvidence,
     buildSyncPayload
   };
 
@@ -1818,22 +1845,61 @@
     return dispatchNormalizedPoint(point.x, point.y);
   }
 
-  function waitForPageOutcome(targetPage, beforeSeq, beforePage, timeout = 1800) {
+  function visibleRoomSignature() {
+    const values = [];
+    const seen = new Set();
+    const nodes = document.querySelectorAll('div,span,button,p');
+
+    for (const el of nodes) {
+      if (values.length >= 80) break;
+      if (el.closest?.('#xinyao-atg-room-scanner,#xinyao-room-mini,#xinyao-atg-live-panel,#xinyao-copy-modal')) continue;
+      if (!isVisible(el)) continue;
+      const text = String(el.textContent || '').trim();
+      if (!/^\d{3,4}$/.test(text) || seen.has(text)) continue;
+      seen.add(text);
+      values.push(text);
+    }
+
+    return values.join('|');
+  }
+
+  function waitForPageOutcome(targetPage, beforeSeq, beforePage, beforeSignature = '', timeout = 1800) {
     return new Promise(resolve => {
       const started = Date.now();
       const timer = setInterval(() => {
-const current = finiteNumber(state.currentPage);
-        const seqChanged = state.pageLoadSeq > beforeSeq;
-        if (current === targetPage && seqChanged && state.dataPagesSeen.has(targetPage)) {
+        const current = finiteNumber(state.currentPage);
+        const afterSignature = visibleRoomSignature();
+        const dataPageSeen = state.dataPagesSeen.has(targetPage);
+        const ok = acceptPageTransitionEvidence({
+          targetPage,
+          currentPage: current,
+          beforeSignature,
+          afterSignature,
+          beforeSeq,
+          afterSeq: state.pageLoadSeq,
+          dataPageSeen
+        });
+
+        if (ok) {
+          state.currentPage = targetPage;
+          state.pagesSeen.add(targetPage);
           clearInterval(timer);
-          resolve({ ok: true, landedPage: current, changed: true });
+          resolve({
+            ok: true,
+            landedPage: targetPage,
+            changed: true,
+            domChanged: Boolean(beforeSignature && afterSignature && beforeSignature !== afterSignature)
+          });
           return;
         }
+
+        const seqChanged = state.pageLoadSeq > beforeSeq;
         if (seqChanged && current !== null && current !== beforePage) {
           clearInterval(timer);
           resolve({ ok: false, landedPage: current, changed: true });
           return;
         }
+
         if (state.scanAbort || Date.now() - started > timeout) {
           clearInterval(timer);
           resolve({ ok: false, landedPage: current, changed: false });
@@ -1850,11 +1916,12 @@ const current = finiteNumber(state.currentPage);
     if (btn) {
       const beforeSeq = state.pageLoadSeq;
       const beforePage = finiteNumber(state.currentPage);
+      const beforeSignature = visibleRoomSignature();
       setPageIntent(page);
       try { btn.click(); } catch {
         state.pageIntent = null;
       }
-      const outcome = await waitForPageOutcome(page, beforeSeq, beforePage, 3200);
+      const outcome = await waitForPageOutcome(page, beforeSeq, beforePage, beforeSignature, 3200);
       if (outcome.ok) return true;
     }
 
@@ -1863,8 +1930,9 @@ const current = finiteNumber(state.currentPage);
     if (page >= 2 && page <= Math.min(9, finiteNumber(totalPages) || 9)) {
       const beforeSeq = state.pageLoadSeq;
       const beforePage = finiteNumber(state.currentPage);
+      const beforeSignature = visibleRoomSignature();
       if (dispatchAutomaticPagePoint(page)) {
-        const outcome = await waitForPageOutcome(page, beforeSeq, beforePage, 3400);
+        const outcome = await waitForPageOutcome(page, beforeSeq, beforePage, beforeSignature, 3400);
         if (outcome.ok) return true;
       }
     }
@@ -1884,7 +1952,7 @@ const current = finiteNumber(state.currentPage);
       const beforeSeq = state.pageLoadSeq;
       const beforePage = finiteNumber(state.currentPage);
       if (!dispatchPagePoint(page, candidateX)) continue;
-      const outcome = await waitForPageOutcome(page, beforeSeq, beforePage, 1600);
+      const outcome = await waitForPageOutcome(page, beforeSeq, beforePage, visibleRoomSignature(), 1600);
       if (outcome.ok) return true;
 
       if (outcome.changed && finiteNumber(outcome.landedPage) !== null) {
@@ -1894,7 +1962,7 @@ const current = finiteNumber(state.currentPage);
           const seq2 = state.pageLoadSeq;
           const page2 = finiteNumber(state.currentPage);
           if (dispatchPagePoint(page, correctedX)) {
-            const correctedOutcome = await waitForPageOutcome(page, seq2, page2, 1900);
+            const correctedOutcome = await waitForPageOutcome(page, seq2, page2, visibleRoomSignature(), 1900);
             if (correctedOutcome.ok) return true;
             if (correctedOutcome.changed && finiteNumber(correctedOutcome.landedPage) !== null) {
               learnedX = correctPageClickX(correctedX, page, correctedOutcome.landedPage, stepX);
@@ -1939,11 +2007,11 @@ const current = finiteNumber(state.currentPage);
 
       const loaded = await navigateToPageAdaptive(page, totalPages, { force: true });
       if (!loaded) {
-        state.scanError = `第 ${page} 頁自動切換失敗。請保持「選擇機台」畫面開啟後再試一次；下方手動校準僅為備用。`;
+        state.scanError = `第 ${page} 頁沒有偵測到畫面切換；已停止本次掃描。`;
         break;
       }
       state.scanVisited.add(page);
-      await delay(220);
+      await delay(550);
     }
 
     state.scanRunning = false;
