@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      2.2.2
+// @version      2.3.0
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -1073,7 +1073,61 @@
     return meta;
   }
 
-  const SCRIPT_VERSION = '2.1.4';
+  // ATG 遊戲畫面固定採 9:16 內容區置中。頁碼列在遊戲內容區內的位置穩定，
+  // 因此一鍵掃描可直接依版面比例點 2→9，不再要求使用者先手動校準。
+  function computeGameViewportRect(viewportWidth, viewportHeight) {
+    const vw = finiteNumber(viewportWidth);
+    const vh = finiteNumber(viewportHeight);
+    if (vw === null || vh === null || vw <= 0 || vh <= 0) return null;
+
+    const aspect = 9 / 16;
+    if (vw / vh >= aspect) {
+      const height = vh;
+      const width = height * aspect;
+      return {
+        left: (vw - width) / 2,
+        top: 0,
+        width,
+        height
+      };
+    }
+
+    const width = vw;
+    const height = width / aspect;
+    return {
+      left: 0,
+      top: (vh - height) / 2,
+      width,
+      height
+    };
+  }
+
+  function pagePointFromGameLayout(page, viewportWidth, viewportHeight) {
+    const p = finiteNumber(page);
+    if (p === null || p < 2 || p > 9) return null;
+    const rect = computeGameViewportRect(viewportWidth, viewportHeight);
+    if (!rect) return null;
+
+    // 依 ATG v1.1.5.3「選擇機台」頁碼列量測：2 在內容寬 15.1%，每格約 9.9%。
+    const relativeX = 0.151 + (p - 2) * 0.099;
+    const relativeY = 0.181;
+    const absoluteX = rect.left + rect.width * relativeX;
+    const absoluteY = rect.top + rect.height * relativeY;
+
+    return {
+      x: clamp(absoluteX / viewportWidth, 0.01, 0.99),
+      y: clamp(absoluteY / viewportHeight, 0.01, 0.99)
+    };
+  }
+
+  function buildAutoPagerSequence(totalPages = 9) {
+    const total = clamp(finiteNumber(totalPages) || 9, 2, 9);
+    const pages = [];
+    for (let page = 2; page <= total; page++) pages.push(page);
+    return pages;
+  }
+
+  const SCRIPT_VERSION = '2.3.0';
 
   function getVersion() {
     return SCRIPT_VERSION;
@@ -1142,6 +1196,9 @@
     pageNumberFromText,
     upsertCalibrationSample,
     resolveTrackedPage,
+    computeGameViewportRect,
+    pagePointFromGameLayout,
+    buildAutoPagerSequence,
     buildSyncPayload
   };
 
@@ -1754,6 +1811,13 @@
     return dispatchNormalizedPoint(xOverride ?? point.x, point.y);
   }
 
+  function dispatchAutomaticPagePoint(page) {
+    const point = pagePointFromGameLayout(page, window.innerWidth, window.innerHeight);
+    if (!point) return false;
+    setPageIntent(page);
+    return dispatchNormalizedPoint(point.x, point.y);
+  }
+
   function waitForPageOutcome(targetPage, beforeSeq, beforePage, timeout = 1800) {
     return new Promise(resolve => {
       const started = Date.now();
@@ -1778,8 +1842,8 @@ const current = finiteNumber(state.currentPage);
     });
   }
 
-  async function navigateToPageAdaptive(page, totalPages) {
-    if (finiteNumber(state.currentPage) === page && state.dataPagesSeen.has(page)) return true;
+  async function navigateToPageAdaptive(page, totalPages, { force = false } = {}) {
+    if (!force && finiteNumber(state.currentPage) === page && state.dataPagesSeen.has(page)) return true;
 
     const pager = findPagerButtons();
     const btn = pager?.get(page);
@@ -1789,12 +1853,23 @@ const current = finiteNumber(state.currentPage);
       setPageIntent(page);
       try { btn.click(); } catch {
         state.pageIntent = null;
-        return false;
       }
       const outcome = await waitForPageOutcome(page, beforeSeq, beforePage, 3200);
       if (outcome.ok) return true;
     }
 
+    // ATG 選房介面在部分裝置是 Canvas，DOM 找不到頁碼按鈕。
+    // 直接使用 9:16 遊戲內容區的固定比例點位，自動點 2→9。
+    if (page >= 2 && page <= Math.min(9, finiteNumber(totalPages) || 9)) {
+      const beforeSeq = state.pageLoadSeq;
+      const beforePage = finiteNumber(state.currentPage);
+      if (dispatchAutomaticPagePoint(page)) {
+        const outcome = await waitForPageOutcome(page, beforeSeq, beforePage, 3400);
+        if (outcome.ok) return true;
+      }
+    }
+
+    // 手動校準保留為備用方案，但一鍵掃描不再依賴它。
     const calibration = state.pageCalibration;
     const point = pagePoint(calibration, page);
     if (!calibration || !point) return false;
@@ -1834,42 +1909,37 @@ const current = finiteNumber(state.currentPage);
 
   async function scanAllPages({ auto = false } = {}) {
     if (state.scanRunning) return;
+
+    // 一鍵掃描就是全自動模式：直接停止任何未完成的手動校準。
+    state.calibrationActive = false;
+    state.calibrationSamples = [];
+    state.calibrationPendingPointer = null;
+    state.calibrationThenScan = false;
+
     const pager = findPagerButtons();
-    if (!pager && !state.pageCalibration) {
-      startPageCalibration({ thenScan: true });
-      return;
-    }
-
-    const totalPages = state.totalPages || pager?.size || 9;
-    const startPage = finiteNumber(state.currentPage) || 1;
-
-    // 窄版 / 手機版選房頁可能不會同時顯示第 1 與最後一頁。
-    // 校準時第 1 頁與最後一頁已由使用者實際點過並完成資料擷取，
-    // 掃描時直接略過已抓到的頁面，避免從最後一頁硬跳回第 1 頁而失敗。
-    if (state.dataPagesSeen.size >= totalPages) {
-      const keep = new Set();
-      for (const page of state.pageCalibration?.samplePages || []) keep.add(page);
-      if (finiteNumber(state.currentPage) !== null) keep.add(state.currentPage);
-      state.dataPagesSeen = keep;
-    }
-
-    const sequence = buildMissingScanSequence(startPage, totalPages, state.dataPagesSeen);
+    const totalPages = clamp(finiteNumber(state.totalPages) || 9, 2, 9);
+    const sequence = buildAutoPagerSequence(totalPages);
 
     state.scanRunning = true;
     state.scanAbort = false;
-    state.scanVisited = new Set(state.dataPagesSeen);
+    // 按下一鍵掃描時目前畫面就是第 1 頁；第 1 頁資料已經在 roomMap。
+    state.scanVisited = new Set([1]);
+    state.pagesSeen.add(1);
+    state.dataPagesSeen.add(1);
+    state.currentPage = 1;
+    state.preferClickedPage = true;
     state.scanError = '';
-    state.scanMessage = auto ? '自動刷新掃描中…' : '全房掃描中…';
+    state.scanMessage = auto ? '自動刷新掃描中…' : '🤖 全自動掃描中｜將自動切換 2 → 9 頁';
     scheduleRender();
 
     for (const page of sequence) {
       if (state.scanAbort) break;
-      state.scanMessage = `掃描第 ${page} / ${totalPages} 頁…`;
+      state.scanMessage = `🤖 自動掃描第 ${page} / ${totalPages} 頁…`;
       scheduleRender();
 
-      const loaded = await navigateToPageAdaptive(page, totalPages);
+      const loaded = await navigateToPageAdaptive(page, totalPages, { force: true });
       if (!loaded) {
-        state.scanError = `第 ${page} 頁自動切換失敗；已嘗試自動修正位置。請保持「選擇機台」畫面開啟後再試一次。`;
+        state.scanError = `第 ${page} 頁自動切換失敗。請保持「選擇機台」畫面開啟後再試一次；下方手動校準僅為備用。`;
         break;
       }
       state.scanVisited.add(page);
@@ -2334,7 +2404,7 @@ const current = finiteNumber(state.currentPage);
         <span>${state.enabled ? '🟢 偵測中' : '⚪ 已暫停'}</span><br>
         已抓房號：<b>${count}</b> / ${expected}　頁數：<b>${pageKnown}</b> / ${pages}<br>
         目前頁：${state.currentPage ?? '—'}　已看頁：${escapeHtml(pageList)}<br>
-        頁碼校準：${state.pageCalibration ? '✅ 已完成' : (state.calibrationActive ? `🧭 進行中 ${state.calibrationSamples.length}/2` : '尚未校準')}<br>
+        掃描方式：🤖 一鍵自動翻頁｜手動校準：${state.pageCalibration ? '✅ 已完成' : (state.calibrationActive ? `🧭 進行中 ${state.calibrationSamples.length}/2` : '非必要')}<br>
         <span style="${state.scanError ? 'color:#ff9a9a;' : 'color:#a7f3d0;'}">${escapeHtml(state.scanError || state.scanMessage)}</span>
       </div>
 
