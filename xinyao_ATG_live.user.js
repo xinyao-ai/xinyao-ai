@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      2.7.0
+// @version      2.8.0
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -870,7 +870,7 @@
 })();
 
 
-/* ===== 芯瑤 ATG 全房分析 v2.7.0｜Binary API 一鍵掃描 ===== */
+/* ===== 芯瑤 ATG 全房分析 v2.8.0｜共用攔截層一鍵掃描 ===== */
 (() => {
   'use strict';
 
@@ -1110,7 +1110,7 @@
       step: 0.05645,
       y: 0.2065,
       showAllX: 0.2120,
-      showAllY: 0.1310
+      showAllY: 0.1560
     };
   }
 
@@ -1365,7 +1365,7 @@
     return scored[0]?.ordered || [];
   }
 
-  const SCRIPT_VERSION = '2.7.0';
+  const SCRIPT_VERSION = '2.8.0';
 
   function getVersion() {
     return SCRIPT_VERSION;
@@ -1403,6 +1403,17 @@
     };
   }
 
+  function markSharedHook(fn) {
+    if (typeof fn !== 'function') return fn;
+    try { Object.defineProperty(fn, '__xinyaoLiveV200Wrapped', { value: true, configurable: true }); } catch (_) {
+      try { fn.__xinyaoLiveV200Wrapped = true; } catch (_) {}
+    }
+    try { Object.defineProperty(fn, '__xinyaoRoomScannerWrapped', { value: true, configurable: true }); } catch (_) {
+      try { fn.__xinyaoRoomScannerWrapped = true; } catch (_) {}
+    }
+    return fn;
+  }
+
   function resolvePanelAction(id) {
     const actions = {
       'xinyao-scan-all': 'scan',
@@ -1425,6 +1436,7 @@
     roomStorageKey,
     findZlibOffset,
     decodeBinaryFrameToText,
+    markSharedHook,
     selectFixedPagerProfile,
     buildScanSequence,
     buildMissingScanSequence,
@@ -1924,14 +1936,15 @@
     }
   }
 
-  JSON.parse = function (...args) {
+  const scannerJSONParse = markSharedHook(function (...args) {
     const result = nativeJSONParse(...args);
     try {
       ingestObject(result, 'JSON.parse');
       scheduleRender();
     } catch {}
     return result;
-  };
+  });
+  JSON.parse = scannerJSONParse;
 
   const nativeFetch = window.fetch;
   if (nativeFetch) {
@@ -2044,18 +2057,20 @@
     ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'].forEach(key => {
       try { Object.defineProperty(XinyaoWebSocket, key, { value: NativeWebSocket[key] }); } catch {}
     });
+    markSharedHook(XinyaoWebSocket);
     window.WebSocket = XinyaoWebSocket;
   }
 
   if (window.TextDecoder) {
     const nativeDecode = TextDecoder.prototype.decode;
-    TextDecoder.prototype.decode = function (...args) {
+    const scannerDecode = markSharedHook(function (...args) {
       const text = nativeDecode.apply(this, args);
       try {
         if (typeof text === 'string' && INTERESTING_TEXT.test(text)) processText(text, 'TextDecoder');
       } catch {}
       return text;
-    };
+    });
+    TextDecoder.prototype.decode = scannerDecode;
   }
 
   function isVisible(el) {
@@ -2985,7 +3000,7 @@
         <span>${state.enabled ? '🟢 偵測中' : '⚪ 已暫停'}</span><br>
         已抓房號：<b>${count}</b> / ${expected}　頁數：<b>${pageKnown}</b> / ${pages}<br>
         目前頁：${state.currentPage ?? '—'}　已看頁：${escapeHtml(pageList)}<br>
-        掃描方式：🤖 一鍵自動掃描 1～9｜Binary API 自動解壓｜不需校準<br>
+        掃描方式：🤖 一鍵自動掃描 1～9｜共用 JSON / WebSocket 攔截｜不需校準<br>
         <span style="${state.scanError ? 'color:#ff9a9a;' : 'color:#a7f3d0;'}">${escapeHtml(state.scanError || state.scanMessage)}</span>
       </div>
 
