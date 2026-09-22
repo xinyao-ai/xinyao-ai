@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      2.8.0
+// @version      2.9.0
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -1365,7 +1365,7 @@
     return scored[0]?.ordered || [];
   }
 
-  const SCRIPT_VERSION = '2.8.0';
+  const SCRIPT_VERSION = '2.9.0';
 
   function getVersion() {
     return SCRIPT_VERSION;
@@ -1946,6 +1946,24 @@
   });
   JSON.parse = scannerJSONParse;
 
+  // ATG 某些翻頁資料會直接走 Response.json()，不一定經過全域 JSON.parse。
+  // 直接攔截已解析完成的 Response 物件，避免畫面已換頁但掃描器收不到 data.tables。
+  try {
+    if (window.Response?.prototype?.json) {
+      const nativeResponseJson = Response.prototype.json;
+      if (!nativeResponseJson.__xinyaoRoomScannerWrapped) {
+        Response.prototype.json = markSharedHook(async function (...args) {
+          const result = await nativeResponseJson.apply(this, args);
+          try {
+            ingestObject(result, `Response.json:${sanitizeUrl(this?.url || '')}`);
+            scheduleRender();
+          } catch {}
+          return result;
+        });
+      }
+    }
+  } catch {}
+
   const nativeFetch = window.fetch;
   if (nativeFetch) {
     window.fetch = async function (...args) {
@@ -1966,9 +1984,10 @@
           url: sanitizeUrl(response.url || url),
           contentType: type
         });
-        if (type.includes('json') || type.includes('text') || type.includes('javascript')) {
-          clone.text().then(t => processText(t, `fetch:${sanitizeUrl(response.url || url)}`)).catch(() => {});
-        }
+        // 不再只相信 Content-Type；ATG 某些資料回應標頭不是 json，但 body 仍是 JSON/text。
+        clone.text().then(t => {
+          if (t && t.trim()) processText(t, `fetch:${sanitizeUrl(response.url || url)}`);
+        }).catch(() => {});
       } catch {}
       return response;
     };
@@ -1996,8 +2015,18 @@
         try {
           const source = `XHR:${sanitizeUrl(this.__xinyaoUrl || '')}`;
           recordEvent('XHR←', { status: this.status, url: sanitizeUrl(this.__xinyaoUrl || '') });
-          if (this.responseType === 'json') ingestObject(this.response, source);
-          else if (this.responseType === '' || this.responseType === 'text') processText(this.responseText, source);
+          if (this.responseType === 'json') {
+            ingestObject(this.response, source);
+          } else if (this.responseType === '' || this.responseType === 'text') {
+            processText(this.responseText, source);
+          } else if (this.responseType === 'arraybuffer' && this.response) {
+            try {
+              const text = new TextDecoder().decode(new Uint8Array(this.response));
+              processText(text, `${source}:arraybuffer`);
+            } catch {}
+          } else if (this.responseType === 'blob' && this.response?.text) {
+            this.response.text().then(t => processText(t, `${source}:blob`)).catch(() => {});
+          }
           scheduleRender();
         } catch {}
       }, { once: true });
@@ -2072,6 +2101,21 @@
     });
     TextDecoder.prototype.decode = scannerDecode;
   }
+
+  // 部分前端框架 / worker 會把已解析資料用 postMessage 傳回主執行緒。
+  try {
+    window.addEventListener('message', event => {
+      try {
+        const value = event?.data;
+        if (value && typeof value === 'object') {
+          ingestObject(value, 'window.message');
+          scheduleRender();
+        } else if (typeof value === 'string' && INTERESTING_TEXT.test(value)) {
+          processText(value, 'window.message');
+        }
+      } catch {}
+    }, true);
+  } catch {}
 
   function isVisible(el) {
     if (!el || !el.isConnected) return false;
@@ -2312,41 +2356,26 @@
     return count;
   }
 
-  function waitForBandToSettle(page, beforeBand, timeout = 2200) {
+  function expectedBandCount(page) {
+    return Number(page) === 9 ? 100 : 500;
+  }
+
+  function waitForPageBand(page, timeout = 8000) {
+    const target = expectedBandCount(page);
     return new Promise(resolve => {
       const started = Date.now();
-      let lastCount = roomBandCount(page);
-      let lastChangeAt = started;
-      let everChanged = lastCount > beforeBand;
-
       const timer = setInterval(() => {
-        const nowTs = Date.now();
         const count = roomBandCount(page);
-        if (count !== lastCount) {
-          lastCount = count;
-          lastChangeAt = nowTs;
-          if (count > beforeBand) everChanged = true;
-        }
-
-        // 收到該頁資料後，連續 450ms 沒再增加就進下一頁。
-        if (everChanged && nowTs - lastChangeAt >= 450) {
+        if (count >= target) {
           clearInterval(timer);
-          resolve({ changed: true, count });
+          resolve({ ok: true, count, target });
           return;
         }
-
-        // 已經有舊資料的頁面不用卡太久；仍固定留時間給 ATG 回傳刷新資料。
-        if (!everChanged && beforeBand > 0 && nowTs - started >= 900) {
+        if (state.scanAbort || Date.now() - started >= timeout) {
           clearInterval(timer);
-          resolve({ changed: false, count });
-          return;
+          resolve({ ok: false, count, target });
         }
-
-        if (state.scanAbort || nowTs - started >= timeout) {
-          clearInterval(timer);
-          resolve({ changed: everChanged, count });
-        }
-      }, 90);
+      }, 100);
     });
   }
 
@@ -2382,25 +2411,49 @@
   }
 
   async function clickFixedPage(profile, page) {
-    const point = pointForFixedProfile(profile, page);
-    if (!point) return false;
-    const beforeBand = roomBandCount(page);
-    setPageIntent(page);
-    const sent = dispatchClientPoint(point.x, point.y, profile.target || null);
-    if (!sent) {
-      state.pageIntent = null;
-      return false;
-    }
-    const result = await waitForBandToSettle(page, beforeBand, 2400);
-    state.pageIntent = null;
-    // 不再因 ATG 的 currentPage / inferredPage 偶發錯值重複亂點。
-    // 點擊已送出就繼續下一頁；room band 有增加時記為已成功取得該頁資料。
-    if (result.changed || result.count > 0) {
+    const targetCount = expectedBandCount(page);
+
+    // 這一頁已完整收過就直接視為完成，不重複等待。
+    if (roomBandCount(page) >= targetCount) {
       state.scanVisited.add(page);
       state.pagesSeen.add(page);
       state.dataPagesSeen.add(page);
+      return { ok: true, count: roomBandCount(page), target: targetCount, cached: true };
     }
-    return true;
+
+    const point = pointForFixedProfile(profile, page);
+    if (!point) return { ok: false, reason: 'no-point', count: roomBandCount(page), target: targetCount };
+
+    // 最多重試 3 次；每一次都必須真的收到該頁完整 500/100 房，才准往下一頁。
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      if (state.scanAbort) return { ok: false, reason: 'aborted', count: roomBandCount(page), target: targetCount };
+
+      setPageIntent(page);
+      const sent = dispatchClientPoint(point.x, point.y, profile.target || null);
+      if (!sent) {
+        state.pageIntent = null;
+        return { ok: false, reason: 'click-failed', count: roomBandCount(page), target: targetCount };
+      }
+
+      state.scanMessage = `🤖 正在讀取第 ${page} / 9 頁資料｜${roomBandCount(page)} / ${targetCount}`;
+      scheduleRender();
+
+      const result = await waitForPageBand(page, attempt === 1 ? 6500 : 9000);
+      state.pageIntent = null;
+
+      if (result.ok) {
+        state.scanVisited.add(page);
+        state.pagesSeen.add(page);
+        state.dataPagesSeen.add(page);
+        return { ok: true, ...result, attempt };
+      }
+
+      state.scanMessage = `第 ${page} 頁資料尚未完整收到（${result.count}/${result.target}）｜重試 ${attempt}/3`;
+      scheduleRender();
+      await delay(350);
+    }
+
+    return { ok: false, reason: 'data-timeout', count: roomBandCount(page), target: targetCount };
   }
 
   function visibleRoomSignature() {
@@ -2508,50 +2561,50 @@
     state.scanAbort = false;
     state.scanVisited = new Set();
     state.scanError = '';
-    state.scanMessage = auto ? '自動刷新掃描中…' : '🤖 一鍵掃描中｜準備巡覽 1～9 頁';
+    state.scanMessage = auto ? '自動刷新掃描中…' : '🤖 一鍵掃描中｜1～9 頁逐頁收完整資料';
     scheduleRender();
 
     const expected = state.totalTableCount || 4100;
     const pages = [1,2,3,4,5,6,7,8,9];
     const profile = fixedPagerProfile();
 
-    // 4100 房掃描一定先切「顯示全部」，避免只拿到空桌子集合。
     state.scanMessage = `🤖 ${profile.layout}模式｜正在切換「顯示全部」…`;
     scheduleRender();
     await ensureShowAll(profile);
 
-    // 第一輪：固定 1 → 9，只點一次，不做錯誤定位重試。
     for (const page of pages) {
       if (state.scanAbort) break;
-      state.scanMessage = `🤖 ${profile.layout}一鍵掃描｜第 ${page} / 9 頁｜已抓 ${numberedCount()} / ${expected}`;
-      scheduleRender();
-      await clickFixedPage(profile, page);
-      await delay(120);
-    }
 
-    // 第二輪只補該房號區間完全沒有資料的頁面；不會在 1、8 之間做定位測試。
-    if (!state.scanAbort) {
-      const missing = pages.filter(page => roomBandCount(page) === 0);
-      for (const page of missing) {
-        if (state.scanAbort) break;
-        state.scanMessage = `🤖 補掃第 ${page} / 9 頁｜已抓 ${numberedCount()} / ${expected}`;
+      const target = expectedBandCount(page);
+      state.scanMessage = `🤖 第 ${page} / 9 頁｜等待房號資料 ${roomBandCount(page)} / ${target}｜總計 ${numberedCount()} / ${expected}`;
+      scheduleRender();
+
+      const result = await clickFixedPage(profile, page);
+      if (!result.ok) {
+        state.scanError = `第 ${page} 頁資料收取失敗：目前 ${result.count ?? roomBandCount(page)} / ${result.target ?? target}。掃描已停在此頁，不會跳過。`;
+        state.scanMessage = `掃描暫停｜總計 ${numberedCount()} / ${expected}`;
+        state.scanRunning = false;
         scheduleRender();
-        await clickFixedPage(profile, page);
-        await delay(180);
+        return;
       }
+
+      state.scanMessage = `✅ 第 ${page} 頁已收完整 ${result.count}/${result.target}｜總計 ${numberedCount()} / ${expected}`;
+      scheduleRender();
+      await delay(250);
     }
 
     state.scanRunning = false;
     const count = numberedCount();
-    const covered = pages.filter(page => roomBandCount(page) > 0);
+    const completePages = pages.filter(page => roomBandCount(page) >= expectedBandCount(page));
 
     if (state.scanAbort) {
       state.scanMessage = `已停止｜目前 ${count} / ${expected}`;
-    } else if (covered.length === 9) {
+    } else if (completePages.length === 9 && count >= 4100) {
       state.scanError = '';
-      state.scanMessage = `✅ 已巡覽 1～9 全頁｜目前抓到 ${count} / ${expected}`;
+      state.scanMessage = `✅ 1～9 頁資料全部完成｜${count} / ${expected}`;
     } else {
-      state.scanError = `已巡覽完成，但第 ${pages.filter(p => !covered.includes(p)).join('、')} 頁尚未收到房號資料。`;
+      const missing = pages.filter(page => roomBandCount(page) < expectedBandCount(page));
+      state.scanError = `資料仍未完整：第 ${missing.join('、')} 頁。`;
       state.scanMessage = `掃描結束｜目前 ${count} / ${expected}`;
     }
     scheduleRender();
