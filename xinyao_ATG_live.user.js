@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      2.9.0
+// @version      3.0.0
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -1108,7 +1108,9 @@
       rect: { left: 0, top: 0, width: vw, height: vh, area: vw * vh },
       x0: 0.1567,
       step: 0.05645,
-      y: 0.2065,
+      // 2026-09-22 實機寬版：1202px 高時頁碼中心約 273px（0.227）。
+      // 舊值 0.2065 會點到頁碼列上方，造成畫面根本沒換頁。
+      y: 0.2270,
       showAllX: 0.2120,
       showAllY: 0.1560
     };
@@ -1365,7 +1367,7 @@
     return scored[0]?.ordered || [];
   }
 
-  const SCRIPT_VERSION = '2.9.0';
+  const SCRIPT_VERSION = '3.0.0';
 
   function getVersion() {
     return SCRIPT_VERSION;
@@ -1438,6 +1440,7 @@
     decodeBinaryFrameToText,
     markSharedHook,
     selectFixedPagerProfile,
+    buildPagerYProbeList,
     buildScanSequence,
     buildMissingScanSequence,
     getVersion,
@@ -1493,6 +1496,7 @@
     currentPage: null,
     pageIntent: null,
     preferClickedPage: false,
+    learnedPagerY: null,
     events: [],
     lastSource: '等待資料',
     pageLoadSeq: 0,
@@ -2321,6 +2325,36 @@
     };
   }
 
+  function buildPagerYProbeList(profile, learnedY = null) {
+    if (!profile) return [];
+    const values = [];
+    const push = value => {
+      const n = finiteNumber(value);
+      if (n === null || n < 0.10 || n > 0.40) return;
+      if (!values.some(v => Math.abs(v - n) < 0.0005)) values.push(n);
+    };
+
+    // 已學到的正確高度永遠優先；之後 1～9 都沿用，不需人工校準。
+    push(learnedY);
+    push(profile.y);
+
+    if (profile.key === 'wide-viewport') {
+      // 寬版只在頁碼列安全垂直範圍內自動探測。
+      // 這些點都位於「顯示全部」下方、房號格上方，不會去亂點房間。
+      push(0.2270);
+      push(0.2190);
+      push(0.2350);
+      push(0.2110);
+      push(0.2430);
+    } else {
+      // 直式版原本定位較穩，只在原高度附近小幅容錯。
+      push(profile.y - 0.0100);
+      push(profile.y + 0.0100);
+    }
+
+    return values;
+  }
+
   function dispatchClientPoint(x, y, targetOverride = null) {
     if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
     if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) return false;
@@ -2413,7 +2447,7 @@
   async function clickFixedPage(profile, page) {
     const targetCount = expectedBandCount(page);
 
-    // 這一頁已完整收過就直接視為完成，不重複等待。
+    // 這一頁已完整收過就直接視為完成。
     if (roomBandCount(page) >= targetCount) {
       state.scanVisited.add(page);
       state.pagesSeen.add(page);
@@ -2421,39 +2455,83 @@
       return { ok: true, count: roomBandCount(page), target: targetCount, cached: true };
     }
 
-    const point = pointForFixedProfile(profile, page);
-    if (!point) return { ok: false, reason: 'no-point', count: roomBandCount(page), target: targetCount };
+    const yCandidates = buildPagerYProbeList(profile, state.learnedPagerY);
+    if (!yCandidates.length) {
+      return { ok: false, reason: 'no-y-candidate', count: roomBandCount(page), target: targetCount };
+    }
 
-    // 最多重試 3 次；每一次都必須真的收到該頁完整 500/100 房，才准往下一頁。
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      if (state.scanAbort) return { ok: false, reason: 'aborted', count: roomBandCount(page), target: targetCount };
+    // 自動尋找真正的頁碼列高度；找到一次就記住，後續所有頁共用。
+    for (let probeIndex = 0; probeIndex < yCandidates.length; probeIndex++) {
+      if (state.scanAbort) {
+        return { ok: false, reason: 'aborted', count: roomBandCount(page), target: targetCount };
+      }
 
+      const yRatio = yCandidates[probeIndex];
+      const basePoint = pointForFixedProfile(profile, page);
+      if (!basePoint) {
+        return { ok: false, reason: 'no-point', count: roomBandCount(page), target: targetCount };
+      }
+
+      const point = {
+        x: basePoint.x,
+        y: profile.rect.top + profile.rect.height * yRatio
+      };
+
+      const beforeBand = roomBandCount(page);
       setPageIntent(page);
       const sent = dispatchClientPoint(point.x, point.y, profile.target || null);
       if (!sent) {
         state.pageIntent = null;
-        return { ok: false, reason: 'click-failed', count: roomBandCount(page), target: targetCount };
+        continue;
       }
 
-      state.scanMessage = `🤖 正在讀取第 ${page} / 9 頁資料｜${roomBandCount(page)} / ${targetCount}`;
+      state.scanMessage = state.learnedPagerY === null
+        ? `🤖 自動定位頁碼列｜第 ${page} 頁｜${beforeBand}/${targetCount}`
+        : `🤖 正在讀取第 ${page} / 9 頁資料｜${beforeBand} / ${targetCount}`;
       scheduleRender();
 
-      const result = await waitForPageBand(page, attempt === 1 ? 6500 : 9000);
+      // 正確點到頁碼後，ATG 會把該頁 tables 灌進 roomMap。
+      // 探測階段不用每個錯誤 Y 都等 9 秒；正確 Y 通常很快開始進資料。
+      const probeTimeout = state.learnedPagerY === null ? 3200 : 8500;
+      const result = await waitForPageBand(page, probeTimeout);
       state.pageIntent = null;
 
       if (result.ok) {
+        state.learnedPagerY = yRatio;
+        profile.y = yRatio;
         state.scanVisited.add(page);
         state.pagesSeen.add(page);
         state.dataPagesSeen.add(page);
-        return { ok: true, ...result, attempt };
+        return { ok: true, ...result, yRatio, probeIndex: probeIndex + 1 };
       }
 
-      state.scanMessage = `第 ${page} 頁資料尚未完整收到（${result.count}/${result.target}）｜重試 ${attempt}/3`;
-      scheduleRender();
-      await delay(350);
+      // 雖然尚未完整 500/100，但只要目標房號區間有開始增加，就代表這個 Y 點對了。
+      // 鎖定後給 ATG 更長時間把本頁資料收完整，不再換高度。
+      const afterBand = roomBandCount(page);
+      if (afterBand > beforeBand) {
+        state.learnedPagerY = yRatio;
+        profile.y = yRatio;
+        state.scanMessage = `🤖 已定位頁碼列｜第 ${page} 頁資料載入中 ${afterBand}/${targetCount}`;
+        scheduleRender();
+        const settled = await waitForPageBand(page, 10000);
+        if (settled.ok) {
+          state.scanVisited.add(page);
+          state.pagesSeen.add(page);
+          state.dataPagesSeen.add(page);
+          return { ok: true, ...settled, yRatio, probeIndex: probeIndex + 1 };
+        }
+        return { ok: false, reason: 'partial-data-timeout', count: settled.count, target: settled.target, yRatio };
+      }
+
+      await delay(180);
     }
 
-    return { ok: false, reason: 'data-timeout', count: roomBandCount(page), target: targetCount };
+    return {
+      ok: false,
+      reason: 'pager-auto-locate-failed',
+      count: roomBandCount(page),
+      target: targetCount
+    };
   }
 
   function visibleRoomSignature() {
@@ -2581,7 +2659,9 @@
 
       const result = await clickFixedPage(profile, page);
       if (!result.ok) {
-        state.scanError = `第 ${page} 頁資料收取失敗：目前 ${result.count ?? roomBandCount(page)} / ${result.target ?? target}。掃描已停在此頁，不會跳過。`;
+        state.scanError = result.reason === 'pager-auto-locate-failed'
+          ? `第 ${page} 頁未能自動切換成功；程式已嘗試頁碼列安全範圍，掃描停在此頁。`
+          : `第 ${page} 頁資料收取失敗：目前 ${result.count ?? roomBandCount(page)} / ${result.target ?? target}。掃描已停在此頁，不會跳過。`;
         state.scanMessage = `掃描暫停｜總計 ${numberedCount()} / ${expected}`;
         state.scanRunning = false;
         scheduleRender();
