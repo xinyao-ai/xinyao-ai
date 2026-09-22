@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      2.4.0
+// @version      2.4.1
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -1226,7 +1226,7 @@
     return scored[0]?.ordered || [];
   }
 
-  const SCRIPT_VERSION = '2.4.0';
+  const SCRIPT_VERSION = '2.4.1';
 
   function getVersion() {
     return SCRIPT_VERSION;
@@ -1846,52 +1846,56 @@
   }
 
   function findPagerButtons() {
-    const primary = [...document.querySelectorAll('button,[role="button"],a')]
+    // 回復 v2.1.2 FINAL 的辨識方式：
+    // 不猜座標、不做校準，直接找畫面上 1～9 頁碼共同所在的父層。
+    const candidates = [...document.querySelectorAll('button,[role="button"],a,li,div,span')]
       .filter(el => !el.closest('#xinyao-atg-room-scanner,#xinyao-room-mini,#xinyao-atg-live-panel,#xinyao-copy-modal'))
       .filter(isVisible)
-      .map(el => {
-        const text = String(el.textContent || '').trim();
-        const page = pageNumberFromText(text);
-        const rect = el.getBoundingClientRect();
-        return page === null ? null : {
-          page,
-          x: rect.left,
-          y: rect.top,
-          width: rect.width,
-          height: rect.height,
-          el
-        };
-      })
-      .filter(Boolean);
+      .map(el => ({ el, text: String(el.textContent || '').trim() }))
+      .filter(x => /^(?:[1-9])$/.test(x.text));
 
-    let selected = selectPagerRow(primary);
+    const groups = new Map();
 
-    if (selected.length < 4) {
-      const fallback = [...document.querySelectorAll('li,div,span')]
-        .filter(el => !el.closest('#xinyao-atg-room-scanner,#xinyao-room-mini,#xinyao-atg-live-panel,#xinyao-copy-modal'))
-        .filter(isVisible)
-        .map(el => {
-          const text = String(el.textContent || '').trim();
-          const page = pageNumberFromText(text);
-          const rect = el.getBoundingClientRect();
-          const clickable = el.closest('button,[role="button"],a') || el;
-          return page === null ? null : {
-            page,
-            x: rect.left,
-            y: rect.top,
-            width: rect.width,
-            height: rect.height,
-            el: clickable
-          };
-        })
-        .filter(Boolean);
-      selected = selectPagerRow([...primary, ...fallback]);
+    for (const c of candidates) {
+      let ancestor = c.el.parentElement;
+
+      for (let depth = 0; ancestor && depth < 6; depth++, ancestor = ancestor.parentElement) {
+        if (ancestor.id === 'xinyao-atg-room-scanner') break;
+
+        if (!groups.has(ancestor)) groups.set(ancestor, new Map());
+        const map = groups.get(ancestor);
+        const page = Number(c.text);
+
+        // 同一頁碼若有巢狀文字節點，優先保留面積較小、較接近實際按鈕的元素。
+        const current = map.get(page);
+        if (!current) {
+          map.set(page, c.el);
+        } else {
+          const cr = current.getBoundingClientRect();
+          const nr = c.el.getBoundingClientRect();
+          if ((nr.width * nr.height) < (cr.width * cr.height)) map.set(page, c.el);
+        }
+      }
     }
 
-    if (selected.length < 4) return null;
+    const viable = [...groups.entries()]
+      .filter(([, map]) => [1,2,3,4,5,6,7,8,9].every(n => map.has(n)))
+      .map(([ancestor, map]) => {
+        const r = ancestor.getBoundingClientRect();
+        return { ancestor, map, area: Math.max(1, r.width * r.height) };
+      })
+      .sort((a, b) => a.area - b.area);
 
+    if (!viable.length) return null;
+
+    const best = viable[0];
     const out = new Map();
-    for (const item of selected) out.set(item.page, item.el);
+
+    for (const [page, el] of best.map.entries()) {
+      const clickable = el.closest('button,[role="button"],a') || el;
+      out.set(page, clickable);
+    }
+
     return out;
   }
 
@@ -1918,6 +1922,13 @@
 
   function clickPagerElement(el) {
     if (!el || !el.isConnected) return false;
+
+    // 先走 ATG 元素自己的 click handler；昨天可用版本就是這條路。
+    try {
+      el.click();
+      return true;
+    } catch (_) {}
+
     const rect = el.getBoundingClientRect();
     if (!rect.width || !rect.height) return false;
 
