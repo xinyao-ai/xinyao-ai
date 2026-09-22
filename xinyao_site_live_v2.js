@@ -2824,3 +2824,273 @@
     start();
   }
 })();
+/* ===== 芯瑤 ATG 全房推薦整合 v2｜恢復第4分頁 ===== */
+(() => {
+  'use strict';
+
+  if (window.__XIANYAO_SITE_ROOM_RECOMMEND_V2__) return;
+  window.__XIANYAO_SITE_ROOM_RECOMMEND_V2__ = true;
+
+  const SNAPSHOT_TYPE = 'XIANYAO_ATG_ROOM_SNAPSHOT_V1';
+  const STORAGE_KEY = 'xinyao_atg_room_snapshot_v1';
+  const ATG_ORIGIN = 'https://play.godeebxp.com';
+
+  const ui = { search: '', status: 'All', sort: 'score' };
+  let snapshot = null;
+  let navButton = null;
+  let panel = null;
+
+  const finite = (v) => {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+  }[ch]));
+
+  const pct = (v) => Number.isFinite(v) ? `${v.toFixed(2)}%` : '—';
+  const num = (v) => Number.isFinite(v) ? Number(v).toLocaleString('zh-TW', { maximumFractionDigits: 2 }) : '—';
+  const roomNo = (v) => String(Math.trunc(v)).padStart(4, '0');
+  const statusText = (s) => s === 'Empty' ? '空房' : s === 'Full' ? '使用中' : s === 'Locked' ? '鎖定' : '未知';
+
+  function rate(win, bet) {
+    const w = finite(win), b = finite(bet);
+    if (w === null || b === null || b <= 0) return null;
+    return (w / b) * 100;
+  }
+
+  function normalizeRoom(room) {
+    if (!room || typeof room !== 'object') return null;
+    const number = finite(room.number);
+    const roomId = finite(room.roomId);
+    if (number === null || roomId === null) return null;
+    const todayBet = finite(room.today?.bet ?? room.todayBet);
+    const todayWin = finite(room.today?.win ?? room.todayWin);
+    const totalBet = finite(room.bet ?? room.totalBet);
+    const totalWin = finite(room.win ?? room.totalWin);
+    return {
+      number,
+      roomId,
+      status: typeof room.status === 'string' ? room.status : 'Unknown',
+      today: { bet: todayBet, win: todayWin },
+      bet: totalBet,
+      win: totalWin,
+      todayRate: rate(todayWin, todayBet),
+      totalRate: rate(totalWin, totalBet)
+    };
+  }
+
+  function normalizeSnapshot(raw) {
+    const rooms = Array.isArray(raw?.rooms) ? raw.rooms.map(normalizeRoom).filter(Boolean) : [];
+    return {
+      type: SNAPSHOT_TYPE,
+      version: String(raw?.version || ''),
+      capturedAt: raw?.capturedAt || new Date().toISOString(),
+      summary: raw?.summary || {},
+      rooms
+    };
+  }
+
+  function loadSnapshot() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? normalizeSnapshot(JSON.parse(raw)) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function saveSnapshot(raw) {
+    snapshot = normalizeSnapshot(raw);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot)); } catch (_) {}
+    render();
+  }
+
+  function percentile(values, value) {
+    const list = values.filter(Number.isFinite).slice().sort((a, b) => a - b);
+    if (!Number.isFinite(value) || !list.length) return 0;
+    if (list.length === 1) return 0.5;
+    let count = 0;
+    for (const n of list) if (n <= value) count++;
+    return Math.max(0, Math.min(1, (count - 1) / (list.length - 1)));
+  }
+
+  function rankRooms(rooms) {
+    const empty = rooms.filter(r => r.status === 'Empty');
+    const todayRates = empty.map(r => r.todayRate);
+    const totalRates = empty.map(r => r.totalRate);
+    const sampleValues = empty.map(r => Math.log1p(Math.max(0, r.today?.bet || 0)));
+
+    return empty.map(r => {
+      const a = percentile(todayRates, r.todayRate);
+      const b = percentile(totalRates, r.totalRate);
+      const c = percentile(sampleValues, Math.log1p(Math.max(0, r.today?.bet || 0)));
+      const score = Math.round((a * 0.45 + b * 0.35 + c * 0.20) * 1000) / 10;
+      const parts = [['今日資料偏高', a], ['累計資料偏高', b], ['投注樣本較足', c]].sort((x, y) => y[1] - x[1]);
+      return { ...r, observationScore: score, reason: parts[0][1] >= 0.72 ? parts[0][0] : '綜合資料較突出' };
+    }).sort((a, b) => b.observationScore - a.observationScore || a.number - b.number);
+  }
+
+  function setActive() {
+    document.querySelectorAll('.mode-button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    navButton?.classList.add('active');
+    panel?.classList.add('active');
+  }
+
+  function filteredRooms(rooms) {
+    let out = rooms.slice();
+    const q = ui.search.trim();
+    if (q) out = out.filter(r => String(r.number).includes(q) || String(r.roomId).includes(q));
+    if (ui.status !== 'All') out = out.filter(r => r.status === ui.status);
+
+    const scoreMap = new Map(rankRooms(rooms).map(r => [r.roomId, r.observationScore]));
+    out.sort((a, b) => {
+      if (ui.sort === 'number') return a.number - b.number;
+      const av = ui.sort === 'today' ? a.todayRate : ui.sort === 'total' ? a.totalRate : ui.sort === 'todayBet' ? finite(a.today?.bet) : scoreMap.get(a.roomId);
+      const bv = ui.sort === 'today' ? b.todayRate : ui.sort === 'total' ? b.totalRate : ui.sort === 'todayBet' ? finite(b.today?.bet) : scoreMap.get(b.roomId);
+      if (!Number.isFinite(av) && !Number.isFinite(bv)) return a.number - b.number;
+      if (!Number.isFinite(av)) return 1;
+      if (!Number.isFinite(bv)) return -1;
+      return bv - av || a.number - b.number;
+    });
+    return { rooms: out, scoreMap };
+  }
+
+  function render() {
+    if (!panel) return;
+    snapshot = snapshot || loadSnapshot();
+
+    if (!snapshot?.rooms?.length) {
+      panel.innerHTML = `
+        <div class="card">
+          <h2 class="section-title">📊 全房推薦</h2>
+          <div style="padding:16px;border-radius:16px;background:#fff7fb;border:1px solid #ffd8e7;line-height:1.8;color:#735c66;">
+            尚未收到 ATG 全房資料。<br>
+            請先在 ATG 按 <b>【一鍵掃描 4100 房】</b>，完成後再按 <b>【同步到芯瑤】</b>。
+          </div>
+        </div>`;
+      return;
+    }
+
+    const ranked = rankRooms(snapshot.rooms).slice(0, 10);
+    const { rooms, scoreMap } = filteredRooms(snapshot.rooms);
+    const captured = new Date(snapshot.capturedAt);
+    const capturedText = Number.isNaN(captured.getTime()) ? String(snapshot.capturedAt || '') : captured.toLocaleString('zh-TW');
+
+    const topHtml = ranked.map((r, i) => `
+      <div style="display:grid;grid-template-columns:42px 70px 85px 85px 80px 1fr;gap:6px;align-items:center;padding:9px 0;border-bottom:1px solid #f4dce7;font-size:12px;">
+        <b style="color:#d94c89;">#${i + 1}</b><b>${roomNo(r.number)}</b><span>${pct(r.todayRate)}</span><span>${pct(r.totalRate)}</span><b style="color:#d94c89;">${r.observationScore.toFixed(1)}</b><span style="color:#8c6d7a;">${esc(r.reason)}</span>
+      </div>`).join('');
+
+    const rowsHtml = rooms.map(r => `<tr>
+      <td><b>${roomNo(r.number)}</b></td>
+      <td>${statusText(r.status)}</td>
+      <td>${pct(r.todayRate)}</td>
+      <td>${pct(r.totalRate)}</td>
+      <td>${num(r.today?.bet)}</td>
+      <td>${Number.isFinite(scoreMap.get(r.roomId)) ? scoreMap.get(r.roomId).toFixed(1) : '—'}</td>
+    </tr>`).join('');
+
+    panel.innerHTML = `
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+          <div><h2 class="section-title" style="margin-bottom:5px;">📊 全房推薦</h2><div style="font-size:12px;color:#9b7d89;">已同步 <b>${snapshot.rooms.length}</b> 房｜${esc(capturedText)}</div></div>
+          <button id="xinyaoRoomClear" type="button" style="border:1px solid #efcddd;background:#fff;color:#d94c89;border-radius:12px;padding:9px 12px;font-weight:800;cursor:pointer;">清除此批資料</button>
+        </div>
+
+        <div style="margin-top:14px;padding:14px;border:1px solid #ffd7e8;background:#fff8fb;border-radius:16px;overflow:auto;">
+          <div style="font-weight:900;color:#d94c89;margin-bottom:7px;">🌸 優先觀察 TOP 10 空房</div>
+          ${topHtml || '<div style="padding:10px;color:#9b7d89;">目前沒有空房資料。</div>'}
+        </div>
+
+        <div style="margin-top:14px;display:grid;grid-template-columns:minmax(160px,1fr) 120px 140px;gap:8px;">
+          <input id="xinyaoRoomSearch" value="${esc(ui.search)}" placeholder="搜尋房號 / roomId" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid #efccdc;border-radius:12px;outline:none;">
+          <select id="xinyaoRoomStatus" style="padding:10px;border:1px solid #efccdc;border-radius:12px;background:#fff;">
+            <option value="All" ${ui.status === 'All' ? 'selected' : ''}>全部狀態</option><option value="Empty" ${ui.status === 'Empty' ? 'selected' : ''}>空房</option><option value="Full" ${ui.status === 'Full' ? 'selected' : ''}>使用中</option><option value="Locked" ${ui.status === 'Locked' ? 'selected' : ''}>鎖定</option>
+          </select>
+          <select id="xinyaoRoomSort" style="padding:10px;border:1px solid #efccdc;border-radius:12px;background:#fff;">
+            <option value="score" ${ui.sort === 'score' ? 'selected' : ''}>觀察分數</option><option value="number" ${ui.sort === 'number' ? 'selected' : ''}>房號</option><option value="today" ${ui.sort === 'today' ? 'selected' : ''}>今日得分率</option><option value="total" ${ui.sort === 'total' ? 'selected' : ''}>累計得分率</option><option value="todayBet" ${ui.sort === 'todayBet' ? 'selected' : ''}>今日投注量</option>
+          </select>
+        </div>
+
+        <div style="margin-top:10px;overflow:auto;max-height:560px;border:1px solid #f1d9e4;border-radius:14px;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead><tr><th>房號</th><th>狀態</th><th>今日率</th><th>累計率</th><th>今日投注</th><th>觀察分</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:#9b7d89;">目前顯示 ${rooms.length} 房。資料僅整理已發生統計，不代表後續結果。</div>
+      </div>`;
+  }
+
+  function injectUi() {
+    if (document.getElementById('xinyaoRoomRecommendPanel')) return true;
+    const analyzeButton = document.querySelector('.mode-button[data-panel="analyzePanel"]');
+    const grid = analyzeButton?.closest('.mode-grid');
+    if (!grid) return false;
+
+    const style = document.createElement('style');
+    style.id = 'xinyaoRoomRecommendStyleV2';
+    style.textContent = `
+      .xinyao-room-tab-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+      @media(max-width:760px){.xinyao-room-tab-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+      #xinyaoRoomRecommendPanel th,#xinyaoRoomRecommendPanel td{padding:9px 7px;border-bottom:1px solid #f3dbe5;text-align:left;white-space:nowrap}
+      #xinyaoRoomRecommendPanel th{color:#9d7184;font-size:11px}
+    `;
+    if (!document.getElementById(style.id)) document.head.appendChild(style);
+
+    grid.classList.add('xinyao-room-tab-grid');
+    navButton = document.createElement('button');
+    navButton.className = 'mode-button';
+    navButton.type = 'button';
+    navButton.dataset.panel = 'xinyaoRoomRecommendPanel';
+    navButton.textContent = '📊 全房推薦';
+    grid.appendChild(navButton);
+
+    panel = document.createElement('section');
+    panel.className = 'panel';
+    panel.id = 'xinyaoRoomRecommendPanel';
+    const navCard = grid.closest('section.card') || grid.parentElement;
+    navCard.insertAdjacentElement('afterend', panel);
+
+    navButton.addEventListener('click', () => { setActive(); render(); });
+    panel.addEventListener('click', e => {
+      if (e.target?.id === 'xinyaoRoomClear') {
+        try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
+        snapshot = null;
+        render();
+      }
+    });
+    panel.addEventListener('input', e => {
+      if (e.target?.id === 'xinyaoRoomSearch') { ui.search = e.target.value; render(); }
+    });
+    panel.addEventListener('change', e => {
+      if (e.target?.id === 'xinyaoRoomStatus') { ui.status = e.target.value; render(); }
+      if (e.target?.id === 'xinyaoRoomSort') { ui.sort = e.target.value; render(); }
+    });
+
+    snapshot = loadSnapshot();
+    render();
+    if (new URLSearchParams(location.search).get('atgRooms') === '1') setActive();
+    return true;
+  }
+
+  window.addEventListener('message', event => {
+    if (event.origin !== ATG_ORIGIN) return;
+    if (event.data?.type !== SNAPSHOT_TYPE) return;
+    saveSnapshot(event.data);
+    setActive();
+  });
+
+  function start() {
+    if (injectUi()) return;
+    const timer = setInterval(() => { if (injectUi()) clearInterval(timer); }, 300);
+    setTimeout(() => clearInterval(timer), 20000);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
+  else start();
+})();
