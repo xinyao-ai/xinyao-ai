@@ -8,7 +8,7 @@
     'https://xinyao-atg-live.love06130430.workers.dev';
 
   const SCRIPT_URL =
-    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=202';
+    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=220';
 
   const GUIDE_IMAGES = {
     ios: './xinyao_guide_ios.png?v=203',
@@ -20,6 +20,12 @@
 
   const USERSCRIPTS_APP_STORE_URL =
     'https://apps.apple.com/tw/app/userscripts/id1463298887';
+
+  const FIREFOX_PLAY_URL =
+    'https://play.google.com/store/apps/details?id=org.mozilla.firefox';
+
+  const FIREFOX_TAMPERMONKEY_URL =
+    'https://addons.mozilla.org/zh-TW/android/addon/tampermonkey/';
 
   const DESKTOP_GUIDE_STEPS = [
     {
@@ -162,6 +168,69 @@
       `,
       images: [
         './ios_step6.png?v=204'
+      ]
+    }
+  ];
+
+  const ANDROID_GUIDE_STEPS = [
+    {
+      stepNumber: 1,
+      title: '安裝 Firefox 瀏覽器',
+      bodyHtml: `
+        <p>先安裝 <b>Firefox</b>，之後娛樂城與芯瑤都會使用 Firefox 開啟。</p>
+        <p>點下方按鈕可以直接前往 Google Play 的 Firefox 官方安裝頁，不需要自己搜尋。</p>
+      `,
+      images: [
+        './android_step1.png?v=205'
+      ],
+      openFirefoxPlay: true
+    },
+    {
+      stepNumber: 2,
+      title: '娛樂城與芯瑤程式要使用同一個 Firefox',
+      bodyHtml: `
+        <p>請確認 <b>HD 皇鼎娛樂城</b> 與 <b>芯瑤💕 ATG AI助手</b> 都使用 <b>同一個 Firefox 瀏覽器</b> 開啟。</p>
+        <p>不要一個用 Chrome、另一個用 Firefox，否則後面的安裝、配對與同步可能無法正常運作。</p>
+      `,
+      images: [
+        './android_step2.png?v=205'
+      ]
+    },
+    {
+      stepNumber: 3,
+      title: '安裝 Tampermonkey 擴充功能',
+      bodyHtml: `
+        <p>點下方 <b>【安裝 Tampermonkey】</b>，進入 Firefox 擴充套件頁。</p>
+        <p>依序點擊 <b>【新增至 Firefox】→【允許／新增】</b>，完成 Tampermonkey 安裝。</p>
+      `,
+      images: [
+        './android_step3.png?v=205'
+      ],
+      openFirefoxTampermonkey: true
+    },
+    {
+      stepNumber: 4,
+      title: '回到芯瑤頁面，安裝共用程式',
+      bodyHtml: `
+        <p>回到 <b>【芯瑤💕 ATG AI助手】</b>。</p>
+        <p>依序操作：<b>【安裝共用程式／查看教學】→ 往下滑 →【我看完教學｜開啟共用程式】→【安裝】</b>。</p>
+        <p>安裝完成後，再回到這個教學頁繼續下一步。</p>
+      `,
+      images: [
+        './android_step4.png?v=205'
+      ],
+      openSharedScript: true
+    },
+    {
+      stepNumber: 5,
+      title: '產生配對碼並完成綁定',
+      bodyHtml: `
+        <p>回到 <b>【芯瑤💕 ATG AI助手】</b>，點擊 <b>【產生配對碼】→【複製配對碼】</b>。</p>
+        <p>再回到 ATG：<b>重新整理頁面</b> → 左上角出現 <b>【芯瑤 ATG 即時助手】</b> → 貼上剛剛複製的 <b>配對碼</b> → 點擊 <b>【綁定】</b>。</p>
+        <p>看到綁定成功後，就可以開始遊戲了 ✅</p>
+      `,
+      images: [
+        './android_step5.png?v=205'
       ]
     }
   ];
@@ -383,7 +452,7 @@
     if (
       platform === 'Android'
     ) {
-      return 'Android：使用支援 UserScript 的瀏覽器／擴充功能，第一次安裝一次即可。';
+      return 'Android：使用 Firefox＋Tampermonkey，第一次安裝一次即可。';
     }
 
     return '電腦：使用 Tampermonkey 安裝一次即可。';
@@ -882,9 +951,7 @@
       },
       android: {
         title: '🤖 Android 安裝教學',
-        subtitle: '請依圖片步驟完成安裝與設定',
-        image: GUIDE_IMAGES.android,
-        button: '開啟共用程式'
+        subtitle: 'Firefox＋Tampermonkey｜共 5 步，一面一個步驟'
       }
     };
 
@@ -930,8 +997,7 @@
 
     let desktopStepIndex = 0;
     let iosStepIndex = 0;
-
-    const modal =
+    let androidStepIndex = 0;const modal =
       document.createElement(
         'div'
       );
@@ -1672,6 +1738,328 @@
         );
     };
 
+    const renderAndroidStep = () => {
+      const body =
+        $('xinyaoGuideBody');
+
+      if (!body) return;
+
+      const step =
+        ANDROID_GUIDE_STEPS[
+          androidStepIndex
+        ];
+
+      const total =
+        ANDROID_GUIDE_STEPS.length;
+
+      const imageHtml =
+        step.images
+          .map((src, index) => `
+            <div
+              style="
+                margin-top:${index === 0 ? 12 : 10}px;
+                border:1px solid #ffd5e6;
+                border-radius:15px;
+                overflow:hidden;
+                background:#fff7fb;
+              "
+            >
+              <img
+                src="${src}"
+                alt="Android 安裝教學第 ${step.stepNumber} 步圖片 ${index + 1}"
+                style="
+                  display:block;
+                  width:100%;
+                  height:auto;
+                  background:#fff;
+                "
+              >
+            </div>
+          `)
+          .join('');
+
+      body.innerHTML = `
+        <div
+          style="
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:10px;
+            margin-bottom:10px;
+          "
+        >
+          <div
+            style="
+              display:inline-flex;
+              align-items:center;
+              gap:7px;
+              padding:7px 11px;
+              border-radius:999px;
+              background:#fff0f6;
+              color:#d94c89;
+              font-size:12px;
+              font-weight:900;
+            "
+          >
+            步驟 ${step.stepNumber} / ${total}
+          </div>
+
+          <div
+            style="
+              flex:1;
+              height:7px;
+              overflow:hidden;
+              border-radius:999px;
+              background:#ffe5ef;
+            "
+          >
+            <div
+              style="
+                width:${((androidStepIndex + 1) / total) * 100}%;
+                height:100%;
+                border-radius:999px;
+                background:#ff5f9e;
+                transition:width .2s ease;
+              "
+            ></div>
+          </div>
+        </div>
+
+        <div
+          style="
+            padding:15px;
+            border:1px solid #ffd5e6;
+            border-radius:16px;
+            background:#fff9fc;
+          "
+        >
+          <div
+            style="
+              font-size:18px;
+              font-weight:950;
+              line-height:1.45;
+              color:#d94c89;
+            "
+          >
+            ${step.stepNumber}. ${step.title}
+          </div>
+
+          <div
+            style="
+              margin-top:10px;
+              font-size:13px;
+              line-height:1.8;
+              color:#604e57;
+            "
+          >
+            ${step.bodyHtml}
+          </div>
+
+          ${
+            step.openFirefoxPlay
+              ? `
+                <button
+                  id="xinyaoOpenFirefoxPlay"
+                  type="button"
+                  style="
+                    width:100%;
+                    margin-top:12px;
+                    padding:12px 14px;
+                    border:0;
+                    border-radius:12px;
+                    background:#ff5f9e;
+                    color:#fff;
+                    font-size:13px;
+                    font-weight:900;
+                    cursor:pointer;
+                  "
+                >
+                  📱 前往 Google Play 下載 Firefox
+                </button>
+              `
+              : ''
+          }
+
+          ${
+            step.openFirefoxTampermonkey
+              ? `
+                <button
+                  id="xinyaoOpenFirefoxTampermonkey"
+                  type="button"
+                  style="
+                    width:100%;
+                    margin-top:12px;
+                    padding:12px 14px;
+                    border:0;
+                    border-radius:12px;
+                    background:#ff5f9e;
+                    color:#fff;
+                    font-size:13px;
+                    font-weight:900;
+                    cursor:pointer;
+                  "
+                >
+                  🧩 安裝 Tampermonkey
+                </button>
+              `
+              : ''
+          }
+
+          ${
+            step.openSharedScript
+              ? `
+                <button
+                  id="xinyaoOpenSharedScriptAndroid"
+                  type="button"
+                  style="
+                    width:100%;
+                    margin-top:12px;
+                    padding:12px 14px;
+                    border:0;
+                    border-radius:12px;
+                    background:#ff5f9e;
+                    color:#fff;
+                    font-size:13px;
+                    font-weight:900;
+                    cursor:pointer;
+                  "
+                >
+                  我看完教學｜開啟共用程式
+                </button>
+              `
+              : ''
+          }
+        </div>
+
+        ${imageHtml}
+
+        <div
+          style="
+            display:flex;
+            gap:9px;
+            margin-top:14px;
+          "
+        >
+          <button
+            id="xinyaoAndroidGuidePrev"
+            type="button"
+            ${androidStepIndex === 0 ? 'disabled' : ''}
+            style="
+              flex:1;
+              padding:11px 12px;
+              border:1px solid #f2bfd3;
+              border-radius:12px;
+              background:#fff;
+              color:${androidStepIndex === 0 ? '#c9bcc2' : '#d94c89'};
+              font-size:13px;
+              font-weight:900;
+              cursor:${androidStepIndex === 0 ? 'default' : 'pointer'};
+            "
+          >
+            ← 上一步
+          </button>
+
+          <button
+            id="xinyaoAndroidGuideNext"
+            type="button"
+            style="
+              flex:1.35;
+              padding:11px 12px;
+              border:0;
+              border-radius:12px;
+              background:#ff5f9e;
+              color:#fff;
+              font-size:13px;
+              font-weight:900;
+              cursor:pointer;
+            "
+          >
+            ${androidStepIndex === total - 1 ? '完成教學 ✓' : '下一步 →'}
+          </button>
+        </div>
+      `;
+
+      $('xinyaoOpenFirefoxPlay')
+        ?.addEventListener(
+          'click',
+          () => {
+            const opened =
+              window.open(
+                FIREFOX_PLAY_URL,
+                '_blank'
+              );
+
+            if (!opened) {
+              window.location.href =
+                FIREFOX_PLAY_URL;
+            }
+          }
+        );$('xinyaoOpenFirefoxTampermonkey')
+        ?.addEventListener(
+          'click',
+          () => {
+            const opened =
+              window.open(
+                FIREFOX_TAMPERMONKEY_URL,
+                '_blank'
+              );
+
+            if (!opened) {
+              window.location.href =
+                FIREFOX_TAMPERMONKEY_URL;
+            }
+          }
+        );
+
+      $('xinyaoOpenSharedScriptAndroid')
+        ?.addEventListener(
+          'click',
+          () => {
+            const opened =
+              window.open(
+                SCRIPT_URL,
+                '_blank'
+              );
+
+            if (!opened) {
+              window.location.href =
+                SCRIPT_URL;
+            }
+          }
+        );
+
+      $('xinyaoAndroidGuidePrev')
+        ?.addEventListener(
+          'click',
+          () => {
+            if (androidStepIndex <= 0) return;
+            androidStepIndex -= 1;
+            renderAndroidStep();
+            const scroll = $('xinyaoGuideScroll');
+            if (scroll) scroll.scrollTop = 0;
+          }
+        );
+
+      $('xinyaoAndroidGuideNext')
+        ?.addEventListener(
+          'click',
+          () => {
+            if (
+              androidStepIndex <
+              total - 1
+            ) {
+              androidStepIndex += 1;
+              renderAndroidStep();
+              const scroll = $('xinyaoGuideScroll');
+              if (scroll) scroll.scrollTop = 0;
+              return;
+            }
+
+            modal.remove();
+          }
+        );
+    };
+
     const renderSimpleGuide = () => {
       const meta =
         guideMeta(
@@ -1818,6 +2206,11 @@
         'ios'
       ) {
         renderIOSStep();
+      } else if (
+        activePlatform ===
+        'android'
+      ) {
+        renderAndroidStep();
       } else {
         renderSimpleGuide();
       }
@@ -1837,6 +2230,10 @@
 
           if (activePlatform === 'ios') {
             iosStepIndex = 0;
+          }
+
+          if (activePlatform === 'android') {
+            androidStepIndex = 0;
           }
 
           renderGuide();
@@ -2426,375 +2823,4 @@
   } else {
     start();
   }
-})();
-
-
-/* ===== 芯瑤 ATG 全房推薦整合 v1 ===== */
-(() => {
-  'use strict';
-
-  const SNAPSHOT_TYPE = 'XIANYAO_ATG_ROOM_SNAPSHOT_V1';
-  const STORAGE_KEY = 'xinyao_atg_room_snapshot_v1';
-  const ATG_ORIGIN = 'https://play.godeebxp.com';
-
-  const finite = (v) => {
-    if (v === null || v === undefined || v === '') return null;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-  };
-
-  const safeRate = (win, bet) => {
-    const w = finite(win), b = finite(bet);
-    if (w === null || b === null || b <= 0) return null;
-    return (w / b) * 100;
-  };
-
-  function normalizeRoom(room) {
-    if (!room || typeof room !== 'object') return null;
-    const number = finite(room.number);
-    const roomId = finite(room.roomId);
-    if (number === null || roomId === null) return null;
-    const todayBet = finite(room.today?.bet ?? room.todayBet);
-    const todayWin = finite(room.today?.win ?? room.todayWin);
-    const totalBet = finite(room.bet ?? room.totalBet);
-    const totalWin = finite(room.win ?? room.totalWin);
-    return {
-      number,
-      roomId,
-      status: typeof room.status === 'string' ? room.status : 'Unknown',
-      today: { bet: todayBet, win: todayWin },
-      bet: totalBet,
-      win: totalWin,
-      todayRate: safeRate(todayWin, todayBet),
-      totalRate: safeRate(totalWin, totalBet)
-    };
-  }
-
-  function normalizeSnapshot(snapshot) {
-    const rooms = Array.isArray(snapshot?.rooms)
-      ? snapshot.rooms.map(normalizeRoom).filter(Boolean)
-      : [];
-    return {
-      type: SNAPSHOT_TYPE,
-      version: String(snapshot?.version || ''),
-      capturedAt: snapshot?.capturedAt || new Date().toISOString(),
-      summary: {
-        roomsKnown: finite(snapshot?.summary?.roomsKnown) ?? rooms.length,
-        totalTableCount: finite(snapshot?.summary?.totalTableCount) ?? rooms.length,
-        totalPages: finite(snapshot?.summary?.totalPages),
-        pagesSeen: Array.isArray(snapshot?.summary?.pagesSeen)
-          ? snapshot.summary.pagesSeen.map(finite).filter(v => v !== null)
-          : []
-      },
-      rooms
-    };
-  }
-
-  function percentileMap(values) {
-    const clean = values.filter(v => Number.isFinite(v)).slice().sort((a, b) => a - b);
-    return (value) => {
-      if (!Number.isFinite(value) || clean.length === 0) return 0;
-      if (clean.length === 1) return 0.5;
-      let lo = 0, hi = clean.length;
-      while (lo < hi) {
-        const mid = (lo + hi) >> 1;
-        if (clean[mid] <= value) lo = mid + 1;
-        else hi = mid;
-      }
-      return Math.max(0, Math.min(1, (lo - 1) / (clean.length - 1)));
-    };
-  }
-
-  function rankEmptyRooms(rooms) {
-    const empty = rooms.filter(r => r.status === 'Empty');
-    const todayPct = percentileMap(empty.map(r => r.todayRate));
-    const totalPct = percentileMap(empty.map(r => r.totalRate));
-    const todayBetPct = percentileMap(empty.map(r => Math.log1p(Math.max(0, finite(r.today?.bet) || 0))));
-    const totalBetPct = percentileMap(empty.map(r => Math.log1p(Math.max(0, finite(r.bet) || 0))));
-
-    return empty.map(room => {
-      const pt = todayPct(room.todayRate);
-      const ptotal = totalPct(room.totalRate);
-      const psample = 0.6 * todayBetPct(Math.log1p(Math.max(0, finite(room.today?.bet) || 0)))
-        + 0.4 * totalBetPct(Math.log1p(Math.max(0, finite(room.bet) || 0)));
-      const rawReliability = (
-        Math.min(1, Math.log1p(Math.max(0, finite(room.today?.bet) || 0)) / Math.log1p(50000))
-        + Math.min(1, Math.log1p(Math.max(0, finite(room.bet) || 0)) / Math.log1p(150000))
-      ) / 2;
-      const reliability = 0.65 + 0.35 * rawReliability;
-      const observationScore = Math.round((100 * (0.45 * pt + 0.35 * ptotal + 0.20 * psample) * reliability) * 10) / 10;
-
-      const components = [
-        ['今日資料偏高', pt],
-        ['累計資料偏高', ptotal],
-        ['投注樣本較足', psample]
-      ].sort((a, b) => b[1] - a[1]);
-      const reason = components[0][1] >= 0.72 ? components[0][0] : '綜合資料較突出';
-
-      return { ...room, observationScore, reason };
-    }).sort((a, b) =>
-      b.observationScore - a.observationScore ||
-      (b.todayRate ?? -Infinity) - (a.todayRate ?? -Infinity) ||
-      a.number - b.number
-    );
-  }
-
-  function filterRooms(rooms, options = {}) {
-    const search = String(options.search || '').trim();
-    const status = options.status || 'All';
-    const sort = options.sort || 'number';
-    let out = rooms.slice();
-    if (search) out = out.filter(r => String(r.number).includes(search) || String(r.roomId).includes(search));
-    if (status !== 'All') out = out.filter(r => r.status === status);
-    const rankedScore = new Map(rankEmptyRooms(rooms).map(r => [r.roomId, r.observationScore]));
-    const value = (r) => {
-      if (sort === 'today') return r.todayRate;
-      if (sort === 'total') return r.totalRate;
-      if (sort === 'todayBet') return finite(r.today?.bet);
-      if (sort === 'score') return rankedScore.get(r.roomId) ?? null;
-      return r.number;
-    };
-    out.sort((a, b) => {
-      if (sort === 'number') return a.number - b.number;
-      const av = value(a), bv = value(b);
-      if (av === null && bv === null) return a.number - b.number;
-      if (av === null) return 1;
-      if (bv === null) return -1;
-      return bv - av || a.number - b.number;
-    });
-    return out;
-  }
-
-  const core = { normalizeRoom, normalizeSnapshot, rankEmptyRooms, filterRooms, safeRate };
-  if (typeof globalThis !== 'undefined' && globalThis.__XIANYAO_SITE_ROOM_TEST__) {
-    globalThis.__XIANYAO_SITE_ROOM_CORE__ = core;
-    return;
-  }
-
-  if (window.__XIANYAO_SITE_ROOM_RECOMMEND_V1__) return;
-  window.__XIANYAO_SITE_ROOM_RECOMMEND_V1__ = true;
-
-  const ui = { search: '', status: 'All', sort: 'score', page: 1, perPage: 100 };
-  let currentSnapshot = null;
-  let panel = null;
-  let navButton = null;
-
-  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]));
-  const pct = (v) => Number.isFinite(v) ? `${v.toFixed(2)}%` : '—';
-  const num = (v) => Number.isFinite(v) ? Number(v).toLocaleString('zh-TW', { maximumFractionDigits: 2 }) : '—';
-  const roomNo = (v) => String(Math.trunc(v)).padStart(4, '0');
-  const statusText = (s) => s === 'Empty' ? '空房' : s === 'Full' ? '使用中' : s === 'Locked' ? '鎖定' : '未知';
-
-  function loadSnapshot() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return null;
-      return normalizeSnapshot(JSON.parse(raw));
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function saveSnapshot(snapshot) {
-    const normalized = normalizeSnapshot(snapshot);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-    } catch (_) {}
-    currentSnapshot = normalized;
-    render();
-    return normalized;
-  }
-
-  function setActive() {
-    document.querySelectorAll('.mode-button').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    navButton?.classList.add('active');
-    panel?.classList.add('active');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  function injectUi() {
-    if (panel && document.body.contains(panel)) return true;
-    const analyzeButton = document.querySelector('.mode-button[data-panel="analyzePanel"]');
-    const grid = analyzeButton?.closest('.mode-grid');
-    if (!grid) return false;
-
-    if (!document.getElementById('xinyaoRoomRecommendStyle')) {
-      const style = document.createElement('style');
-      style.id = 'xinyaoRoomRecommendStyle';
-      style.textContent = `
-        .xinyao-room-tab-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
-        @media(max-width:760px){.xinyao-room-tab-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
-        .xinyao-room-table{width:100%;border-collapse:collapse;font-size:12px}
-        .xinyao-room-table th,.xinyao-room-table td{padding:9px 7px;border-bottom:1px solid #f3dbe5;text-align:left;white-space:nowrap}
-        .xinyao-room-table th{color:#9d7184;font-size:11px}
-        .xinyao-room-chip{display:inline-flex;padding:3px 8px;border-radius:999px;background:#fff0f6;color:#d94c89;font-weight:800;font-size:11px}
-      `;
-      document.head.appendChild(style);
-    }
-
-    grid.classList.add('xinyao-room-tab-grid');
-    navButton = document.createElement('button');
-    navButton.className = 'mode-button';
-    navButton.type = 'button';
-    navButton.dataset.panel = 'xinyaoRoomRecommendPanel';
-    navButton.textContent = '📊 全房推薦';
-    grid.appendChild(navButton);
-
-    panel = document.createElement('section');
-    panel.className = 'panel';
-    panel.id = 'xinyaoRoomRecommendPanel';
-    const navCard = grid.closest('section.card') || grid.parentElement;
-    navCard.insertAdjacentElement('afterend', panel);
-
-    navButton.addEventListener('click', () => {
-      setActive();
-      render();
-    });
-
-    panel.addEventListener('click', e => {
-      const id = e.target?.id;
-      if (id === 'xinyaoRoomPrev') { ui.page = Math.max(1, ui.page - 1); render(); }
-      if (id === 'xinyaoRoomNext') { ui.page += 1; render(); }
-      if (id === 'xinyaoRoomClear') {
-        localStorage.removeItem(STORAGE_KEY);
-        currentSnapshot = null;
-        render();
-      }
-    });
-
-    panel.addEventListener('input', e => {
-      if (e.target?.id === 'xinyaoRoomSearch') { ui.search = e.target.value; ui.page = 1; render(); }
-    });
-    panel.addEventListener('change', e => {
-      if (e.target?.id === 'xinyaoRoomStatus') { ui.status = e.target.value; ui.page = 1; render(); }
-      if (e.target?.id === 'xinyaoRoomSort') { ui.sort = e.target.value; ui.page = 1; render(); }
-    });
-
-    currentSnapshot = loadSnapshot();
-    render();
-
-    if (new URLSearchParams(location.search).get('atgRooms') === '1') setActive();
-    return true;
-  }
-
-  function render() {
-    if (!panel) return;
-    const snapshot = currentSnapshot || loadSnapshot();
-    if (!snapshot || snapshot.rooms.length === 0) {
-      panel.innerHTML = `
-        <div class="card">
-          <h2 class="section-title">📊 全房推薦</h2>
-          <div style="padding:16px;border-radius:16px;background:#fff7fb;border:1px solid #ffd8e7;line-height:1.8;color:#735c66;">
-            尚未收到 ATG 全房資料。<br>
-            請到 ATG 的「芯瑤 ATG 全房分析」先完成 4100 房掃描，再按 <b>【同步到芯瑤】</b>。
-          </div>
-          <div style="margin-top:10px;font-size:12px;color:#9b7d89;">本頁只整理已發生的房號統計，不代表後續結果或獲利保證。</div>
-        </div>`;
-      return;
-    }
-
-    currentSnapshot = snapshot;
-    const ranked = rankEmptyRooms(snapshot.rooms);
-    const top = ranked.slice(0, 10);
-    const filtered = filterRooms(snapshot.rooms, ui);
-    const totalPages = Math.max(1, Math.ceil(filtered.length / ui.perPage));
-    ui.page = Math.max(1, Math.min(ui.page, totalPages));
-    const start = (ui.page - 1) * ui.perPage;
-    const pageRows = filtered.slice(start, start + ui.perPage);
-    const captured = new Date(snapshot.capturedAt);
-    const capturedText = Number.isNaN(captured.getTime()) ? snapshot.capturedAt : captured.toLocaleString('zh-TW');
-
-    const topHtml = top.map((r, i) => `
-      <div style="display:grid;grid-template-columns:38px 62px 72px 72px 74px 1fr;gap:6px;align-items:center;padding:9px 0;border-bottom:1px solid #f4dce7;font-size:12px;">
-        <b style="color:#d94c89;">#${i + 1}</b>
-        <b>${roomNo(r.number)}</b>
-        <span>${pct(r.todayRate)}</span>
-        <span>${pct(r.totalRate)}</span>
-        <b style="color:#d94c89;">${r.observationScore.toFixed(1)}</b>
-        <span style="color:#8c6d7a;">${esc(r.reason)}</span>
-      </div>`).join('');
-
-    const rowsHtml = pageRows.map(r => {
-      const score = ranked.find(x => x.roomId === r.roomId)?.observationScore;
-      return `<tr>
-        <td><b>${roomNo(r.number)}</b></td>
-        <td><span class="xinyao-room-chip">${statusText(r.status)}</span></td>
-        <td>${pct(r.todayRate)}</td>
-        <td>${pct(r.totalRate)}</td>
-        <td>${num(r.today?.bet)}</td>
-        <td>${Number.isFinite(score) ? score.toFixed(1) : '—'}</td>
-      </tr>`;
-    }).join('');
-
-    panel.innerHTML = `
-      <div class="card">
-        <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
-          <div>
-            <h2 class="section-title" style="margin-bottom:5px;">📊 全房推薦</h2>
-            <div style="font-size:12px;color:#9b7d89;line-height:1.65;">已同步 <b>${snapshot.rooms.length}</b> 房｜資料時間 ${esc(capturedText)}</div>
-          </div>
-          <button id="xinyaoRoomClear" type="button" style="border:1px solid #efcddd;background:#fff;color:#d94c89;border-radius:12px;padding:9px 12px;font-weight:800;cursor:pointer;">清除此批資料</button>
-        </div>
-
-        <div style="margin-top:14px;padding:14px;border:1px solid #ffd7e8;background:#fff8fb;border-radius:16px;">
-          <div style="font-weight:900;color:#d94c89;margin-bottom:7px;">🌸 優先觀察 TOP 10 空房</div>
-          <div style="display:grid;grid-template-columns:38px 62px 72px 72px 74px 1fr;gap:6px;font-size:11px;color:#9b7d89;padding-bottom:4px;">
-            <span>名次</span><span>房號</span><span>今日率</span><span>累計率</span><span>觀察分</span><span>主要原因</span>
-          </div>
-          ${topHtml || '<div style="padding:12px;color:#9b7d89;">目前沒有可排行的空房資料。</div>'}
-          <div style="margin-top:8px;font-size:11px;color:#9b7d89;line-height:1.6;">觀察分數依今日／累計統計與樣本量做相對排序，只代表目前資料較突出，不代表下一局結果。</div>
-        </div>
-
-        <div style="margin-top:14px;display:grid;grid-template-columns:minmax(160px,1fr) 120px 140px;gap:8px;">
-          <input id="xinyaoRoomSearch" value="${esc(ui.search)}" placeholder="搜尋房號 / roomId" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid #efccdc;border-radius:12px;outline:none;">
-          <select id="xinyaoRoomStatus" style="padding:10px;border:1px solid #efccdc;border-radius:12px;background:#fff;">
-            <option value="All" ${ui.status === 'All' ? 'selected' : ''}>全部狀態</option>
-            <option value="Empty" ${ui.status === 'Empty' ? 'selected' : ''}>空房</option>
-            <option value="Full" ${ui.status === 'Full' ? 'selected' : ''}>使用中</option>
-            <option value="Locked" ${ui.status === 'Locked' ? 'selected' : ''}>鎖定</option>
-          </select>
-          <select id="xinyaoRoomSort" style="padding:10px;border:1px solid #efccdc;border-radius:12px;background:#fff;">
-            <option value="score" ${ui.sort === 'score' ? 'selected' : ''}>觀察分數</option>
-            <option value="number" ${ui.sort === 'number' ? 'selected' : ''}>房號</option>
-            <option value="today" ${ui.sort === 'today' ? 'selected' : ''}>今日得分率</option>
-            <option value="total" ${ui.sort === 'total' ? 'selected' : ''}>累計得分率</option>
-            <option value="todayBet" ${ui.sort === 'todayBet' ? 'selected' : ''}>今日投注量</option>
-          </select>
-        </div>
-
-        <div style="margin-top:10px;overflow:auto;max-height:520px;border:1px solid #f1d9e4;border-radius:14px;">
-          <table class="xinyao-room-table">
-            <thead><tr><th>房號</th><th>狀態</th><th>今日率</th><th>累計率</th><th>今日投注</th><th>觀察分</th></tr></thead>
-            <tbody>${rowsHtml}</tbody>
-          </table>
-        </div>
-
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:#8f7480;">
-          <span>符合 ${filtered.length} 房｜第 ${ui.page} / ${totalPages} 頁</span>
-          <div style="display:flex;gap:7px;">
-            <button id="xinyaoRoomPrev" type="button" style="border:1px solid #efccdc;background:#fff;border-radius:10px;padding:8px 11px;cursor:pointer;">上一頁</button>
-            <button id="xinyaoRoomNext" type="button" style="border:1px solid #efccdc;background:#fff;border-radius:10px;padding:8px 11px;cursor:pointer;">下一頁</button>
-          </div>
-        </div>
-      </div>`;
-  }
-
-  window.addEventListener('message', event => {
-    if (event.origin !== ATG_ORIGIN) return;
-    if (event.data?.type !== SNAPSHOT_TYPE) return;
-    saveSnapshot(event.data);
-    if (new URLSearchParams(location.search).get('atgRooms') === '1') setActive();
-  });
-
-  function start() {
-    if (injectUi()) return;
-    const timer = setInterval(() => {
-      if (injectUi()) clearInterval(timer);
-    }, 500);
-    setTimeout(() => clearInterval(timer), 20000);
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
-  else start();
 })();
