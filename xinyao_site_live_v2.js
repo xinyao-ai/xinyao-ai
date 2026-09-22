@@ -8,7 +8,7 @@
     'https://xinyao-atg-live.love06130430.workers.dev';
 
   const SCRIPT_URL =
-    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=310';
+    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=312';
 
   const GUIDE_IMAGES = {
     ios: './xinyao_guide_ios.png?v=203',
@@ -2832,8 +2832,11 @@
   window.__XIANYAO_SITE_ROOM_RECOMMEND_V2__ = true;
 
   const SNAPSHOT_TYPE = 'XIANYAO_ATG_ROOM_SNAPSHOT_V1';
+  const SYNC_READY_TYPE = 'XIANYAO_ATG_SYNC_READY_V1';
+  const SYNC_ACK_TYPE = 'XIANYAO_ATG_SYNC_ACK_V1';
   const STORAGE_KEY = 'xinyao_atg_room_snapshot_v1';
   const ATG_ORIGIN = 'https://play.godeebxp.com';
+  let receivedSyncThisLoad = false;
 
   const ui = { search: '', status: 'All', sort: 'score' };
   let snapshot = null;
@@ -3082,10 +3085,36 @@
     if (event.origin !== ATG_ORIGIN) return;
     if (event.data?.type !== SNAPSHOT_TYPE) return;
     saveSnapshot(event.data);
+    receivedSyncThisLoad = true;
     setActive();
+    try {
+      event.source?.postMessage({
+        type: SYNC_ACK_TYPE,
+        rooms: Array.isArray(event.data?.rooms) ? event.data.rooms.length : 0
+      }, event.origin);
+    } catch (_) {}
   });
 
+  function requestSnapshotFromOpener() {
+    if (new URLSearchParams(location.search).get('atgRooms') !== '1') return;
+    let tries = 0;
+    const ping = () => {
+      if (receivedSyncThisLoad) return true;
+      tries += 1;
+      try {
+        window.opener?.postMessage({ type: SYNC_READY_TYPE }, ATG_ORIGIN);
+      } catch (_) {}
+      return tries >= 40;
+    };
+    if (ping()) return;
+    const timer = setInterval(() => {
+      if (ping()) clearInterval(timer);
+    }, 350);
+    setTimeout(() => clearInterval(timer), 15000);
+  }
+
   function start() {
+    requestSnapshotFromOpener();
     if (injectUi()) return;
     const timer = setInterval(() => { if (injectUi()) clearInterval(timer); }, 300);
     setTimeout(() => clearInterval(timer), 20000);
