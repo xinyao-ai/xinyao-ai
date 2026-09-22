@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      2.2.1
+// @version      2.2.2
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -870,7 +870,7 @@
 })();
 
 
-/* ===== 芯瑤 ATG 全房分析 v2.1.3｜配對成功後自動顯示 ===== */
+/* ===== 芯瑤 ATG 全房分析 v2.1.4｜配對成功後自動顯示 ===== */
 (() => {
   'use strict';
 
@@ -1048,7 +1048,32 @@
     return [0, -step * 0.4, step * 0.4, -step * 0.8, step * 0.8, -step * 1.2, step * 1.2];
   }
 
-  const SCRIPT_VERSION = '2.1.3';
+  function pageNumberFromText(text) {
+    const value = String(text ?? '').trim();
+    return /^[1-9]$/.test(value) ? Number(value) : null;
+  }
+
+  function upsertCalibrationSample(samples, page, x, y) {
+    const p = pageNumberFromText(page);
+    const nx = finiteNumber(x);
+    const ny = finiteNumber(y);
+    const list = Array.isArray(samples) ? samples.slice() : [];
+    if (p === null || nx === null || ny === null) return list;
+    const next = list.filter(sample => finiteNumber(sample?.page) !== p);
+    next.push({ page: p, x: nx, y: ny });
+    return next;
+  }
+
+  function resolveTrackedPage(metaPage, intentPage, previousPage, preferClickedPage = false) {
+    const intended = finiteNumber(intentPage);
+    const previous = finiteNumber(previousPage);
+    const meta = finiteNumber(metaPage);
+    if (intended !== null) return intended;
+    if (preferClickedPage && previous !== null) return previous;
+    return meta;
+  }
+
+  const SCRIPT_VERSION = '2.1.4';
 
   function getVersion() {
     return SCRIPT_VERSION;
@@ -1114,6 +1139,9 @@
     pagePoint,
     correctPageClickX,
     buildProbeOffsets,
+    pageNumberFromText,
+    upsertCalibrationSample,
+    resolveTrackedPage,
     buildSyncPayload
   };
 
@@ -1151,6 +1179,8 @@
     tablePerPage: 0,
     totalPages: 0,
     currentPage: null,
+    pageIntent: null,
+    preferClickedPage: false,
     events: [],
     lastSource: '等待資料',
     pageLoadSeq: 0,
@@ -1172,6 +1202,34 @@
     autoTimer: null,
     renderTimer: null
   };
+
+  function setPageIntent(page) {
+    const p = finiteNumber(page);
+    if (p === null || p < 1 || p > 9) return null;
+    state.pageIntent = { page: p, ts: Date.now() };
+    state.preferClickedPage = true;
+    return p;
+  }
+
+  function freshPageIntent(maxAge = 6000) {
+    const intent = state.pageIntent;
+    if (!intent) return null;
+    if (Date.now() - Number(intent.ts || 0) > maxAge) {
+      state.pageIntent = null;
+      return null;
+    }
+    return intent;
+  }
+
+  function clickedPageFromTarget(target) {
+    let el = target && target.nodeType === 1 ? target : target?.parentElement;
+    for (let depth = 0; el && depth < 5; depth++, el = el.parentElement) {
+      if (el.closest?.('#xinyao-atg-room-scanner,#xinyao-room-mini,#xinyao-copy-modal')) return null;
+      const page = pageNumberFromText(el.textContent);
+      if (page !== null) return page;
+    }
+    return null;
+  }
 
   const now = () => new Date().toLocaleTimeString('zh-TW', {
     hour12: false,
@@ -1212,7 +1270,7 @@
     state.calibrationPendingPointer = null;
     state.calibrationThenScan = thenScan;
     state.scanError = '';
-    state.scanMessage = '🧭 校準中 0/2：請先手動點第 1 頁，再點第 9 頁。';
+    state.scanMessage = '🧭 校準中 0/2：請手動點兩個不同頁碼（建議 2 → 9）。';
     scheduleRender();
   }
 
@@ -1238,11 +1296,34 @@
     const target = event.target;
     if (target?.closest?.('#xinyao-atg-room-scanner,#xinyao-room-mini,#xinyao-copy-modal')) return;
     if (!window.innerWidth || !window.innerHeight) return;
-    state.calibrationPendingPointer = {
+
+    const pointer = {
       x: event.clientX / window.innerWidth,
       y: event.clientY / window.innerHeight,
       ts: Date.now()
     };
+    state.calibrationPendingPointer = pointer;
+
+    // 部分裝置的 tableMeta.currentPage 會停在舊頁。
+    // 校準直接採用使用者實際點到的頁碼，不再等待 meta.currentPage 變化。
+    const clickedPage = clickedPageFromTarget(target);
+    if (clickedPage !== null) {
+      setPageIntent(clickedPage);
+      state.calibrationSamples = upsertCalibrationSample(
+        state.calibrationSamples,
+        clickedPage,
+        pointer.x,
+        pointer.y
+      );
+      state.calibrationPendingPointer = null;
+
+      const pages = state.calibrationSamples.map(sample => sample.page).sort((a, b) => a - b);
+      state.scanMessage = pages.length === 1
+        ? `🧭 校準中 1/2：已記錄第 ${pages[0]} 頁，請再點另一個不同頁碼（建議第 9 頁）`
+        : `🧭 已記錄頁碼 ${pages.join('、')}`;
+      finishPageCalibrationIfReady();
+      scheduleRender();
+    }
   }
 
   document.addEventListener('pointerdown', captureCalibrationPointer, true);
@@ -1347,11 +1428,18 @@
 
     const previousPage = finiteNumber(state.currentPage);
     const totalTableCount = finiteNumber(meta.totalTableCount);
-    const currentPage = finiteNumber(meta.currentPage);
+    const metaCurrentPage = finiteNumber(meta.currentPage);
+    const intent = freshPageIntent();
+    const currentPage = resolveTrackedPage(
+      metaCurrentPage,
+      intent?.page ?? null,
+      previousPage,
+      state.preferClickedPage
+    );
     const tablePerPage = finiteNumber(meta.tablePerPage);
     const totalPages = finiteNumber(meta.totalPages);
 
-    if ([totalTableCount, currentPage, tablePerPage, totalPages].every(v => v === null)) return false;
+    if ([totalTableCount, metaCurrentPage, tablePerPage, totalPages].every(v => v === null)) return false;
 
     if (totalTableCount !== null) state.totalTableCount = totalTableCount;
     if (tablePerPage !== null) state.tablePerPage = tablePerPage;
@@ -1406,13 +1494,22 @@
       let count = 0;
       for (const room of tables) if (upsertRoom(room, `${source}:tables`)) count++;
       if (count) {
+        const intent = freshPageIntent();
+        if (intent) {
+          state.currentPage = intent.page;
+          state.pagesSeen.add(intent.page);
+        }
+
         state.pageLoadSeq++;
         if (finiteNumber(state.currentPage) !== null) state.dataPagesSeen.add(state.currentPage);
+
         recordEvent('tableList', {
           count,
           currentPage: state.currentPage,
           roomsKnown: numberedCount()
         });
+
+        if (intent) state.pageIntent = null;
       }
     }
 
@@ -1653,6 +1750,7 @@
   function dispatchPagePoint(page, xOverride = null) {
     const point = pagePoint(state.pageCalibration, page);
     if (!point) return false;
+    setPageIntent(page);
     return dispatchNormalizedPoint(xOverride ?? point.x, point.y);
   }
 
@@ -1688,7 +1786,11 @@ const current = finiteNumber(state.currentPage);
     if (btn) {
       const beforeSeq = state.pageLoadSeq;
       const beforePage = finiteNumber(state.currentPage);
-      try { btn.click(); } catch { return false; }
+      setPageIntent(page);
+      try { btn.click(); } catch {
+        state.pageIntent = null;
+        return false;
+      }
       const outcome = await waitForPageOutcome(page, beforeSeq, beforePage, 3200);
       if (outcome.ok) return true;
     }
@@ -2244,7 +2346,7 @@ const current = finiteNumber(state.currentPage);
         <button id="xinyao-expand" style="${secondaryButtonStyle()}">${ui.expanded ? '收合分析' : '完整分析'}</button>
         <button id="xinyao-sync-site" style="${buttonStyle('grid-column:1 / -1;')}">🌸 同步到芯瑤</button>
         <button id="xinyao-calibrate" style="${secondaryButtonStyle('grid-column:1 / -1;')}">${state.calibrationActive
-          ? `校準中 ${state.calibrationSamples.length}/2｜請點 1 → 9`
+          ? `校準中 ${state.calibrationSamples.length}/2｜請點兩個頁碼`
           : (state.pageCalibration ? '重新校準頁碼' : '校準頁碼位置')}</button>
       </div>
 
