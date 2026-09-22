@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 全房分析
 // @namespace    xinyao-atg-room-scanner
-// @version      2.1.2
+// @version      2.1.3
 // @description  一鍵掃描 ATG 全房、整理房號統計，並可將非敏感房號快照同步到芯瑤 ATG AI助手。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -171,7 +171,22 @@
     return { x: x + stepX * (p - 1), y };
   }
 
-  const SCRIPT_VERSION = '2.1.2';
+
+  function correctPageClickX(clickedX, targetPage, landedPage, stepX) {
+    const x = finiteNumber(clickedX);
+    const target = finiteNumber(targetPage);
+    const landed = finiteNumber(landedPage);
+    const step = finiteNumber(stepX);
+    if (x === null || target === null || landed === null || step === null || step === 0) return x;
+    return clamp(x + (target - landed) * step, 0.01, 0.99);
+  }
+
+  function buildProbeOffsets(stepX) {
+    const step = Math.abs(finiteNumber(stepX) || 0.04);
+    return [0, -step * 0.4, step * 0.4, -step * 0.8, step * 0.8, -step * 1.2, step * 1.2];
+  }
+
+  const SCRIPT_VERSION = '2.1.3';
 
   function getVersion() {
     return SCRIPT_VERSION;
@@ -235,6 +250,8 @@
     resolvePanelAction,
     buildPageCalibration,
     pagePoint,
+    correctPageClickX,
+    buildProbeOffsets,
     buildSyncPayload
   };
 
@@ -750,11 +767,9 @@
     return out;
   }
 
-  function dispatchPagePoint(page) {
-    const point = pagePoint(state.pageCalibration, page);
-    if (!point) return false;
-    const x = Math.round(point.x * window.innerWidth);
-    const y = Math.round(point.y * window.innerHeight);
+  function dispatchNormalizedPoint(xNorm, yNorm) {
+    const x = Math.round(clamp(xNorm, 0.01, 0.99) * window.innerWidth);
+    const y = Math.round(clamp(yNorm, 0.01, 0.99) * window.innerHeight);
     if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) return false;
     const target = document.elementFromPoint(x, y);
     if (!target) return false;
@@ -773,32 +788,84 @@
     return true;
   }
 
-  function goToPage(page) {
-    const pager = findPagerButtons();
-    const btn = pager?.get(page);
-    if (btn) {
-      try { btn.click(); return true; } catch {}
-    }
-    if (state.pageCalibration) return dispatchPagePoint(page);
-    return false;
+  function dispatchPagePoint(page, xOverride = null) {
+    const point = pagePoint(state.pageCalibration, page);
+    if (!point) return false;
+    return dispatchNormalizedPoint(xOverride ?? point.x, point.y);
   }
 
-  function waitForPage(page, beforeSeq, timeout = 8000) {
+  function waitForPageOutcome(targetPage, beforeSeq, beforePage, timeout = 1800) {
     return new Promise(resolve => {
       const started = Date.now();
       const timer = setInterval(() => {
-        const ok = state.currentPage === page && state.pageLoadSeq > beforeSeq && state.dataPagesSeen.has(page);
-        if (ok) {
+        const current = finiteNumber(state.currentPage);
+        const seqChanged = state.pageLoadSeq > beforeSeq;
+        if (current === targetPage && seqChanged && state.dataPagesSeen.has(targetPage)) {
           clearInterval(timer);
-          resolve(true);
+          resolve({ ok: true, landedPage: current, changed: true });
+          return;
+        }
+        if (seqChanged && current !== null && current !== beforePage) {
+          clearInterval(timer);
+          resolve({ ok: false, landedPage: current, changed: true });
           return;
         }
         if (state.scanAbort || Date.now() - started > timeout) {
           clearInterval(timer);
-          resolve(false);
+          resolve({ ok: false, landedPage: current, changed: false });
         }
-      }, 100);
+      }, 80);
     });
+  }
+
+  async function navigateToPageAdaptive(page, totalPages) {
+    if (finiteNumber(state.currentPage) === page && state.dataPagesSeen.has(page)) return true;
+
+    const pager = findPagerButtons();
+    const btn = pager?.get(page);
+    if (btn) {
+      const beforeSeq = state.pageLoadSeq;
+      const beforePage = finiteNumber(state.currentPage);
+      try { btn.click(); } catch { return false; }
+      const outcome = await waitForPageOutcome(page, beforeSeq, beforePage, 3200);
+      if (outcome.ok) return true;
+    }
+
+    const calibration = state.pageCalibration;
+    const point = pagePoint(calibration, page);
+    if (!calibration || !point) return false;
+
+    const stepX = finiteNumber(calibration.stepX) || 0.05;
+    const probes = buildProbeOffsets(stepX);
+    let learnedX = null;
+
+    for (const offset of probes) {
+      if (state.scanAbort) return false;
+      const candidateX = clamp((learnedX ?? point.x) + offset, 0.01, 0.99);
+      const beforeSeq = state.pageLoadSeq;
+      const beforePage = finiteNumber(state.currentPage);
+      if (!dispatchPagePoint(page, candidateX)) continue;
+      const outcome = await waitForPageOutcome(page, beforeSeq, beforePage, 1600);
+      if (outcome.ok) return true;
+
+      if (outcome.changed && finiteNumber(outcome.landedPage) !== null) {
+        const correctedX = correctPageClickX(candidateX, page, outcome.landedPage, stepX);
+        if (correctedX !== null && Math.abs(correctedX - candidateX) > 0.002) {
+          learnedX = correctedX;
+          const seq2 = state.pageLoadSeq;
+          const page2 = finiteNumber(state.currentPage);
+          if (dispatchPagePoint(page, correctedX)) {
+            const correctedOutcome = await waitForPageOutcome(page, seq2, page2, 1900);
+            if (correctedOutcome.ok) return true;
+            if (correctedOutcome.changed && finiteNumber(correctedOutcome.landedPage) !== null) {
+              learnedX = correctPageClickX(correctedX, page, correctedOutcome.landedPage, stepX);
+            }
+          }
+        }
+      }
+    }
+
+    return false;
   }
 
   async function scanAllPages({ auto = false } = {}) {
@@ -833,18 +900,12 @@
 
     for (const page of sequence) {
       if (state.scanAbort) break;
-      const beforeSeq = state.pageLoadSeq;
       state.scanMessage = `掃描第 ${page} / ${totalPages} 頁…`;
       scheduleRender();
 
-      const moved = goToPage(page);
-      if (!moved) {
-        state.scanError = `無法切換到第 ${page} 頁，請按「重新校準頁碼」。`;
-        break;
-      }
-      const loaded = await waitForPage(page, beforeSeq, 8000);
+      const loaded = await navigateToPageAdaptive(page, totalPages);
       if (!loaded) {
-        state.scanError = `第 ${page} 頁未自動切換，請按「重新校準頁碼」後再試。`;
+        state.scanError = `第 ${page} 頁自動切換失敗；已嘗試自動修正位置。請保持「選擇機台」畫面開啟後再試一次。`;
         break;
       }
       state.scanVisited.add(page);
