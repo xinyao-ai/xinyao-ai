@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      2.5.0
+// @version      2.6.0
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -870,7 +870,7 @@
 })();
 
 
-/* ===== 芯瑤 ATG 全房分析 v2.5.0｜免 DOM 一鍵掃描 ===== */
+/* ===== 芯瑤 ATG 全房分析 v2.6.0｜固定版型一鍵掃描 ===== */
 (() => {
   'use strict';
 
@@ -2035,61 +2035,91 @@
     return out.sort((a, b) => b.area - a.area).slice(0, 4);
   }
 
-  function autoPagerProfiles() {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const rects = [
-      { key: 'viewport', left: 0, top: 0, width: vw, height: vh },
-      ...visibleCanvasRects().map((r, i) => ({ key: `canvas${i}`, ...r }))
-    ];
+  function fixedPagerProfile() {
+    const vw = Math.max(1, window.innerWidth);
+    const vh = Math.max(1, window.innerHeight);
+    const canvases = visibleCanvasRects()
+      .filter(r => r.height >= vh * 0.58 && r.width >= vw * 0.26);
 
-    const unique = new Map();
-    for (const rect of rects) {
-      if (!rect.width || !rect.height) continue;
+    // ATG 有兩種實際選房版型：
+    // 1) 寬版：1～9 橫跨整個遊戲畫面。
+    // 2) 直式置中版：遊戲畫布在中央，左右是延伸背景。
+    // 直接依可見主 Canvas 的外觀比例選版型，不再用「試點某頁」做定位。
+    const portrait = canvases
+      .filter(r => (r.width / Math.max(1, r.height)) >= 0.45 && (r.width / Math.max(1, r.height)) <= 0.88)
+      .sort((a, b) => b.area - a.area)[0];
 
-      // 橫版 ATG（目前桌面版）：依實際 1～9 列位置量測。
-      const wide = {
-        key: `${rect.key}:wide`,
-        rect,
-        x0: 0.1567,
-        step: 0.05645,
-        y: 0.2120
-      };
-
-      // 窄版／置中直式 ATG：沿用昨天正常版的 9:16 遊戲內容比例。
-      const portrait = {
-        key: `${rect.key}:portrait`,
-        rect,
+    if (portrait) {
+      return {
+        key: 'portrait-canvas',
+        layout: '直式',
+        target: portrait.el,
+        rect: portrait,
+        // 由 ATG 直式選房畫面實際 1～9 中心位置量測。
         x0: 0.0520,
         step: 0.0990,
-        y: 0.1810
+        y: 0.1810,
+        showAllX: 0.4430,
+        showAllY: 0.1470
       };
-
-      for (const profile of [wide, portrait]) {
-        const sig = [
-          Math.round(profile.rect.left), Math.round(profile.rect.top),
-          Math.round(profile.rect.width), Math.round(profile.rect.height),
-          profile.x0, profile.step, profile.y
-        ].join(':');
-        if (!unique.has(sig)) unique.set(sig, profile);
-      }
     }
-    return [...unique.values()];
+
+    const wide = canvases
+      .filter(r => (r.width / Math.max(1, r.height)) > 1.05)
+      .sort((a, b) => b.area - a.area)[0];
+
+    if (wide) {
+      return {
+        key: 'wide-canvas',
+        layout: '寬版',
+        target: wide.el,
+        rect: wide,
+        // 由 ATG 寬版選房畫面實際 1～9 中心位置量測。
+        x0: 0.1567,
+        step: 0.05645,
+        y: 0.2065,
+        showAllX: 0.2120,
+        showAllY: 0.1310
+      };
+    }
+
+    // 看不到 Canvas 時仍以目前 ATG 寬版 viewport 版型執行。
+    return {
+      key: 'wide-viewport',
+      layout: '寬版',
+      target: null,
+      rect: { left: 0, top: 0, width: vw, height: vh },
+      x0: 0.1567,
+      step: 0.05645,
+      y: 0.2065,
+      showAllX: 0.2120,
+      showAllY: 0.1310
+    };
   }
 
-  function pointForAutoProfile(profile, page) {
+  function pointForFixedProfile(profile, page) {
     const p = finiteNumber(page);
     if (!profile || p === null || p < 1 || p > 9) return null;
     const r = profile.rect;
-    const x = r.left + r.width * (profile.x0 + (p - 1) * profile.step);
-    const y = r.top + r.height * profile.y;
-    return { x, y };
+    return {
+      x: r.left + r.width * (profile.x0 + (p - 1) * profile.step),
+      y: r.top + r.height * profile.y
+    };
   }
 
-  function dispatchClientPoint(x, y) {
+  function filterPointForFixedProfile(profile) {
+    if (!profile) return null;
+    const r = profile.rect;
+    return {
+      x: r.left + r.width * profile.showAllX,
+      y: r.top + r.height * profile.showAllY
+    };
+  }
+
+  function dispatchClientPoint(x, y, targetOverride = null) {
     if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
     if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) return false;
-    const target = document.elementFromPoint(Math.round(x), Math.round(y));
+    const target = targetOverride || document.elementFromPoint(Math.round(x), Math.round(y));
     if (!target) return false;
 
     const init = {
@@ -2098,6 +2128,7 @@
       screenX: Math.round(x), screenY: Math.round(y),
       pointerId: 1, pointerType: 'mouse', isPrimary: true, button: 0
     };
+
     try { target.dispatchEvent(new PointerEvent('pointermove', { ...init, buttons: 0 })); } catch (_) {}
     try { target.dispatchEvent(new PointerEvent('pointerdown', { ...init, buttons: 1 })); } catch (_) {}
     try { target.dispatchEvent(new MouseEvent('mousedown', { ...init, buttons: 1 })); } catch (_) {}
@@ -2107,114 +2138,108 @@
     return true;
   }
 
-  function waitForTargetPage(targetPage, beforeSeq, timeout = 2200) {
+  function roomBandCount(page) {
+    const p = finiteNumber(page);
+    if (p === null || p < 1 || p > 9) return 0;
+    const min = (p - 1) * 500 + 1;
+    const max = p === 9 ? 4100 : p * 500;
+    let count = 0;
+    for (const room of state.roomMap.values()) {
+      const n = finiteNumber(room?.number);
+      if (n !== null && n >= min && n <= max) count++;
+    }
+    return count;
+  }
+
+  function waitForBandToSettle(page, beforeBand, timeout = 2200) {
     return new Promise(resolve => {
       const started = Date.now();
+      let lastCount = roomBandCount(page);
+      let lastChangeAt = started;
+      let everChanged = lastCount > beforeBand;
+
       const timer = setInterval(() => {
-        const inferred = finiteNumber(state.latestInferredPage);
-        const seqChanged = state.pageLoadSeq > beforeSeq;
-        if (seqChanged && inferred === targetPage) {
+        const nowTs = Date.now();
+        const count = roomBandCount(page);
+        if (count !== lastCount) {
+          lastCount = count;
+          lastChangeAt = nowTs;
+          if (count > beforeBand) everChanged = true;
+        }
+
+        // 收到該頁資料後，連續 450ms 沒再增加就進下一頁。
+        if (everChanged && nowTs - lastChangeAt >= 450) {
           clearInterval(timer);
-          resolve(true);
+          resolve({ changed: true, count });
           return;
         }
-        if (state.scanAbort || Date.now() - started >= timeout) {
+
+        // 已經有舊資料的頁面不用卡太久；仍固定留時間給 ATG 回傳刷新資料。
+        if (!everChanged && beforeBand > 0 && nowTs - started >= 900) {
           clearInterval(timer);
-          resolve(false);
+          resolve({ changed: false, count });
+          return;
         }
-      }, 80);
+
+        if (state.scanAbort || nowTs - started >= timeout) {
+          clearInterval(timer);
+          resolve({ changed: everChanged, count });
+        }
+      }, 90);
     });
   }
 
-  async function tryAutoProfile(profile, targetPage, timeout = 2000) {
-    const point = pointForAutoProfile(profile, targetPage);
-    if (!point) return false;
-    const beforeSeq = state.pageLoadSeq;
-    setPageIntent(targetPage);
-    if (!dispatchClientPoint(point.x, point.y)) {
-      state.pageIntent = null;
-      return false;
-    }
-    const ok = await waitForTargetPage(targetPage, beforeSeq, timeout);
-    state.pageIntent = null;
-    if (ok) {
-      state.autoPagerProfile = {
-        key: profile.key,
-        // 存成 viewport 比例，後續頁面即使重新 render 也可繼續使用。
-        left: profile.rect.left / window.innerWidth,
-        top: profile.rect.top / window.innerHeight,
-        width: profile.rect.width / window.innerWidth,
-        height: profile.rect.height / window.innerHeight,
-        x0: profile.x0,
-        step: profile.step,
-        y: profile.y
-      };
-    }
-    return ok;
-  }
-
-  function hydratedAutoProfile() {
-    const p = state.autoPagerProfile;
-    if (!p) return null;
-    return {
-      key: p.key,
-      rect: {
-        left: p.left * window.innerWidth,
-        top: p.top * window.innerHeight,
-        width: p.width * window.innerWidth,
-        height: p.height * window.innerHeight
-      },
-      x0: p.x0,
-      step: p.step,
-      y: p.y
-    };
-  }
-
-  async function discoverAutoPagerProfile() {
-    const current = finiteNumber(state.latestInferredPage);
-    const targets = current === 1 ? [2, 9] : current === 9 ? [8, 1] : [1, 9, 2];
-
-    for (const targetPage of targets) {
-      for (const profile of autoPagerProfiles()) {
-        if (state.scanAbort) return null;
-        state.scanMessage = `🤖 自動定位翻頁｜測試第 ${targetPage} 頁…`;
-        scheduleRender();
-        if (await tryAutoProfile(profile, targetPage, 1700)) return hydratedAutoProfile();
-        await delay(120);
+  function deepClickableByText(text) {
+    for (const root of collectDeepRoots()) {
+      let nodes = [];
+      try { nodes = [...root.querySelectorAll('button,[role="button"],a,div,span')]; } catch (_) {}
+      for (const el of nodes) {
+        try {
+          if (!isVisible(el)) continue;
+          if (String(el.textContent || '').trim() !== text) continue;
+          return el.closest?.('button,[role="button"],a') || el;
+        } catch (_) {}
       }
     }
     return null;
   }
 
-  async function clickCanvasPage(page) {
-    let profile = hydratedAutoProfile();
-    if (!profile) profile = await discoverAutoPagerProfile();
-    if (!profile) return false;
-
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const point = pointForAutoProfile(profile, page);
-      if (!point) return false;
-      const beforeSeq = state.pageLoadSeq;
-      setPageIntent(page);
-      dispatchClientPoint(point.x, point.y);
-      const ok = await waitForTargetPage(page, beforeSeq, attempt === 0 ? 2300 : 3200);
-      state.pageIntent = null;
-      if (ok) return true;
-      await delay(120);
+  async function ensureShowAll(profile) {
+    // 能抓到 DOM 時直接點文字；抓不到（Canvas）就用該版型「顯示全部」固定位置。
+    const dom = deepClickableByText('顯示全部');
+    if (dom) {
+      try { dom.click(); } catch (_) { clickPagerElement(dom); }
+      await delay(700);
+      return true;
     }
 
-    // 版型可能因縮放改變；清掉自動定位後重新找一次。
-    state.autoPagerProfile = null;
-    profile = await discoverAutoPagerProfile();
-    if (!profile) return false;
-    const point = pointForAutoProfile(profile, page);
+    const point = filterPointForFixedProfile(profile);
     if (!point) return false;
-    const beforeSeq = state.pageLoadSeq;
+    dispatchClientPoint(point.x, point.y, profile.target || null);
+    await delay(800);
+    return true;
+  }
+
+  async function clickFixedPage(profile, page) {
+    const point = pointForFixedProfile(profile, page);
+    if (!point) return false;
+    const beforeBand = roomBandCount(page);
     setPageIntent(page);
-    dispatchClientPoint(point.x, point.y);
-    const ok = await waitForTargetPage(page, beforeSeq, 3000);
+    const sent = dispatchClientPoint(point.x, point.y, profile.target || null);
+    if (!sent) {
+      state.pageIntent = null;
+      return false;
+    }
+    const result = await waitForBandToSettle(page, beforeBand, 2400);
     state.pageIntent = null;
-    return ok;
+    // 不再因 ATG 的 currentPage / inferredPage 偶發錯值重複亂點。
+    // 點擊已送出就繼續下一頁；room band 有增加時記為已成功取得該頁資料。
+    if (result.changed || result.count > 0) {
+      state.scanVisited.add(page);
+      state.pagesSeen.add(page);
+      state.dataPagesSeen.add(page);
+    }
+    return true;
   }
 
   function visibleRoomSignature() {
@@ -2322,80 +2347,51 @@
     state.scanAbort = false;
     state.scanVisited = new Set();
     state.scanError = '';
-    state.scanMessage = auto ? '自動刷新掃描中…' : '🤖 一鍵掃描中｜準備自動巡覽 1～9 頁';
+    state.scanMessage = auto ? '自動刷新掃描中…' : '🤖 一鍵掃描中｜準備巡覽 1～9 頁';
     scheduleRender();
 
-    const initialCount = numberedCount();
     const expected = state.totalTableCount || 4100;
     const pages = [1,2,3,4,5,6,7,8,9];
-    let domMode = Boolean(findPagerButtons());
+    const profile = fixedPagerProfile();
 
-    // 若 ATG 把頁碼畫在 Canvas / Shadow DOM，第一次就自動找畫布座標，不要求人工校準。
-    if (!domMode) {
-      state.scanMessage = '🤖 ATG 頁碼為遊戲畫布｜正在自動定位，不需手動校準…';
-      scheduleRender();
-      const profile = await discoverAutoPagerProfile();
-      if (!profile) {
-        state.scanRunning = false;
-        state.scanError = 'ATG 自動翻頁定位未成功。請保持「選擇機台」完整顯示，且瀏覽器縮放先設為 100% 後再按一次。';
-        scheduleRender();
-        return;
-      }
-    }
+    // 4100 房掃描一定先切「顯示全部」，避免只拿到空桌子集合。
+    state.scanMessage = `🤖 ${profile.layout}模式｜正在切換「顯示全部」…`;
+    scheduleRender();
+    await ensureShowAll(profile);
 
+    // 第一輪：固定 1 → 9，只點一次，不做錯誤定位重試。
     for (const page of pages) {
       if (state.scanAbort) break;
-      if (numberedCount() >= expected) break;
-
-      state.scanMessage = `🤖 自動掃描第 ${page} / 9 頁｜已抓 ${numberedCount()} / ${expected}`;
+      state.scanMessage = `🤖 ${profile.layout}一鍵掃描｜第 ${page} / 9 頁｜已抓 ${numberedCount()} / ${expected}`;
       scheduleRender();
-
-      let ok = false;
-      if (domMode) {
-        const pager = findPagerButtons();
-        const btn = pager?.get(page);
-        if (btn) {
-          const beforeSeq = state.pageLoadSeq;
-          setPageIntent(page);
-          clickPagerElement(btn);
-          ok = await waitForTargetPage(page, beforeSeq, 3000);
-          state.pageIntent = null;
-        } else {
-          domMode = false;
-        }
-      }
-
-      if (!domMode && !ok) ok = await clickCanvasPage(page);
-      if (ok) state.scanVisited.add(page);
-      await delay(180);
+      await clickFixedPage(profile, page);
+      await delay(120);
     }
 
-    // 第二輪只補沒成功取得的頁，避免偶發封包延遲造成缺頁。
-    if (!state.scanAbort && numberedCount() < expected) {
-      for (const page of pages) {
-        if (state.scanAbort || numberedCount() >= expected) break;
-        if (state.scanVisited.has(page)) continue;
+    // 第二輪只補該房號區間完全沒有資料的頁面；不會在 1、8 之間做定位測試。
+    if (!state.scanAbort) {
+      const missing = pages.filter(page => roomBandCount(page) === 0);
+      for (const page of missing) {
+        if (state.scanAbort) break;
         state.scanMessage = `🤖 補掃第 ${page} / 9 頁｜已抓 ${numberedCount()} / ${expected}`;
         scheduleRender();
-        const ok = await clickCanvasPage(page);
-        if (ok) state.scanVisited.add(page);
-        await delay(220);
+        await clickFixedPage(profile, page);
+        await delay(180);
       }
     }
 
     state.scanRunning = false;
     const count = numberedCount();
+    const covered = pages.filter(page => roomBandCount(page) > 0);
 
     if (state.scanAbort) {
       state.scanMessage = `已停止｜目前 ${count} / ${expected}`;
-    } else if (count >= expected || state.scanVisited.size >= 9) {
+    } else if (covered.length === 9) {
       state.scanError = '';
-      state.scanMessage = `✅ 全房掃描完成｜${count} / ${expected}`;
-    } else if (count > initialCount) {
-      state.scanError = '';
-      state.scanMessage = `掃描完成｜目前 ${count} / ${expected}｜已完成 ${state.scanVisited.size}/9 頁`;
+      state.scanMessage = `✅ 已巡覽 1～9 全頁｜目前抓到 ${count} / ${expected}`;
     } else {
-      state.scanError = '自動翻頁已執行，但尚未收到新的 ATG 房間資料。請關閉再重新開啟「選擇機台」後按一次。';
+      state.scanError = `已巡覽完成，但第 ${pages.filter(p => !covered.includes(p)).join('、')} 頁尚未收到房號資料。`;
+      state.scanMessage = `掃描結束｜目前 ${count} / ${expected}`;
     }
     scheduleRender();
   }
@@ -2415,7 +2411,7 @@
     }
     if (minutes > 0) {
       state.autoTimer = setInterval(() => {
-        if (!state.scanRunning && findPagerButtons()) scanAllPages({ auto: true });
+        if (!state.scanRunning) scanAllPages({ auto: true });
       }, minutes * 60 * 1000);
     }
     scheduleRender();
