@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.0.1
+// @version      3.1.0
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -883,7 +883,7 @@
 })();
 
 
-/* ===== 芯瑤 ATG 全房分析 v2.8.0｜共用攔截層一鍵掃描 ===== */
+/* ===== 芯瑤 ATG 全房分析 v3.1.0｜全裝置自適應一鍵掃描 ===== */
 (() => {
   'use strict';
 
@@ -1070,62 +1070,119 @@
     return '';
   }
 
-  // 版型選擇只決定「去哪裡點」，不再決定資料是否成功。
-  // 窄版使用中央直式 Canvas；寬版固定用 viewport，避免誤抓到局部 WebGL canvas 而整排偏移。
-  function selectFixedPagerProfile(viewportWidth, viewportHeight, canvasRects = []) {
+  // ===== 全裝置自適應頁碼定位 =====
+  // 不再用「某一支手機 / 某一種解析度」寫死座標。
+  // 先從目前畫面挑出真正的遊戲 surface，再準備多組安全的頁碼列假設；
+  // 實際點擊後用 ATG 回來的房號區間判斷落在哪一頁，自動修正 X / Y 並記住。
+  function selectAdaptiveGameSurface(viewportWidth, viewportHeight, canvasRects = []) {
     const vw = Math.max(1, finiteNumber(viewportWidth) || 1);
     const vh = Math.max(1, finiteNumber(viewportHeight) || 1);
+    const viewportArea = vw * vh;
+
     const rows = (Array.isArray(canvasRects) ? canvasRects : [])
-      .map((r, index) => ({
-        index,
-        left: finiteNumber(r?.left) || 0,
-        top: finiteNumber(r?.top) || 0,
-        width: finiteNumber(r?.width) || 0,
-        height: finiteNumber(r?.height) || 0,
-        area: finiteNumber(r?.area) || ((finiteNumber(r?.width) || 0) * (finiteNumber(r?.height) || 0))
-      }))
-      .filter(r => r.width > 0 && r.height > 0);
-
-    const portrait = rows
-      .filter(r => {
-        const ratio = r.width / Math.max(1, r.height);
-        const widthRatio = r.width / vw;
-        const centerX = r.left + r.width / 2;
-        return ratio >= 0.40 &&
-          ratio <= 0.88 &&
-          widthRatio >= 0.22 &&
-          widthRatio <= 0.60 &&
-          r.height >= vh * 0.58 &&
-          Math.abs(centerX - vw / 2) <= vw * 0.16;
+      .map((r, index) => {
+        const left = finiteNumber(r?.left) || 0;
+        const top = finiteNumber(r?.top) || 0;
+        const width = finiteNumber(r?.width) || 0;
+        const height = finiteNumber(r?.height) || 0;
+        const area = finiteNumber(r?.area) || width * height;
+        const widthRatio = width / vw;
+        const heightRatio = height / vh;
+        const coverage = area / viewportArea;
+        const centerX = left + width / 2;
+        const centerY = top + height / 2;
+        const centerDistance = Math.hypot((centerX - vw / 2) / vw, (centerY - vh / 2) / vh);
+        return { index, left, top, width, height, area, widthRatio, heightRatio, coverage, centerDistance };
       })
-      .sort((a, b) => b.area - a.area)[0];
+      .filter(r => r.width >= Math.min(300, vw * 0.45) && r.height >= Math.min(260, vh * 0.45));
 
-    if (portrait) {
+    const ranked = rows
+      .filter(r => r.coverage >= 0.34 && r.widthRatio >= 0.45 && r.heightRatio >= 0.45)
+      .map(r => ({
+        ...r,
+        score: r.coverage * 6 + Math.min(r.widthRatio, 1) + Math.min(r.heightRatio, 1) - r.centerDistance * 2.5
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    const best = ranked[0];
+    if (best) {
       return {
-        key: 'portrait-canvas',
-        layout: '直式',
-        canvasIndex: portrait.index,
-        rect: portrait,
-        x0: 0.0520,
-        step: 0.0990,
-        y: 0.1810,
-        showAllX: 0.4430,
-        showAllY: 0.1470
+        source: 'canvas',
+        canvasIndex: best.index,
+        rect: {
+          left: best.left,
+          top: best.top,
+          width: best.width,
+          height: best.height,
+          area: best.area
+        }
       };
     }
 
     return {
-      key: 'wide-viewport',
-      layout: '寬版',
+      source: 'viewport',
       canvasIndex: -1,
-      rect: { left: 0, top: 0, width: vw, height: vh, area: vw * vh },
-      x0: 0.1567,
-      step: 0.05645,
-      // 2026-09-22 實機寬版：1202px 高時頁碼中心約 273px（0.227）。
-      // 舊值 0.2065 會點到頁碼列上方，造成畫面根本沒換頁。
-      y: 0.2270,
-      showAllX: 0.2120,
-      showAllY: 0.1560
+      rect: { left: 0, top: 0, width: vw, height: vh, area: viewportArea }
+    };
+  }
+
+  function buildAdaptivePagerHypotheses(rect, viewportWidth, viewportHeight) {
+    if (!rect) return [];
+    const width = Math.max(1, finiteNumber(rect.width) || 1);
+    const height = Math.max(1, finiteNumber(rect.height) || 1);
+    const ratio = width / height;
+    const vw = Math.max(1, finiteNumber(viewportWidth) || width);
+    const vh = Math.max(1, finiteNumber(viewportHeight) || height);
+    const viewportRatio = vw / vh;
+    const hypotheses = [];
+    const add = (id, x0, step, y, showAllX, showAllY) => {
+      const lastX = x0 + step * 8;
+      if (x0 <= 0.01 || step <= 0.015 || lastX >= 0.98 || y <= 0.08 || y >= 0.38) return;
+      hypotheses.push({ id, x0, step, y, showAllX, showAllY });
+    };
+
+    if (ratio >= 1.35 || viewportRatio >= 1.25) {
+      // 已驗證的兩種 ATG landscape 排版 + 中間值。
+      // 實際裝置若不是其中任何一種，後續 landing feedback 仍會自動修正。
+      add('landscape-compact', 0.1771, 0.0528, 0.1814, 0.2430, 0.1050);
+      add('landscape-wide',    0.0755, 0.0732, 0.2270, 0.1000, 0.1300);
+      add('landscape-mid',     0.1230, 0.0625, 0.2050, 0.1700, 0.1180);
+    } else if (ratio <= 0.90 || viewportRatio <= 0.85) {
+      add('portrait-main', 0.0520, 0.0990, 0.1810, 0.4430, 0.1470);
+      add('portrait-mid',  0.0700, 0.0910, 0.2050, 0.4300, 0.1500);
+      add('portrait-wide', 0.0950, 0.0820, 0.2300, 0.4150, 0.1600);
+    } else {
+      // 平板、分割畫面、特殊縮放比例。
+      add('balanced-a', 0.1050, 0.0740, 0.1900, 0.1900, 0.1250);
+      add('balanced-b', 0.1350, 0.0640, 0.2150, 0.2050, 0.1350);
+      add('balanced-c', 0.0700, 0.0830, 0.2350, 0.1750, 0.1450);
+    }
+
+    return hypotheses;
+  }
+
+  // 舊函式名稱保留，避免其他程式碼需要大改；但內部已是全裝置自適應。
+  function selectFixedPagerProfile(viewportWidth, viewportHeight, canvasRects = []) {
+    const vw = Math.max(1, finiteNumber(viewportWidth) || 1);
+    const vh = Math.max(1, finiteNumber(viewportHeight) || 1);
+    const surface = selectAdaptiveGameSurface(vw, vh, canvasRects);
+    const hypotheses = buildAdaptivePagerHypotheses(surface.rect, vw, vh);
+    const primary = hypotheses[0] || {
+      id: 'fallback', x0: 0.12, step: 0.07, y: 0.21, showAllX: 0.18, showAllY: 0.13
+    };
+    const aspect = surface.rect.width / Math.max(1, surface.rect.height);
+    const viewportAspect = vw / vh;
+    const layout = (aspect >= 1.35 || viewportAspect >= 1.25)
+      ? '橫版自適應'
+      : ((aspect <= 0.90 || viewportAspect <= 0.85) ? '直版自適應' : '平板自適應');
+    return {
+      key: 'adaptive-surface',
+      layout,
+      source: surface.source,
+      canvasIndex: surface.canvasIndex,
+      rect: surface.rect,
+      hypotheses,
+      ...primary
     };
   }
 
@@ -1380,7 +1437,7 @@
     return scored[0]?.ordered || [];
   }
 
-  const SCRIPT_VERSION = '3.0.0';
+  const SCRIPT_VERSION = '3.1.0';
 
   function getVersion() {
     return SCRIPT_VERSION;
@@ -1452,6 +1509,8 @@
     findZlibOffset,
     decodeBinaryFrameToText,
     markSharedHook,
+    selectAdaptiveGameSurface,
+    buildAdaptivePagerHypotheses,
     selectFixedPagerProfile,
     buildPagerYProbeList,
     buildScanSequence,
@@ -1510,6 +1569,9 @@
     pageIntent: null,
     preferClickedPage: false,
     learnedPagerY: null,
+    pagerSamples: [],
+    adaptivePagerCalibration: null,
+    pagerSurfaceSignature: '',
     events: [],
     lastSource: '等待資料',
     pageLoadSeq: 0,
@@ -2297,44 +2359,85 @@
     return out.sort((a, b) => b.area - a.area).slice(0, 4);
   }
 
+  function profileSurfaceSignature(profile) {
+    const r = profile?.rect;
+    if (!r) return '';
+    return [
+      profile.source || 'unknown',
+      Math.round(r.left), Math.round(r.top),
+      Math.round(r.width), Math.round(r.height),
+      Math.round(window.devicePixelRatio * 100) / 100
+    ].join(':');
+  }
+
+  function resetAdaptivePagerLearning() {
+    state.learnedPagerY = null;
+    state.pagerSamples = [];
+    state.adaptivePagerCalibration = null;
+  }
+
   function fixedPagerProfile() {
     const vw = Math.max(1, window.innerWidth);
     const vh = Math.max(1, window.innerHeight);
-    const canvases = visibleCanvasRects()
-      .filter(r => r.height >= vh * 0.58 && r.width >= vw * 0.20);
-
+    const canvases = visibleCanvasRects();
     const selected = selectFixedPagerProfile(vw, vh, canvases);
-    if (selected.key === 'portrait-canvas') {
-      const source = canvases[selected.canvasIndex];
-      return {
-        ...selected,
-        target: source?.el || null,
-        rect: source || selected.rect
-      };
-    }
-
-    return {
+    const source = selected.canvasIndex >= 0 ? canvases[selected.canvasIndex] : null;
+    const profile = {
       ...selected,
-      target: null
+      target: source?.el || null,
+      rect: source || selected.rect
     };
+
+    const signature = profileSurfaceSignature(profile);
+    if (state.pagerSurfaceSignature && state.pagerSurfaceSignature !== signature) {
+      resetAdaptivePagerLearning();
+    }
+    state.pagerSurfaceSignature = signature;
+    return profile;
   }
 
-  function pointForFixedProfile(profile, page) {
+  function activePagerCalibration(profile) {
+    if (!profile) return null;
+    if (state.adaptivePagerCalibration && state.pagerSurfaceSignature === profileSurfaceSignature(profile)) {
+      return state.adaptivePagerCalibration;
+    }
+    return null;
+  }
+
+  function pointForFixedProfile(profile, page, hypothesis = null, xOverrideRatio = null, yOverrideRatio = null) {
     const p = finiteNumber(page);
     if (!profile || p === null || p < 1 || p > 9) return null;
     const r = profile.rect;
+    const calibration = activePagerCalibration(profile);
+    let ratioPoint = calibration ? pagePoint(calibration, p) : null;
+    const h = hypothesis || profile.hypotheses?.[0] || profile;
+    if (!ratioPoint) {
+      ratioPoint = {
+        x: h.x0 + (p - 1) * h.step,
+        y: h.y
+      };
+    }
+    const xr = finiteNumber(xOverrideRatio) ?? ratioPoint.x;
+    const yr = finiteNumber(yOverrideRatio) ?? ratioPoint.y;
     return {
-      x: r.left + r.width * (profile.x0 + (p - 1) * profile.step),
-      y: r.top + r.height * profile.y
+      x: r.left + r.width * xr,
+      y: r.top + r.height * yr,
+      xRatio: xr,
+      yRatio: yr
     };
   }
 
   function filterPointForFixedProfile(profile) {
     if (!profile) return null;
     const r = profile.rect;
+    const calibration = activePagerCalibration(profile);
+    const h = profile.hypotheses?.[0] || profile;
+    // show-all 不需要精準到單一像素；用目前版型主假設，並限制在遊戲 surface 內。
+    const xRatio = h.showAllX ?? 0.18;
+    const yRatio = calibration?.y ? Math.max(0.08, calibration.y - 0.075) : (h.showAllY ?? 0.13);
     return {
-      x: r.left + r.width * profile.showAllX,
-      y: r.top + r.height * profile.showAllY
+      x: r.left + r.width * xRatio,
+      y: r.top + r.height * yRatio
     };
   }
 
@@ -2343,29 +2446,57 @@
     const values = [];
     const push = value => {
       const n = finiteNumber(value);
-      if (n === null || n < 0.10 || n > 0.40) return;
+      if (n === null || n < 0.10 || n > 0.34) return;
       if (!values.some(v => Math.abs(v - n) < 0.0005)) values.push(n);
     };
 
-    // 已學到的正確高度永遠優先；之後 1～9 都沿用，不需人工校準。
+    push(activePagerCalibration(profile)?.y);
     push(learnedY);
-    push(profile.y);
-
-    if (profile.key === 'wide-viewport') {
-      // 寬版只在頁碼列安全垂直範圍內自動探測。
-      // 這些點都位於「顯示全部」下方、房號格上方，不會去亂點房間。
-      push(0.2270);
-      push(0.2190);
-      push(0.2350);
-      push(0.2110);
-      push(0.2430);
-    } else {
-      // 直式版原本定位較穩，只在原高度附近小幅容錯。
-      push(profile.y - 0.0100);
-      push(profile.y + 0.0100);
+    for (const h of profile.hypotheses || []) {
+      push(h.y);
+      push(h.y - 0.012);
+      push(h.y + 0.012);
     }
-
+    // 最後才走通用安全帶，涵蓋瀏覽器縮放 / 平板分割畫面。
+    [0.165, 0.185, 0.205, 0.225, 0.245, 0.265].forEach(push);
     return values;
+  }
+
+  function rememberPagerSample(profile, page, xRatio, yRatio) {
+    const p = finiteNumber(page);
+    const xr = finiteNumber(xRatio);
+    const yr = finiteNumber(yRatio);
+    if (!profile || p === null || xr === null || yr === null) return;
+    state.pagerSamples = upsertCalibrationSample(state.pagerSamples, String(p), xr, yr);
+    const calibration = buildPageCalibration(state.pagerSamples);
+    if (calibration) state.adaptivePagerCalibration = calibration;
+    state.learnedPagerY = yr;
+  }
+
+  function waitForPagerLanding(beforeSeq, beforePage, targetPage, timeout = 1800) {
+    const target = finiteNumber(targetPage);
+    return new Promise(resolve => {
+      const started = Date.now();
+      const timer = setInterval(() => {
+        const inferred = finiteNumber(state.latestInferredPage);
+        const seqChanged = state.pageLoadSeq > beforeSeq;
+        const targetCount = target !== null ? roomBandCount(target) : 0;
+        if (target !== null && targetCount > 0 && inferred === target) {
+          clearInterval(timer);
+          resolve({ landedPage: inferred, seqChanged, targetCount });
+          return;
+        }
+        if (seqChanged && inferred !== null && inferred !== finiteNumber(beforePage)) {
+          clearInterval(timer);
+          resolve({ landedPage: inferred, seqChanged, targetCount });
+          return;
+        }
+        if (state.scanAbort || Date.now() - started >= timeout) {
+          clearInterval(timer);
+          resolve({ landedPage: inferred, seqChanged, targetCount });
+        }
+      }, 80);
+    });
   }
 
   function dispatchClientPoint(x, y, targetOverride = null) {
@@ -2460,7 +2591,6 @@
   async function clickFixedPage(profile, page) {
     const targetCount = expectedBandCount(page);
 
-    // 這一頁已完整收過就直接視為完成。
     if (roomBandCount(page) >= targetCount) {
       state.scanVisited.add(page);
       state.pagesSeen.add(page);
@@ -2468,75 +2598,85 @@
       return { ok: true, count: roomBandCount(page), target: targetCount, cached: true };
     }
 
+    const calibration = activePagerCalibration(profile);
+    const baseHypotheses = calibration
+      ? [{ id: 'learned', x0: calibration.startX, step: calibration.stepX, y: calibration.y }]
+      : (profile.hypotheses || []);
+    const hypotheses = baseHypotheses.length ? baseHypotheses : [profile];
     const yCandidates = buildPagerYProbeList(profile, state.learnedPagerY);
     if (!yCandidates.length) {
       return { ok: false, reason: 'no-y-candidate', count: roomBandCount(page), target: targetCount };
     }
 
-    // 自動尋找真正的頁碼列高度；找到一次就記住，後續所有頁共用。
-    for (let probeIndex = 0; probeIndex < yCandidates.length; probeIndex++) {
-      if (state.scanAbort) {
-        return { ok: false, reason: 'aborted', count: roomBandCount(page), target: targetCount };
-      }
-
-      const yRatio = yCandidates[probeIndex];
-      const basePoint = pointForFixedProfile(profile, page);
-      if (!basePoint) {
-        return { ok: false, reason: 'no-point', count: roomBandCount(page), target: targetCount };
-      }
-
-      const point = {
-        x: basePoint.x,
-        y: profile.rect.top + profile.rect.height * yRatio
-      };
-
-      const beforeBand = roomBandCount(page);
-      setPageIntent(page);
-      const sent = dispatchClientPoint(point.x, point.y, profile.target || null);
-      if (!sent) {
-        state.pageIntent = null;
-        continue;
-      }
-
-      state.scanMessage = state.learnedPagerY === null
-        ? `🤖 自動定位頁碼列｜第 ${page} 頁｜${beforeBand}/${targetCount}`
-        : `🤖 正在讀取第 ${page} / 9 頁資料｜${beforeBand} / ${targetCount}`;
-      scheduleRender();
-
-      // 正確點到頁碼後，ATG 會把該頁 tables 灌進 roomMap。
-      // 探測階段不用每個錯誤 Y 都等 9 秒；正確 Y 通常很快開始進資料。
-      const probeTimeout = state.learnedPagerY === null ? 3200 : 8500;
-      const result = await waitForPageBand(page, probeTimeout);
-      state.pageIntent = null;
-
-      if (result.ok) {
-        state.learnedPagerY = yRatio;
-        profile.y = yRatio;
-        state.scanVisited.add(page);
-        state.pagesSeen.add(page);
-        state.dataPagesSeen.add(page);
-        return { ok: true, ...result, yRatio, probeIndex: probeIndex + 1 };
-      }
-
-      // 雖然尚未完整 500/100，但只要目標房號區間有開始增加，就代表這個 Y 點對了。
-      // 鎖定後給 ATG 更長時間把本頁資料收完整，不再換高度。
-      const afterBand = roomBandCount(page);
-      if (afterBand > beforeBand) {
-        state.learnedPagerY = yRatio;
-        profile.y = yRatio;
-        state.scanMessage = `🤖 已定位頁碼列｜第 ${page} 頁資料載入中 ${afterBand}/${targetCount}`;
-        scheduleRender();
-        const settled = await waitForPageBand(page, 10000);
-        if (settled.ok) {
-          state.scanVisited.add(page);
-          state.pagesSeen.add(page);
-          state.dataPagesSeen.add(page);
-          return { ok: true, ...settled, yRatio, probeIndex: probeIndex + 1 };
+    for (const hypothesis of hypotheses) {
+      const step = Math.abs(finiteNumber(hypothesis.step) || 0.06);
+      for (const yRatio of yCandidates) {
+        if (state.scanAbort) {
+          return { ok: false, reason: 'aborted', count: roomBandCount(page), target: targetCount };
         }
-        return { ok: false, reason: 'partial-data-timeout', count: settled.count, target: settled.target, yRatio };
-      }
 
-      await delay(180);
+        let xRatio = activePagerCalibration(profile)
+          ? pagePoint(activePagerCalibration(profile), page)?.x
+          : (hypothesis.x0 + (page - 1) * hypothesis.step);
+        if (!Number.isFinite(xRatio)) continue;
+
+        // 同一組 X/Y 最多用實際「落在哪一頁」回饋修正 3 次。
+        for (let correction = 0; correction < 3; correction++) {
+          xRatio = clamp(xRatio, 0.025, 0.965);
+          const point = pointForFixedProfile(profile, page, hypothesis, xRatio, yRatio);
+          if (!point) break;
+
+          const beforeSeq = state.pageLoadSeq;
+          const beforePage = state.latestInferredPage;
+          const beforeBand = roomBandCount(page);
+          setPageIntent(page);
+          const sent = dispatchClientPoint(point.x, point.y, profile.target || null);
+          if (!sent) {
+            state.pageIntent = null;
+            break;
+          }
+
+          state.scanMessage = `🤖 全裝置自動定位｜第 ${page} 頁｜${beforeBand}/${targetCount}`;
+          scheduleRender();
+
+          const landing = await waitForPagerLanding(beforeSeq, beforePage, page, 1700);
+          const afterBand = roomBandCount(page);
+          const landed = finiteNumber(landing.landedPage);
+
+          if (afterBand > beforeBand || landed === page) {
+            rememberPagerSample(profile, page, xRatio, yRatio);
+            const settled = await waitForPageBand(page, 10000);
+            state.pageIntent = null;
+            if (settled.ok) {
+              state.scanVisited.add(page);
+              state.pagesSeen.add(page);
+              state.dataPagesSeen.add(page);
+              return {
+                ok: true,
+                ...settled,
+                hypothesis: hypothesis.id || 'adaptive',
+                xRatio,
+                yRatio,
+                corrected: correction
+              };
+            }
+            if (settled.count > beforeBand) {
+              return { ok: false, reason: 'partial-data-timeout', count: settled.count, target: settled.target };
+            }
+          }
+
+          if (landed !== null && landed >= 1 && landed <= 9 && landed !== page) {
+            // 點到鄰近頁時，不換裝置模板；直接依真實落頁修正 X。
+            xRatio = clamp(xRatio + (page - landed) * step, 0.025, 0.965);
+            state.pageIntent = null;
+            await delay(100);
+            continue;
+          }
+
+          state.pageIntent = null;
+          break;
+        }
+      }
     }
 
     return {
@@ -2659,9 +2799,10 @@
     const pages = [1,2,3,4,5,6,7,8,9];
     const profile = fixedPagerProfile();
 
-    state.scanMessage = `🤖 ${profile.layout}模式｜正在切換「顯示全部」…`;
+    // 全房資料來自 ATG 的 tables 回傳，與畫面「顯示全部 / 顯示空桌」篩選無關。
+    // 因此不再為了切篩選器去猜座標，避免不同裝置誤點；只定位遊戲區與頁碼列。
+    state.scanMessage = `🤖 ${profile.layout}｜正在自動定位遊戲區與頁碼列…`;
     scheduleRender();
-    await ensureShowAll(profile);
 
     for (const page of pages) {
       if (state.scanAbort) break;
@@ -3272,6 +3413,16 @@
       }
     }, 500);
   }
+
+  window.addEventListener('resize', () => {
+    resetAdaptivePagerLearning();
+    state.pagerSurfaceSignature = '';
+  }, { passive: true });
+
+  window.addEventListener('orientationchange', () => {
+    resetAdaptivePagerLearning();
+    state.pagerSurfaceSignature = '';
+  }, { passive: true });
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', waitForPairThenCreatePanel, { once: true });
