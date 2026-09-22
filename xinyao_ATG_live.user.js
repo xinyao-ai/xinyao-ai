@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.0
+// @version      3.1.2
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -883,7 +883,7 @@
 })();
 
 
-/* ===== 芯瑤 ATG 全房分析 v3.1.0｜全裝置自適應一鍵掃描 ===== */
+/* ===== 芯瑤 ATG 全房分析 v3.1.1｜全裝置自適應＋免彈窗同步 ===== */
 (() => {
   'use strict';
 
@@ -924,25 +924,27 @@
     const todayRate = safeRate(room?.today?.win, room?.today?.bet);
     const totalRate = safeRate(room?.win, room?.bet);
 
-    const weightedDelta = (rate, bet, scale, maxAbs) => {
+    // 平滑動態分數：不再把高得分率硬截在固定上限。
+    // 投注量越少，訊號越靠近中性 50；資料量越充足，才讓得分率差異完整反映。
+    const weightedSignal = (rate, bet, volumeScale, rateSpread) => {
       if (rate === null) return null;
       const volume = Math.max(0, finiteNumber(bet) || 0);
-      const weight = clamp(Math.log10(volume + 1) / scale, 0.2, 1);
-      return clamp((rate - 100) * weight, -maxAbs, maxAbs);
+      const volumeWeight = clamp(Math.log10(volume + 1) / volumeScale, 0.25, 1);
+      return Math.tanh((rate - 100) / rateSpread) * volumeWeight;
     };
 
-    const td = weightedDelta(todayRate, room?.today?.bet, 5.5, 45);
-    const cd = weightedDelta(totalRate, room?.bet, 6, 35);
+    const todaySignal = weightedSignal(todayRate, room?.today?.bet, 6.0, 60);
+    const totalSignal = weightedSignal(totalRate, room?.bet, 6.5, 55);
 
     let observationScore = null;
-    if (td !== null || cd !== null) {
-      if (td !== null && cd !== null) {
-        observationScore = clamp(50 + td * 0.65 + cd * 0.35, 0, 100);
-      } else if (td !== null) {
-        observationScore = clamp(50 + td, 0, 100);
+    if (todaySignal !== null || totalSignal !== null) {
+      let combinedSignal;
+      if (todaySignal !== null && totalSignal !== null) {
+        combinedSignal = todaySignal * 0.65 + totalSignal * 0.35;
       } else {
-        observationScore = clamp(50 + cd, 0, 100);
+        combinedSignal = todaySignal ?? totalSignal;
       }
+      observationScore = clamp(50 + combinedSignal * 50, 0, 100);
     }
 
     return {
@@ -1437,7 +1439,7 @@
     return scored[0]?.ordered || [];
   }
 
-  const SCRIPT_VERSION = '3.1.0';
+  const SCRIPT_VERSION = '3.1.2';
 
   function getVersion() {
     return SCRIPT_VERSION;
@@ -1541,6 +1543,13 @@
   window.__XIANYAO_ATG_ROOM_SCANNER_V200__ = true;
 
   const VERSION = SCRIPT_VERSION;
+  const SITE_URL = 'https://xinyao-ai.github.io/xinyao-ai/?atgRooms=1';
+  const SITE_ORIGIN = 'https://xinyao-ai.github.io';
+  const SYNC_READY_TYPE = 'XIANYAO_ATG_SYNC_READY_V1';
+  const SYNC_ACK_TYPE = 'XIANYAO_ATG_SYNC_ACK_V1';
+  let pendingSyncPayload = null;
+  let syncHandshakeTimer = null;
+  let syncLinkArmedUntil = 0;
   const SENSITIVE_KEY = /(token|cookie|authorization|password|passwd|secret|username|userid|user_id|email|phone|login|session|ticket|credential|access[_-]?key|^t$)/i;
   const INTERESTING_TEXT = /(room|table|page|lobby|slotTableUpdated|tableMeta|totalTableCount)/i;
   const nativeJSONParse = JSON.parse.bind(JSON);
@@ -2943,43 +2952,57 @@
     };
   }
 
-  function syncToXinyaoSite() {
+  function prepareSyncToXinyaoSite() {
     const rooms = numberedRooms();
     if (!rooms.length) {
       state.scanError = '目前沒有可同步的房號資料，請先完成全房掃描。';
       scheduleRender();
-      return;
+      return false;
     }
 
-    const payload = buildSyncPayload(rooms, state);
-    const siteUrl = 'https://xinyao-ai.github.io/xinyao-ai/?atgRooms=1';
-    const targetOrigin = 'https://xinyao-ai.github.io';
-    const target = window.open(siteUrl, 'xinyao-atg-ai');
-
-    if (!target) {
-      state.scanError = '瀏覽器阻擋開啟芯瑤頁面，請允許彈出式視窗後再按一次。';
-      scheduleRender();
-      return;
-    }
-
+    pendingSyncPayload = buildSyncPayload(rooms, state);
     state.scanError = '';
-    state.scanMessage = `正在同步 ${payload.rooms.length} 房到芯瑤…`;
+    state.scanMessage = `準備同步 ${pendingSyncPayload.rooms.length} 房｜正在開啟芯瑤…`;
     scheduleRender();
 
-    let tries = 0;
-    const timer = setInterval(() => {
-      tries += 1;
-      try {
-        target.postMessage(payload, targetOrigin);
-      } catch (_) {}
+    if (syncHandshakeTimer) clearTimeout(syncHandshakeTimer);
+    syncHandshakeTimer = setTimeout(() => {
+      syncHandshakeTimer = null;
+      if (!pendingSyncPayload) return;
+      state.scanError = '芯瑤頁面尚未回應同步要求；請回到此頁再按一次「同步到芯瑤」。';
+      state.scanMessage = `同步等待中｜資料仍保留 ${pendingSyncPayload.rooms.length} 房`;
+      scheduleRender();
+    }, 20000);
 
-      if (tries >= 16) {
-        clearInterval(timer);
-        state.scanMessage = `✅ 已送出 ${payload.rooms.length} 房｜請到芯瑤「全房推薦」查看`;
-        scheduleRender();
-      }
-    }, 500);
+    return true;
   }
+
+  window.addEventListener('message', event => {
+    if (event.origin !== SITE_ORIGIN) return;
+
+    if (event.data?.type === SYNC_READY_TYPE) {
+      if (!pendingSyncPayload) return;
+      try {
+        event.source?.postMessage(pendingSyncPayload, SITE_ORIGIN);
+        state.scanError = '';
+        state.scanMessage = `正在同步 ${pendingSyncPayload.rooms.length} 房到芯瑤…`;
+        scheduleRender();
+      } catch (_) {}
+      return;
+    }
+
+    if (event.data?.type === SYNC_ACK_TYPE) {
+      const rooms = Number(event.data?.rooms) || pendingSyncPayload?.rooms?.length || 0;
+      pendingSyncPayload = null;
+      if (syncHandshakeTimer) {
+        clearTimeout(syncHandshakeTimer);
+        syncHandshakeTimer = null;
+      }
+      state.scanError = '';
+      state.scanMessage = `✅ 已同步 ${rooms} 房｜芯瑤「全房推薦」已更新`;
+      scheduleRender();
+    }
+  }, true);
 
   function closeCopyDialog() {
     document.getElementById('xinyao-copy-modal')?.remove();
@@ -3203,6 +3226,19 @@
   function render() {
     if (!state.panel) return;
 
+    // 手機上 ATG 資料更新很頻繁。使用者按住「同步到芯瑤」到 click 發生前，
+    // 暫停重建面板，避免真正的 <a> 在 pointerdown / click 之間被替換掉。
+    if (Date.now() < syncLinkArmedUntil) {
+      const wait = Math.max(30, syncLinkArmedUntil - Date.now() + 20);
+      if (!state.renderTimer) {
+        state.renderTimer = setTimeout(() => {
+          state.renderTimer = null;
+          render();
+        }, wait);
+      }
+      return;
+    }
+
     const count = numberedCount();
     const expected = state.totalTableCount || '?';
     const pageKnown = state.pagesSeen.size;
@@ -3297,7 +3333,7 @@
         <button id="xinyao-scan-all" style="${buttonStyle()}">${state.scanRunning ? '掃描中…' : '一鍵掃描 4100 房'}</button>
         <button id="xinyao-stop" style="${secondaryButtonStyle()}">停止掃描</button>
         <button id="xinyao-expand" style="${secondaryButtonStyle()}">${ui.expanded ? '收合分析' : '完整分析'}</button>
-        <button id="xinyao-sync-site" style="${buttonStyle('grid-column:1 / -1;')}">🌸 同步到芯瑤</button>
+        <a id="xinyao-sync-site" href="https://xinyao-ai.github.io/xinyao-ai/?atgRooms=1" target="xinyao-atg-ai" style="${buttonStyle('grid-column:1 / -1;display:block;text-decoration:none;text-align:center;box-sizing:border-box;')}">🌸 同步到芯瑤</a>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 120px;gap:6px;margin-top:6px;align-items:center;">
@@ -3351,6 +3387,16 @@
     // ATG 即時資料很頻繁，render() 會重建 panel 內容；若把 click 綁在每顆
     // 臨時按鈕上，按下與放開之間節點可能已被替換，造成看起來「沒反應」。
     panel.addEventListener('pointerdown', event => {
+      const link = event.target?.closest?.('a#xinyao-sync-site');
+      if (link && panel.contains(link)) {
+        syncLinkArmedUntil = Date.now() + 700;
+        if (!prepareSyncToXinyaoSite()) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        return;
+      }
+
       const button = event.target?.closest?.('button[id]');
       if (!button || !panel.contains(button)) return;
       const action = resolvePanelAction(button.id);
@@ -3378,7 +3424,7 @@
         ui.roomListPage += 1;
         scheduleRender();
       } else if (action === 'sync') {
-        syncToXinyaoSite();
+        // 同步按鈕已改為真正連結；由 click 事件準備握手資料，不在此攔截。
       }
     }, true);
 
