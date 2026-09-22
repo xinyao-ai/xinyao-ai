@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 全房分析
 // @namespace    xinyao-atg-room-scanner
-// @version      2.1.1
+// @version      2.1.2
 // @description  一鍵掃描 ATG 全房、整理房號統計，並可將非敏感房號快照同步到芯瑤 ATG AI助手。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -119,6 +119,25 @@
     return Array.from({ length: total }, (_, i) => ((start + i) % total) + 1);
   }
 
+  function buildMissingScanSequence(startPage, totalPages, seenPages = new Set()) {
+    const total = Math.max(1, finiteNumber(totalPages) || 1);
+    const start = clamp(finiteNumber(startPage) || 1, 1, total);
+    const seen = new Set(
+      [...(seenPages instanceof Set ? seenPages : (Array.isArray(seenPages) ? seenPages : []))]
+        .map(finiteNumber)
+        .filter(p => p !== null && p >= 1 && p <= total)
+    );
+    const ascending = [];
+    for (let page = 1; page <= total; page++) {
+      if (!seen.has(page)) ascending.push(page);
+    }
+    if (!ascending.length) return [];
+    const descending = [...ascending].reverse();
+    const ascDistance = Math.abs(ascending[0] - start);
+    const descDistance = Math.abs(descending[0] - start);
+    return descDistance < ascDistance ? descending : ascending;
+  }
+
   function buildPageCalibration(samples) {
     const unique = new Map();
     for (const sample of samples || []) {
@@ -152,7 +171,7 @@
     return { x: x + stepX * (p - 1), y };
   }
 
-  const SCRIPT_VERSION = '2.1.0';
+  const SCRIPT_VERSION = '2.1.2';
 
   function getVersion() {
     return SCRIPT_VERSION;
@@ -211,6 +230,7 @@
     rankRooms,
     countNumberedRooms,
     buildScanSequence,
+    buildMissingScanSequence,
     getVersion,
     resolvePanelAction,
     buildPageCalibration,
@@ -313,7 +333,7 @@
     state.calibrationPendingPointer = null;
     state.calibrationThenScan = thenScan;
     state.scanError = '';
-    state.scanMessage = '🧭 校準頁碼：請手動點兩個不同頁碼（建議 1 再 9），之後會自動掃描。';
+    state.scanMessage = '🧭 校準中 0/2：請先手動點第 1 頁，再點第 9 頁。';
     scheduleRender();
   }
 
@@ -323,7 +343,9 @@
     savePageCalibration(calibration);
     state.calibrationActive = false;
     state.calibrationPendingPointer = null;
-    state.scanMessage = `✅ 頁碼校準完成（${calibration.samplePages.join('、')}），準備自動掃描…`;
+    state.scanMessage = state.calibrationThenScan
+      ? `✅ 頁碼校準完成（${calibration.samplePages.join('、')}）｜正在掃描尚未抓取的頁面…`
+      : `✅ 頁碼校準完成（${calibration.samplePages.join('、')}）｜可按「一鍵掃描 4100 房」`;
     scheduleRender();
     if (state.calibrationThenScan) {
       state.calibrationThenScan = false;
@@ -466,7 +488,9 @@
           state.calibrationSamples.push({ page: currentPage, x: pointer.x, y: pointer.y });
           state.calibrationPendingPointer = null;
           const pages = state.calibrationSamples.map(s => s.page).sort((a, b) => a - b);
-          state.scanMessage = `🧭 已記錄頁碼 ${pages.join('、')}｜還需要 ${Math.max(0, 2 - pages.length)} 個不同頁碼`;
+          state.scanMessage = pages.length === 1
+            ? `🧭 校準中 1/2：已記錄第 ${pages[0]} 頁，請再點另一個不同頁碼（建議第 9 頁）`
+            : `🧭 已記錄頁碼 ${pages.join('、')}`;
           finishPageCalibrationIfReady();
         }
       }
@@ -787,11 +811,22 @@
 
     const totalPages = state.totalPages || pager?.size || 9;
     const startPage = finiteNumber(state.currentPage) || 1;
-    const sequence = buildScanSequence(startPage, totalPages);
+
+    // 窄版 / 手機版選房頁可能不會同時顯示第 1 與最後一頁。
+    // 校準時第 1 頁與最後一頁已由使用者實際點過並完成資料擷取，
+    // 掃描時直接略過已抓到的頁面，避免從最後一頁硬跳回第 1 頁而失敗。
+    if (state.dataPagesSeen.size >= totalPages) {
+      const keep = new Set();
+      for (const page of state.pageCalibration?.samplePages || []) keep.add(page);
+      if (finiteNumber(state.currentPage) !== null) keep.add(state.currentPage);
+      state.dataPagesSeen = keep;
+    }
+
+    const sequence = buildMissingScanSequence(startPage, totalPages, state.dataPagesSeen);
 
     state.scanRunning = true;
     state.scanAbort = false;
-    state.scanVisited = new Set();
+    state.scanVisited = new Set(state.dataPagesSeen);
     state.scanError = '';
     state.scanMessage = auto ? '自動刷新掃描中…' : '全房掃描中…';
     scheduleRender();
@@ -819,7 +854,7 @@
     state.scanRunning = false;
     const count = numberedCount();
     const expected = state.totalTableCount || 4100;
-    const allPages = state.scanVisited.size >= totalPages;
+    const allPages = state.scanVisited.size >= totalPages || state.dataPagesSeen.size >= totalPages;
 
     if (state.scanAbort) {
       state.scanMessage = `已停止｜目前 ${count} / ${expected}`;
@@ -1266,7 +1301,7 @@
 
     state.panel.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px;">
-        <div style="font-weight:800;font-size:14px;">🔎 芯瑤 ATG 全房分析 <span style="font-size:10px;opacity:.65;">v${VERSION}</span></div>
+        <div style="font-weight:800;font-size:14px;">🌸 芯瑤 ATG 全房分析</div>
         <button id="xinyao-room-hide" style="${secondaryButtonStyle('padding:4px 8px;')}">縮小</button>
       </div>
 
@@ -1285,7 +1320,9 @@
         <button id="xinyao-stop" style="${secondaryButtonStyle()}">停止掃描</button>
         <button id="xinyao-expand" style="${secondaryButtonStyle()}">${ui.expanded ? '收合分析' : '完整分析'}</button>
         <button id="xinyao-sync-site" style="${buttonStyle('grid-column:1 / -1;')}">🌸 同步到芯瑤</button>
-        <button id="xinyao-calibrate" style="${secondaryButtonStyle('grid-column:1 / -1;')}">${state.pageCalibration ? '重新校準頁碼' : '校準頁碼位置'}</button>
+        <button id="xinyao-calibrate" style="${secondaryButtonStyle('grid-column:1 / -1;')}">${state.calibrationActive
+          ? `校準中 ${state.calibrationSamples.length}/2｜請點 1 → 9`
+          : (state.pageCalibration ? '重新校準頁碼' : '校準頁碼位置')}</button>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 120px;gap:6px;margin-top:6px;align-items:center;">
