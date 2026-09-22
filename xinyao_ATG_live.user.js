@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.0.0
+// @version      3.0.1
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -20,6 +20,7 @@
   const TOKEN_KEY = 'xinyao_atg_device_token_v2';
   const DEVICE_ID_KEY = 'xinyao_atg_device_id_v2';
   const nativeJSONParse = JSON.parse.bind(JSON);
+  const cloudFetch = window.fetch.bind(window);
 
   const state = {
     connected: false,
@@ -45,6 +46,8 @@
     lastSync: '',
     cloudStatus: '等待配對',
     cloudTime: '',
+    pairMessage: '',
+    pairBusy: false,
     replaced: false
   };
 
@@ -546,7 +549,7 @@
 
     pushBusy = true;
     try {
-      const response = await fetch(`${WORKER}/push`, {
+      const response = await cloudFetch(`${WORKER}/push`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -584,32 +587,43 @@
     if (pairCode.length < 4) throw new Error('請輸入配對碼');
 
     state.cloudStatus = '正在配對…';
+    state.pairMessage = '正在驗證配對碼…';
+    state.pairBusy = true;
     state.replaced = false;
     render();
 
-    const response = await fetch(`${WORKER}/pair/claim`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        pairCode,
-        deviceId: getDeviceId(),
-        deviceName: deviceName(),
-        platform: platformName()
-      })
-    });
+    let response;
+    let result = {};
+    try {
+      response = await cloudFetch(`${WORKER}/pair/claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pairCode,
+          deviceId: getDeviceId(),
+          deviceName: deviceName(),
+          platform: platformName()
+        })
+      });
 
-    const result = await response.json().catch(() => ({}));
+      result = await response.json().catch(() => ({}));
+    } catch (error) {
+      throw new Error(`配對連線失敗：${error?.message || '無法連線'}`);
+    }
+
     if (!response.ok || !result?.ok || !result?.deviceToken) {
-      throw new Error(
+      const reason =
         result?.error === 'pair_code_invalid_or_expired'
           ? '配對碼無效或已過期'
-          : (result?.message || '配對失敗')
-      );
+          : (result?.message || result?.error || `配對失敗（HTTP ${response.status}）`);
+      throw new Error(reason);
     }
 
     deviceToken = result.deviceToken;
     localStorage.setItem(TOKEN_KEY, deviceToken);
     state.cloudStatus = '✅ 已綁定會員帳號';
+    state.pairMessage = '✅ 配對成功';
+    state.pairBusy = false;
     state.replaced = false;
     lastPushSignature = '';
     render();
@@ -637,10 +651,10 @@
       <div style="display:flex;gap:5px;">
         <input id="xinyaoPairInput" maxlength="12" placeholder="配對碼"
           style="width:100px;min-width:0;border:1px solid rgba(255,255,255,.22);border-radius:8px;background:rgba(255,255,255,.09);color:#fff;padding:6px 7px;font-size:11px;outline:none;text-transform:uppercase;">
-        <button id="xinyaoPairButton" type="button"
-          style="border:0;border-radius:8px;background:#ff5f9e;color:#fff;padding:6px 8px;font-size:11px;font-weight:800;cursor:pointer;">綁定</button>
+        <button id="xinyaoPairButton" type="button" ${state.pairBusy ? 'disabled' : ''}
+          style="border:0;border-radius:8px;background:#ff5f9e;color:#fff;padding:6px 8px;font-size:11px;font-weight:800;cursor:pointer;opacity:${state.pairBusy ? '.55' : '1'};">${state.pairBusy ? '配對中…' : '綁定'}</button>
       </div>
-      <div id="xinyaoPairMessage" style="font-size:9px;margin-top:5px;opacity:.68;"></div>
+      <div id="xinyaoPairMessage" style="font-size:9px;margin-top:5px;opacity:.82;color:${state.pairMessage.startsWith('✅') ? '#9ff0be' : '#ffd0df'};">${state.pairMessage || ''}</div>
     ` : '';
 
     panel.innerHTML = `
@@ -691,15 +705,14 @@
     if (button) {
       button.onclick = async event => {
         event.stopPropagation();
-        button.disabled = true;
+        if (state.pairBusy) return;
         try {
           await claimPairCode(input?.value);
         } catch (error) {
-          if (message) message.textContent = error?.message || '配對失敗';
+          state.pairBusy = false;
+          state.pairMessage = error?.message || '配對失敗';
           state.cloudStatus = '配對失敗';
           render();
-        } finally {
-          button.disabled = false;
         }
       };
     }
