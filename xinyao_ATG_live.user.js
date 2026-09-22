@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      2.6.0
+// @version      2.7.0
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -870,7 +870,7 @@
 })();
 
 
-/* ===== 芯瑤 ATG 全房分析 v2.6.0｜固定版型一鍵掃描 ===== */
+/* ===== 芯瑤 ATG 全房分析 v2.7.0｜Binary API 一鍵掃描 ===== */
 (() => {
   'use strict';
 
@@ -973,6 +973,145 @@
 
   function countNumberedRooms(rooms) {
     return (rooms || []).filter(r => finiteNumber(r?.number) !== null).length;
+  }
+
+  // 房號才是 4100 房真正穩定的唯一鍵；roomId 在不同批次/頁面不保證適合作為累積鍵。
+  function roomStorageKey(room) {
+    const number = finiteNumber(room?.number);
+    if (number !== null && number >= 1 && number <= 4100) return `n:${number}`;
+    const roomId = finiteNumber(room?.roomId);
+    return roomId !== null ? `id:${roomId}` : null;
+  }
+
+  // ATG Binary frame 常見格式：04 + zlib(78 9C/DA/01/5E...)。
+  // 不寫死只跳 1 byte，而是在前 32 bytes 內找合法 zlib header。
+  function findZlibOffset(input) {
+    let bytes;
+    try {
+      if (input instanceof Uint8Array) bytes = input;
+      else if (input instanceof ArrayBuffer) bytes = new Uint8Array(input);
+      else if (ArrayBuffer.isView(input)) bytes = new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+      else return -1;
+    } catch (_) {
+      return -1;
+    }
+
+    const limit = Math.min(Math.max(0, bytes.length - 1), 32);
+    for (let i = 0; i < limit; i++) {
+      const cmf = bytes[i];
+      const flg = bytes[i + 1];
+      if ((cmf & 0x0f) !== 8) continue; // deflate
+      if (((cmf << 8) + flg) % 31 !== 0) continue;
+      return i;
+    }
+    return -1;
+  }
+
+  async function inflateZlibText(bytes) {
+    const chunk = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+
+    // 現代 Chrome / Edge / Safari 優先走原生 API，不需額外套件。
+    if (typeof DecompressionStream === 'function') {
+      const stream = new Blob([chunk]).stream().pipeThrough(new DecompressionStream('deflate'));
+      return await new Response(stream).text();
+    }
+
+    // 某些 ATG 頁面本身有 pako，舊瀏覽器可直接借用。
+    const pako = typeof globalThis !== 'undefined' ? globalThis.pako : null;
+    if (pako && typeof pako.inflate === 'function') {
+      const out = pako.inflate(chunk);
+      return new TextDecoder().decode(out);
+    }
+
+    return '';
+  }
+
+  async function decodeBinaryFrameToText(input) {
+    let bytes;
+    try {
+      if (input instanceof Uint8Array) bytes = input;
+      else if (input instanceof ArrayBuffer) bytes = new Uint8Array(input);
+      else if (ArrayBuffer.isView(input)) bytes = new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+      else if (typeof Blob !== 'undefined' && input instanceof Blob) bytes = new Uint8Array(await input.arrayBuffer());
+      else return '';
+    } catch (_) {
+      return '';
+    }
+
+    if (!bytes.length) return '';
+
+    const zlibOffset = findZlibOffset(bytes);
+    if (zlibOffset >= 0) {
+      try {
+        const text = await inflateZlibText(bytes.subarray(zlibOffset));
+        if (text && text.trim()) return text;
+      } catch (_) {}
+    }
+
+    // 少數 frame 不是壓縮資料；保留直接 UTF-8 解碼 fallback。
+    try {
+      const direct = new TextDecoder().decode(bytes);
+      if (direct && direct.trim()) return direct.replace(/^\u0004+/, '');
+    } catch (_) {}
+
+    return '';
+  }
+
+  // 版型選擇只決定「去哪裡點」，不再決定資料是否成功。
+  // 窄版使用中央直式 Canvas；寬版固定用 viewport，避免誤抓到局部 WebGL canvas 而整排偏移。
+  function selectFixedPagerProfile(viewportWidth, viewportHeight, canvasRects = []) {
+    const vw = Math.max(1, finiteNumber(viewportWidth) || 1);
+    const vh = Math.max(1, finiteNumber(viewportHeight) || 1);
+    const rows = (Array.isArray(canvasRects) ? canvasRects : [])
+      .map((r, index) => ({
+        index,
+        left: finiteNumber(r?.left) || 0,
+        top: finiteNumber(r?.top) || 0,
+        width: finiteNumber(r?.width) || 0,
+        height: finiteNumber(r?.height) || 0,
+        area: finiteNumber(r?.area) || ((finiteNumber(r?.width) || 0) * (finiteNumber(r?.height) || 0))
+      }))
+      .filter(r => r.width > 0 && r.height > 0);
+
+    const portrait = rows
+      .filter(r => {
+        const ratio = r.width / Math.max(1, r.height);
+        const widthRatio = r.width / vw;
+        const centerX = r.left + r.width / 2;
+        return ratio >= 0.40 &&
+          ratio <= 0.88 &&
+          widthRatio >= 0.22 &&
+          widthRatio <= 0.60 &&
+          r.height >= vh * 0.58 &&
+          Math.abs(centerX - vw / 2) <= vw * 0.16;
+      })
+      .sort((a, b) => b.area - a.area)[0];
+
+    if (portrait) {
+      return {
+        key: 'portrait-canvas',
+        layout: '直式',
+        canvasIndex: portrait.index,
+        rect: portrait,
+        x0: 0.0520,
+        step: 0.0990,
+        y: 0.1810,
+        showAllX: 0.4430,
+        showAllY: 0.1470
+      };
+    }
+
+    return {
+      key: 'wide-viewport',
+      layout: '寬版',
+      canvasIndex: -1,
+      rect: { left: 0, top: 0, width: vw, height: vh, area: vw * vh },
+      x0: 0.1567,
+      step: 0.05645,
+      y: 0.2065,
+      showAllX: 0.2120,
+      showAllY: 0.1310
+    };
   }
 
   function buildScanSequence(startPage, totalPages) {
@@ -1226,7 +1365,7 @@
     return scored[0]?.ordered || [];
   }
 
-  const SCRIPT_VERSION = '2.4.1';
+  const SCRIPT_VERSION = '2.7.0';
 
   function getVersion() {
     return SCRIPT_VERSION;
@@ -1283,6 +1422,10 @@
     calculateMetrics,
     rankRooms,
     countNumberedRooms,
+    roomStorageKey,
+    findZlibOffset,
+    decodeBinaryFrameToText,
+    selectFixedPagerProfile,
     buildScanSequence,
     buildMissingScanSequence,
     getVersion,
@@ -1553,7 +1696,12 @@
     const room = normalizeRoom(obj);
     if (!room) return false;
 
-    const prev = state.roomMap.get(room.roomId) || {};
+    const key = roomStorageKey(room);
+    if (!key) return false;
+
+    const idFallbackKey = finiteNumber(room.roomId) !== null ? `id:${room.roomId}` : null;
+    const prev = state.roomMap.get(key) || (idFallbackKey ? state.roomMap.get(idFallbackKey) : null) || {};
+
     const merged = {
       ...prev,
       ...room,
@@ -1567,7 +1715,8 @@
       }
     };
 
-    state.roomMap.set(room.roomId, merged);
+    if (idFallbackKey && idFallbackKey !== key) state.roomMap.delete(idFallbackKey);
+    state.roomMap.set(key, merged);
     state.lastSource = source;
     return finiteNumber(merged.number) !== null;
   }
@@ -1579,17 +1728,29 @@
     for (const [roomIdRaw, status] of Object.entries(statusObj)) {
       const roomId = Number(roomIdRaw);
       if (!Number.isFinite(roomId) || typeof status !== 'string') continue;
-      const prev = state.roomMap.get(roomId) || {
-        roomId,
-        number: null,
-        today: { bet: null, win: null }
-      };
-      state.roomMap.set(roomId, {
-        ...prev,
-        status,
-        updatedAt: new Date().toISOString()
-      });
-      changed++;
+
+      let matched = false;
+      for (const [key, prev] of state.roomMap.entries()) {
+        if (finiteNumber(prev?.roomId) !== roomId) continue;
+        state.roomMap.set(key, {
+          ...prev,
+          status,
+          updatedAt: new Date().toISOString()
+        });
+        matched = true;
+        changed++;
+      }
+
+      if (!matched) {
+        state.roomMap.set(`id:${roomId}`, {
+          roomId,
+          number: null,
+          status,
+          today: { bet: null, win: null },
+          updatedAt: new Date().toISOString()
+        });
+        changed++;
+      }
     }
 
     if (changed) state.lastSource = source;
@@ -1832,6 +1993,27 @@
     };
   }
 
+  async function processBinarySocketData(data, source) {
+    try {
+      const text = await decodeBinaryFrameToText(data);
+      if (!text || !text.trim()) return false;
+
+      recordEvent('WS←binary', {
+        source,
+        preview: sanitizeText(text).slice(0, 280)
+      });
+
+      processText(text, `${source}:binary`);
+      return true;
+    } catch (error) {
+      recordEvent('WS←binary-error', {
+        source,
+        error: String(error?.message || error).slice(0, 240)
+      });
+      return false;
+    }
+  }
+
   const NativeWebSocket = window.WebSocket;
   if (NativeWebSocket) {
     function XinyaoWebSocket(url, protocols) {
@@ -1848,7 +2030,11 @@
 
       ws.addEventListener('message', event => {
         try {
-          if (typeof event.data === 'string') processText(event.data, `WebSocket:${safeUrl}`);
+          if (typeof event.data === 'string') {
+            processText(event.data, `WebSocket:${safeUrl}`);
+          } else {
+            processBinarySocketData(event.data, `WebSocket:${safeUrl}`).catch(() => {});
+          }
         } catch {}
       });
       return ws;
@@ -2039,61 +2225,21 @@
     const vw = Math.max(1, window.innerWidth);
     const vh = Math.max(1, window.innerHeight);
     const canvases = visibleCanvasRects()
-      .filter(r => r.height >= vh * 0.58 && r.width >= vw * 0.26);
+      .filter(r => r.height >= vh * 0.58 && r.width >= vw * 0.20);
 
-    // ATG 有兩種實際選房版型：
-    // 1) 寬版：1～9 橫跨整個遊戲畫面。
-    // 2) 直式置中版：遊戲畫布在中央，左右是延伸背景。
-    // 直接依可見主 Canvas 的外觀比例選版型，不再用「試點某頁」做定位。
-    const portrait = canvases
-      .filter(r => (r.width / Math.max(1, r.height)) >= 0.45 && (r.width / Math.max(1, r.height)) <= 0.88)
-      .sort((a, b) => b.area - a.area)[0];
-
-    if (portrait) {
+    const selected = selectFixedPagerProfile(vw, vh, canvases);
+    if (selected.key === 'portrait-canvas') {
+      const source = canvases[selected.canvasIndex];
       return {
-        key: 'portrait-canvas',
-        layout: '直式',
-        target: portrait.el,
-        rect: portrait,
-        // 由 ATG 直式選房畫面實際 1～9 中心位置量測。
-        x0: 0.0520,
-        step: 0.0990,
-        y: 0.1810,
-        showAllX: 0.4430,
-        showAllY: 0.1470
+        ...selected,
+        target: source?.el || null,
+        rect: source || selected.rect
       };
     }
 
-    const wide = canvases
-      .filter(r => (r.width / Math.max(1, r.height)) > 1.05)
-      .sort((a, b) => b.area - a.area)[0];
-
-    if (wide) {
-      return {
-        key: 'wide-canvas',
-        layout: '寬版',
-        target: wide.el,
-        rect: wide,
-        // 由 ATG 寬版選房畫面實際 1～9 中心位置量測。
-        x0: 0.1567,
-        step: 0.05645,
-        y: 0.2065,
-        showAllX: 0.2120,
-        showAllY: 0.1310
-      };
-    }
-
-    // 看不到 Canvas 時仍以目前 ATG 寬版 viewport 版型執行。
     return {
-      key: 'wide-viewport',
-      layout: '寬版',
-      target: null,
-      rect: { left: 0, top: 0, width: vw, height: vh },
-      x0: 0.1567,
-      step: 0.05645,
-      y: 0.2065,
-      showAllX: 0.2120,
-      showAllY: 0.1310
+      ...selected,
+      target: null
     };
   }
 
@@ -2839,7 +2985,7 @@
         <span>${state.enabled ? '🟢 偵測中' : '⚪ 已暫停'}</span><br>
         已抓房號：<b>${count}</b> / ${expected}　頁數：<b>${pageKnown}</b> / ${pages}<br>
         目前頁：${state.currentPage ?? '—'}　已看頁：${escapeHtml(pageList)}<br>
-        掃描方式：🤖 一鍵自動掃描 1～9｜不需校準<br>
+        掃描方式：🤖 一鍵自動掃描 1～9｜Binary API 自動解壓｜不需校準<br>
         <span style="${state.scanError ? 'color:#ff9a9a;' : 'color:#a7f3d0;'}">${escapeHtml(state.scanError || state.scanMessage)}</span>
       </div>
 
