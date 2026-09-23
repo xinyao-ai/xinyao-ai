@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.3
+// @version      3.1.4
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -883,7 +883,7 @@
 })();
 
 
-/* ===== 芯瑤 ATG 全房分析 v3.1.3｜全裝置自適應＋免彈窗同步＋排行榜快照 ===== */
+/* ===== 芯瑤 ATG 全房分析 v3.1.4｜全裝置自適應＋免彈窗同步＋掃描結果持久化 ===== */
 (() => {
   'use strict';
 
@@ -1439,7 +1439,7 @@
     return scored[0]?.ordered || [];
   }
 
-  const SCRIPT_VERSION = '3.1.2';
+  const SCRIPT_VERSION = '3.1.4';
 
   function getVersion() {
     return SCRIPT_VERSION;
@@ -1474,6 +1474,98 @@
           : (Array.isArray(summary.pagesSeen) ? summary.pagesSeen.slice() : [])
       },
       rooms: safeRooms
+    };
+  }
+
+
+  const FULL_SCAN_SESSION_TYPE = 'XIANYAO_ATG_FULL_SCAN_SESSION_V1';
+
+  function normalizePageList(value) {
+    const source = value instanceof Set ? [...value] : (Array.isArray(value) ? value : []);
+    return [...new Set(source
+      .map(finiteNumber)
+      .filter(page => page !== null && page >= 1 && page <= 9)
+      .map(page => Math.trunc(page)))]
+      .sort((a, b) => a - b);
+  }
+
+  function buildFullScanSessionSnapshot(summary = {}) {
+    const roomMap = new Map();
+    for (const rawRoom of (Array.isArray(summary.rooms) ? summary.rooms : [])) {
+      const room = normalizeRoom(rawRoom);
+      if (!room) continue;
+      const key = roomStorageKey(room);
+      if (!key) continue;
+      roomMap.set(key, {
+        roomId: room.roomId,
+        number: room.number,
+        status: room.status,
+        today: {
+          bet: room.today?.bet ?? null,
+          win: room.today?.win ?? null
+        },
+        bet: room.bet ?? null,
+        win: room.win ?? null
+      });
+    }
+
+    const rooms = [...roomMap.values()]
+      .filter(room => finiteNumber(room.number) !== null)
+      .sort((a, b) => a.number - b.number);
+    const pagesSeen = normalizePageList(summary.pagesSeen);
+    const dataPagesSeen = normalizePageList(summary.dataPagesSeen);
+
+    return {
+      type: FULL_SCAN_SESSION_TYPE,
+      version: SCRIPT_VERSION,
+      capturedAt: new Date().toISOString(),
+      rankingSnapshotAt: String(summary.rankingSnapshotAt || new Date().toISOString()),
+      totalTableCount: finiteNumber(summary.totalTableCount) ?? rooms.length,
+      tablePerPage: finiteNumber(summary.tablePerPage) ?? 500,
+      totalPages: finiteNumber(summary.totalPages) ?? 9,
+      currentPage: finiteNumber(summary.currentPage),
+      pagesSeen,
+      dataPagesSeen,
+      rooms
+    };
+  }
+
+  function parseFullScanSessionSnapshot(raw) {
+    let parsed = raw;
+    try {
+      if (typeof raw === 'string') parsed = JSON.parse(raw);
+    } catch (_) {
+      return null;
+    }
+    if (!parsed || typeof parsed !== 'object' || parsed.type !== FULL_SCAN_SESSION_TYPE) return null;
+
+    const snapshot = buildFullScanSessionSnapshot({
+      rooms: parsed.rooms,
+      rankingSnapshotAt: parsed.rankingSnapshotAt || parsed.capturedAt,
+      totalTableCount: parsed.totalTableCount,
+      tablePerPage: parsed.tablePerPage,
+      totalPages: parsed.totalPages,
+      currentPage: parsed.currentPage,
+      pagesSeen: parsed.pagesSeen,
+      dataPagesSeen: parsed.dataPagesSeen
+    });
+
+    const requiredPages = [1,2,3,4,5,6,7,8,9];
+    const complete = snapshot.rooms.length >= 4100 &&
+      snapshot.totalTableCount >= 4100 &&
+      snapshot.totalPages >= 9 &&
+      requiredPages.every(page => snapshot.pagesSeen.includes(page)) &&
+      requiredPages.every(page => snapshot.dataPagesSeen.includes(page));
+
+    if (!complete) return null;
+
+    return {
+      ...snapshot,
+      capturedAt: String(parsed.capturedAt || snapshot.capturedAt),
+      rankingSnapshotAt: String(parsed.rankingSnapshotAt || parsed.capturedAt || snapshot.rankingSnapshotAt),
+      rankingSnapshotRooms: snapshot.rooms
+        .filter(room => room.status === 'Empty')
+        .map(room => ({ ...room, today: { ...room.today } }))
     };
   }
 
@@ -1531,7 +1623,9 @@
     buildAutoPagerSequence,
     acceptPageTransitionEvidence,
     selectPagerRow,
-    buildSyncPayload
+    buildSyncPayload,
+    buildFullScanSessionSnapshot,
+    parseFullScanSessionSnapshot
   };
 
   if (typeof globalThis !== 'undefined' && globalThis.__XIANYAO_ATG_TEST__) {
@@ -1547,6 +1641,7 @@
   const SITE_ORIGIN = 'https://xinyao-ai.github.io';
   const SYNC_READY_TYPE = 'XIANYAO_ATG_SYNC_READY_V1';
   const SYNC_ACK_TYPE = 'XIANYAO_ATG_SYNC_ACK_V1';
+  const FULL_SCAN_SESSION_KEY = 'xinyao_atg_full_scan_session_v1';
   let pendingSyncPayload = null;
   let syncHandshakeTimer = null;
   let syncLinkArmedUntil = 0;
@@ -1607,6 +1702,86 @@
     autoTimer: null,
     renderTimer: null
   };
+
+  function clearStoredFullScanSession() {
+    try { sessionStorage.removeItem(FULL_SCAN_SESSION_KEY); } catch (_) {}
+  }
+
+  function resetFullScanData({ clearStored = true } = {}) {
+    if (clearStored) clearStoredFullScanSession();
+    state.roomMap.clear();
+    state.pagesSeen = new Set();
+    state.dataPagesSeen = new Set();
+    state.totalTableCount = 0;
+    state.tablePerPage = 0;
+    state.totalPages = 0;
+    state.currentPage = null;
+    state.pageIntent = null;
+    state.preferClickedPage = false;
+    state.pageLoadSeq = 0;
+    state.scanVisited = new Set();
+    state.rankingSnapshotRooms = null;
+    state.rankingSnapshotAt = '';
+    state.latestTableNumbers = [];
+    state.latestInferredPage = null;
+  }
+
+  function saveFullScanSession() {
+    const snapshot = buildFullScanSessionSnapshot({
+      rooms: [...state.roomMap.values()],
+      rankingSnapshotAt: state.rankingSnapshotAt,
+      totalTableCount: state.totalTableCount,
+      tablePerPage: state.tablePerPage,
+      totalPages: state.totalPages,
+      currentPage: state.currentPage,
+      pagesSeen: state.pagesSeen,
+      dataPagesSeen: state.dataPagesSeen
+    });
+
+    if (snapshot.rooms.length < 4100 || snapshot.totalPages < 9) return false;
+    try {
+      sessionStorage.setItem(FULL_SCAN_SESSION_KEY, JSON.stringify(snapshot));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function restoreFullScanSession() {
+    let raw = '';
+    try { raw = sessionStorage.getItem(FULL_SCAN_SESSION_KEY) || ''; } catch (_) { return false; }
+    if (!raw) return false;
+
+    const snapshot = parseFullScanSessionSnapshot(raw);
+    if (!snapshot) {
+      clearStoredFullScanSession();
+      return false;
+    }
+
+    state.roomMap.clear();
+    for (const rawRoom of snapshot.rooms) {
+      const room = normalizeRoom(rawRoom);
+      const key = roomStorageKey(room);
+      if (!room || !key) continue;
+      state.roomMap.set(key, room);
+    }
+
+    state.pagesSeen = new Set(snapshot.pagesSeen);
+    state.dataPagesSeen = new Set(snapshot.dataPagesSeen);
+    state.totalTableCount = snapshot.totalTableCount;
+    state.tablePerPage = snapshot.tablePerPage;
+    state.totalPages = snapshot.totalPages;
+    state.currentPage = snapshot.currentPage ?? 9;
+    state.scanVisited = new Set(snapshot.pagesSeen);
+    state.rankingSnapshotRooms = snapshot.rankingSnapshotRooms;
+    state.rankingSnapshotAt = snapshot.rankingSnapshotAt;
+    state.scanError = '';
+    state.scanMessage = `✅ 已還原全房掃描｜${snapshot.rooms.length} / ${snapshot.totalTableCount}｜9 / 9 頁｜排行榜維持掃描完成時結果`;
+    state.lastSource = 'sessionStorage 還原';
+    return true;
+  }
+
+  restoreFullScanSession();
 
   function setPageIntent(page) {
     const p = finiteNumber(page);
@@ -2799,6 +2974,9 @@
   async function scanAllPages({ auto = false } = {}) {
     if (state.scanRunning) return;
 
+    // 使用者主動重新掃描時才清除上一輪持久化結果；進房/重載不會清除。
+    if (!auto) resetFullScanData({ clearStored: true });
+
     state.scanRunning = true;
     state.scanAbort = false;
     state.scanVisited = new Set();
@@ -2846,8 +3024,9 @@
       state.scanMessage = `已停止｜目前 ${count} / ${expected}`;
     } else if (completePages.length === 9 && count >= 4100) {
       const snapshotCount = captureRankingSnapshot();
-      state.scanError = '';
-      state.scanMessage = `✅ 1～9 頁資料全部完成｜${count} / ${expected}｜排行榜已固定 ${snapshotCount} 個空房`;
+      const persisted = saveFullScanSession();
+      state.scanError = persisted ? '' : '掃描已完成，但瀏覽器未能保存本次全房資料；進房或重新整理後可能需要重新掃描。';
+      state.scanMessage = `✅ 1～9 頁資料全部完成｜${count} / ${expected}｜排行榜已固定 ${snapshotCount} 個空房${persisted ? '｜已保存進房後可還原' : ''}`;
     } else {
       const missing = pages.filter(page => roomBandCount(page) < expectedBandCount(page));
       state.scanError = `資料仍未完整：第 ${missing.join('、')} 頁。`;
