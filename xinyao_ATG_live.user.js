@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.6
+// @version      3.1.7
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -21,6 +21,7 @@
   const DEVICE_ID_KEY = 'xinyao_atg_device_id_v2';
   const ROOM_FREE_ENTRY_KEY = 'xinyao_atg_room_free_entry_v1';
   const FULL_SCAN_SESSION_KEY_LIVE = 'xinyao_atg_full_scan_session_v1';
+  const RUNTIME_ROOM_KEY = `runtime:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
   const nativeJSONParse = JSON.parse.bind(JSON);
   const cloudFetch = window.fetch.bind(window);
 
@@ -35,7 +36,7 @@
     freeGameActive: false,
     freeGameLastPositiveSpinId: '',
     freeGameZeroSpinId: '',
-    currentRoomKey: '',
+    currentRoomKey: RUNTIME_ROOM_KEY,
     currentRoomNumber: null,
     roomFreeGameEntries: 0,
     roomFreeGameInProgress: false,
@@ -68,18 +69,22 @@
   let fullScanRoomIndexById = new Map();
 
   function evolveRoomFreeEntryCounter(previous = {}, event = {}) {
-    const eventRoomKey = String(event.roomKey || previous.roomKey || '');
+    // ATG 的遊戲結果封包不一定帶 room/table id。
+    // 沒有房號時仍必須能計數，因此使用 runtime fallback；真正房號稍後出現時再升級 identity。
+    const eventRoomKey = String(event.roomKey || previous.roomKey || '__runtime__');
     const previousRoomKey = String(previous.roomKey || '');
-    const roomChanged = Boolean(eventRoomKey && previousRoomKey && eventRoomKey !== previousRoomKey);
+    const roomChanged = Boolean(
+      eventRoomKey && previousRoomKey &&
+      eventRoomKey !== previousRoomKey &&
+      !previousRoomKey.startsWith('runtime:') && previousRoomKey !== '__runtime__'
+    );
     const next = {
-      roomKey: eventRoomKey || previousRoomKey,
+      roomKey: eventRoomKey || previousRoomKey || '__runtime__',
       roomNumber: event.roomNumber ?? previous.roomNumber ?? null,
       count: roomChanged ? 0 : Math.max(0, Number(previous.count) || 0),
       inProgress: roomChanged ? false : Boolean(previous.inProgress),
       lastEntrySpinId: roomChanged ? '' : String(previous.lastEntrySpinId || '')
     };
-
-    if (!next.roomKey) return next;
 
     const active = Boolean(event.active);
     const entrySignal = Boolean(event.entrySignal);
@@ -126,7 +131,8 @@
   }
 
   function saveRoomFreeEntrySession() {
-    if (!state.currentRoomKey) return;
+    // runtime fallback 無法證明重新載入後仍是同一房，因此不持久化，避免換房沿用舊次數。
+    if (!state.currentRoomKey || state.currentRoomKey.startsWith('runtime:')) return;
     try {
       sessionStorage.setItem(ROOM_FREE_ENTRY_KEY, JSON.stringify({
         roomKey: state.currentRoomKey,
@@ -235,18 +241,25 @@
       return false;
     }
 
+    // 若目前只是 runtime fallback，現在才拿到真實房號：保留已累積的免遊次數，不視為換房。
+    const upgradingRuntimeIdentity = String(state.currentRoomKey || '').startsWith('runtime:');
     state.currentRoomKey = nextKey;
     state.currentRoomNumber = identity.roomNumber ?? null;
-    state.roomFreeGameEntries = 0;
-    state.roomFreeGameInProgress = false;
-    state.roomFreeGameLastEntrySpinId = '';
+    if (!upgradingRuntimeIdentity) {
+      state.roomFreeGameEntries = 0;
+      state.roomFreeGameInProgress = false;
+      state.roomFreeGameLastEntrySpinId = '';
+    }
     saveRoomFreeEntrySession();
     return true;
   }
 
-  function restoreRoomFreeEntrySession() {
+  function restoreRoomFreeEntrySession(expectedRoomKey = '') {
     const saved = loadRoomFreeEntrySession();
-    if (!saved?.roomKey) return false;
+    if (!saved?.roomKey || saved.roomKey.startsWith('runtime:')) return false;
+    // 只有能從目前 URL 證明仍是同一房時才還原，避免切房後沿用上一房次數。
+    if (expectedRoomKey && saved.roomKey !== expectedRoomKey) return false;
+    if (!expectedRoomKey) return false;
     state.currentRoomKey = saved.roomKey;
     state.currentRoomNumber = saved.roomNumber;
     state.roomFreeGameEntries = saved.count;
@@ -256,8 +269,8 @@
   }
 
   function updateRoomFreeEntryCounter(active, spinId, entrySignal = false) {
-    const roomKey = state.currentRoomKey || '';
-    if (!roomKey) return false;
+    // 免遊計數不能依賴 ATG 是否有附房號；沒有 identity 時就用本次遊戲 runtime key。
+    const roomKey = state.currentRoomKey || RUNTIME_ROOM_KEY;
     const next = evolveRoomFreeEntryCounter({
       roomKey: state.currentRoomKey,
       roomNumber: state.currentRoomNumber,
@@ -283,9 +296,11 @@
     return changed;
   }
 
-  restoreRoomFreeEntrySession();
   const initialRoomIdentity = resolveRoomIdentityFromUrl();
-  if (initialRoomIdentity) applyRoomIdentity(initialRoomIdentity);
+  if (initialRoomIdentity) {
+    if (!restoreRoomFreeEntrySession(initialRoomIdentity.key)) applyRoomIdentity(initialRoomIdentity);
+    else applyRoomIdentity(initialRoomIdentity);
+  }
 
   function toNumber(value) {
     if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -965,7 +980,7 @@
       <div class="xinyaoRow"><span>本次完成轉數</span><b>${state.completedSpins}</b></div>
       <div class="xinyaoLine"></div>
       <div style="text-align:right;font-size:10px;opacity:.62;">最後同步 ${state.lastSync || '—'}</div>
-      <div style="margin-top:2px;text-align:right;font-size:9px;opacity:.45;">本房免遊次數：換房歸零，同房重新整理保留</div>
+      <div style="margin-top:2px;text-align:right;font-size:9px;opacity:.45;">本房免遊次數：有房號時依房計算；無房號時依本次進房工作階段計算</div>
       ${pairBox}
     `;
 
