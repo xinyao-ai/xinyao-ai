@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.2
+// @version      3.1.3
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -883,7 +883,7 @@
 })();
 
 
-/* ===== 芯瑤 ATG 全房分析 v3.1.1｜全裝置自適應＋免彈窗同步 ===== */
+/* ===== 芯瑤 ATG 全房分析 v3.1.3｜全裝置自適應＋免彈窗同步＋排行榜快照 ===== */
 (() => {
   'use strict';
 
@@ -1590,6 +1590,8 @@
     scanVisited: new Set(),
     scanMessage: '尚未開始全房掃描',
     scanError: '',
+    rankingSnapshotRooms: null,
+    rankingSnapshotAt: '',
     latestTableNumbers: [],
     latestInferredPage: null,
     autoPagerProfile: null,
@@ -2843,8 +2845,9 @@
     if (state.scanAbort) {
       state.scanMessage = `已停止｜目前 ${count} / ${expected}`;
     } else if (completePages.length === 9 && count >= 4100) {
+      const snapshotCount = captureRankingSnapshot();
       state.scanError = '';
-      state.scanMessage = `✅ 1～9 頁資料全部完成｜${count} / ${expected}`;
+      state.scanMessage = `✅ 1～9 頁資料全部完成｜${count} / ${expected}｜排行榜已固定 ${snapshotCount} 個空房`;
     } else {
       const missing = pages.filter(page => roomBandCount(page) < expectedBandCount(page));
       state.scanError = `資料仍未完整：第 ${missing.join('、')} 頁。`;
@@ -2919,8 +2922,22 @@
     return rooms;
   }
 
+  function captureRankingSnapshot() {
+    const snapshot = numberedRooms()
+      .filter(r => r?.status === 'Empty')
+      .map(r => normalizeRoom(r))
+      .filter(Boolean);
+
+    state.rankingSnapshotRooms = snapshot;
+    state.rankingSnapshotAt = new Date().toISOString();
+    return snapshot.length;
+  }
+
   function topRooms() {
-    return rankRooms(numberedRooms(), { onlyEmpty: true, mode: ui.rankMode }).slice(0, ui.topN);
+    const source = Array.isArray(state.rankingSnapshotRooms)
+      ? state.rankingSnapshotRooms
+      : numberedRooms();
+    return rankRooms(source, { onlyEmpty: true, mode: ui.rankMode }).slice(0, ui.topN);
   }
 
   function exportData() {
