@@ -8,7 +8,7 @@
     'https://xinyao-atg-live.love06130430.workers.dev';
 
   const SCRIPT_URL =
-    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=315';
+    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=316';
 
   const GUIDE_IMAGES = {
     ios: './xinyao_guide_ios.png?v=203',
