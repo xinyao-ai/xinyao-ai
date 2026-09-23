@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.4
+// @version      3.1.5
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -19,6 +19,8 @@
   const WORKER = 'https://xinyao-atg-live.love06130430.workers.dev';
   const TOKEN_KEY = 'xinyao_atg_device_token_v2';
   const DEVICE_ID_KEY = 'xinyao_atg_device_id_v2';
+  const ROOM_FREE_ENTRY_KEY = 'xinyao_atg_room_free_entry_v1';
+  const FULL_SCAN_SESSION_KEY_LIVE = 'xinyao_atg_full_scan_session_v1';
   const nativeJSONParse = JSON.parse.bind(JSON);
   const cloudFetch = window.fetch.bind(window);
 
@@ -33,6 +35,11 @@
     freeGameActive: false,
     freeGameLastPositiveSpinId: '',
     freeGameZeroSpinId: '',
+    currentRoomKey: '',
+    currentRoomNumber: null,
+    roomFreeGameEntries: 0,
+    roomFreeGameInProgress: false,
+    roomFreeGameLastEntrySpinId: '',
     completedSpins: 0,
     lastSeenSpinId: '',
     previousSpinId: '',
@@ -57,6 +64,215 @@
   let pushBusy = false;
   let lastPushSignature = '';
   let deviceToken = localStorage.getItem(TOKEN_KEY) || '';
+  let fullScanRoomIndexRaw = '';
+  let fullScanRoomIndexById = new Map();
+
+  function evolveRoomFreeEntryCounter(previous = {}, event = {}) {
+    const eventRoomKey = String(event.roomKey || previous.roomKey || '');
+    const previousRoomKey = String(previous.roomKey || '');
+    const roomChanged = Boolean(eventRoomKey && previousRoomKey && eventRoomKey !== previousRoomKey);
+    const next = {
+      roomKey: eventRoomKey || previousRoomKey,
+      roomNumber: event.roomNumber ?? previous.roomNumber ?? null,
+      count: roomChanged ? 0 : Math.max(0, Number(previous.count) || 0),
+      inProgress: roomChanged ? false : Boolean(previous.inProgress),
+      lastEntrySpinId: roomChanged ? '' : String(previous.lastEntrySpinId || '')
+    };
+
+    if (!next.roomKey) return next;
+
+    const active = Boolean(event.active);
+    const spinId = String(event.spinId || '');
+    if (active) {
+      if (!next.inProgress) {
+        next.count += 1;
+        next.inProgress = true;
+        next.lastEntrySpinId = spinId;
+      }
+    } else if (next.inProgress) {
+      next.inProgress = false;
+    }
+    return next;
+  }
+
+  function loadRoomFreeEntrySession() {
+    try {
+      const raw = sessionStorage.getItem(ROOM_FREE_ENTRY_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      return {
+        roomKey: String(parsed.roomKey || ''),
+        roomNumber: toNumber(parsed.roomNumber),
+        count: Math.max(0, Math.trunc(toNumber(parsed.count) || 0)),
+        inProgress: Boolean(parsed.inProgress),
+        lastEntrySpinId: String(parsed.lastEntrySpinId || '')
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function saveRoomFreeEntrySession() {
+    if (!state.currentRoomKey) return;
+    try {
+      sessionStorage.setItem(ROOM_FREE_ENTRY_KEY, JSON.stringify({
+        roomKey: state.currentRoomKey,
+        roomNumber: state.currentRoomNumber,
+        count: state.roomFreeGameEntries,
+        inProgress: state.roomFreeGameInProgress,
+        lastEntrySpinId: state.roomFreeGameLastEntrySpinId,
+        updatedAt: new Date().toISOString()
+      }));
+    } catch (_) {}
+  }
+
+  function fullScanRoomNumberByRoomId(roomId) {
+    const id = toNumber(roomId);
+    if (id === null) return null;
+    try {
+      const raw = sessionStorage.getItem(FULL_SCAN_SESSION_KEY_LIVE) || '';
+      if (!raw) return null;
+      if (raw !== fullScanRoomIndexRaw) {
+        const parsed = JSON.parse(raw);
+        const next = new Map();
+        for (const room of (Array.isArray(parsed?.rooms) ? parsed.rooms : [])) {
+          const rid = toNumber(room?.roomId);
+          const number = toNumber(room?.number);
+          if (rid !== null && number !== null && number >= 1 && number <= 4100) next.set(rid, number);
+        }
+        fullScanRoomIndexRaw = raw;
+        fullScanRoomIndexById = next;
+      }
+      return fullScanRoomIndexById.get(id) ?? null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function findNamedNumber(value, names, depth = 0, seen = new WeakSet()) {
+    if (!value || typeof value !== 'object' || depth > 8 || seen.has(value)) return null;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const found = findNamedNumber(item, names, depth + 1, seen);
+        if (found !== null) return found;
+      }
+      return null;
+    }
+    for (const [key, raw] of Object.entries(value)) {
+      const normalized = String(key).replace(/[^a-z0-9]/gi, '').toLowerCase();
+      if (names.has(normalized)) {
+        const n = toNumber(raw);
+        if (n !== null) return n;
+      }
+    }
+    for (const child of Object.values(value)) {
+      if (!child || typeof child !== 'object') continue;
+      const found = findNamedNumber(child, names, depth + 1, seen);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+
+  function resolveRoomIdentityFromUrl() {
+    try {
+      const url = new URL(location.href);
+      const numberNames = new Set(['roomnumber','roomno','roomnum','tablenumber','tableno','tablenum','machinenumber','machineno']);
+      const idNames = new Set(['roomid','tableid']);
+      for (const [key, raw] of url.searchParams.entries()) {
+        const name = String(key).replace(/[^a-z0-9]/gi, '').toLowerCase();
+        const n = toNumber(raw);
+        if (n === null) continue;
+        if (numberNames.has(name) && n >= 1 && n <= 4100) return { key: `room:${n}`, roomNumber: n };
+        if (idNames.has(name)) {
+          const mapped = fullScanRoomNumberByRoomId(n);
+          return mapped !== null ? { key: `room:${mapped}`, roomNumber: mapped } : { key: `roomId:${n}`, roomNumber: null };
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function resolveRoomIdentityFromEngine(engine) {
+    const numberNames = new Set(['roomnumber','roomno','roomnum','tablenumber','tableno','tablenum','machinenumber','machineno']);
+    const directNumber = findNamedNumber(engine, numberNames);
+    if (directNumber !== null && directNumber >= 1 && directNumber <= 4100) {
+      return { key: `room:${directNumber}`, roomNumber: directNumber };
+    }
+
+    const roomId = findNamedNumber(engine, new Set(['roomid','tableid']));
+    if (roomId !== null) {
+      const mapped = fullScanRoomNumberByRoomId(roomId);
+      return mapped !== null
+        ? { key: `room:${mapped}`, roomNumber: mapped }
+        : { key: `roomId:${roomId}`, roomNumber: null };
+    }
+    return resolveRoomIdentityFromUrl();
+  }
+
+  function applyRoomIdentity(identity) {
+    if (!identity?.key) return false;
+    const nextKey = String(identity.key);
+    if (state.currentRoomKey === nextKey) {
+      if (identity.roomNumber !== null && identity.roomNumber !== undefined && state.currentRoomNumber !== identity.roomNumber) {
+        state.currentRoomNumber = identity.roomNumber;
+        saveRoomFreeEntrySession();
+        return true;
+      }
+      return false;
+    }
+
+    state.currentRoomKey = nextKey;
+    state.currentRoomNumber = identity.roomNumber ?? null;
+    state.roomFreeGameEntries = 0;
+    state.roomFreeGameInProgress = false;
+    state.roomFreeGameLastEntrySpinId = '';
+    saveRoomFreeEntrySession();
+    return true;
+  }
+
+  function restoreRoomFreeEntrySession() {
+    const saved = loadRoomFreeEntrySession();
+    if (!saved?.roomKey) return false;
+    state.currentRoomKey = saved.roomKey;
+    state.currentRoomNumber = saved.roomNumber;
+    state.roomFreeGameEntries = saved.count;
+    state.roomFreeGameInProgress = saved.inProgress;
+    state.roomFreeGameLastEntrySpinId = saved.lastEntrySpinId;
+    return true;
+  }
+
+  function updateRoomFreeEntryCounter(active, spinId) {
+    const roomKey = state.currentRoomKey || '';
+    if (!roomKey) return false;
+    const next = evolveRoomFreeEntryCounter({
+      roomKey: state.currentRoomKey,
+      roomNumber: state.currentRoomNumber,
+      count: state.roomFreeGameEntries,
+      inProgress: state.roomFreeGameInProgress,
+      lastEntrySpinId: state.roomFreeGameLastEntrySpinId
+    }, {
+      roomKey,
+      roomNumber: state.currentRoomNumber,
+      active,
+      spinId
+    });
+
+    const changed =
+      next.count !== state.roomFreeGameEntries ||
+      next.inProgress !== state.roomFreeGameInProgress ||
+      next.lastEntrySpinId !== state.roomFreeGameLastEntrySpinId;
+    state.roomFreeGameEntries = next.count;
+    state.roomFreeGameInProgress = next.inProgress;
+    state.roomFreeGameLastEntrySpinId = next.lastEntrySpinId;
+    if (changed) saveRoomFreeEntrySession();
+    return changed;
+  }
+
+  restoreRoomFreeEntrySession();
+  const initialRoomIdentity = resolveRoomIdentityFromUrl();
+  if (initialRoomIdentity) applyRoomIdentity(initialRoomIdentity);
 
   function toNumber(value) {
     if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -319,6 +535,8 @@
       spinId
     );
 
+    if (updateRoomFreeEntryCounter(nextFreeGame.active, spinId)) changed = true;
+
     if (state.freeGameActive !== nextFreeGame.active) {
       state.freeGameActive = nextFreeGame.active;
       changed = true;
@@ -350,7 +568,10 @@
     const finalState = getFinalGameState(engine);
     state.lastSeenSpinId = spinId;
 
-    let changed = updateGeneralFromEngine(engine, finalState, spinId);
+    let changed = false;
+    const roomIdentity = resolveRoomIdentityFromEngine(engine);
+    if (roomIdentity && applyRoomIdentity(roomIdentity)) changed = true;
+    if (updateGeneralFromEngine(engine, finalState, spinId)) changed = true;
     if (!state.waitingResult) return changed;
 
     if (!state.currentSpinId && state.previousSpinId && spinId === state.previousSpinId) {
@@ -669,11 +890,11 @@
       <div class="xinyaoRow"><span>目前押注</span><b>${money(state.stake)}</b></div>
       <div class="xinyaoRow"><span>最新一局派彩</span><b>${money(state.latestPayout)}</b></div>
       <div class="xinyaoRow"><span>本次最高派彩</span><b>${money(state.maxPayout)}</b></div>
-      <div class="xinyaoRow"><span>免費遊戲狀態</span><b>${freeGameText()}</b></div>
+      <div class="xinyaoRow"><span>本房免遊次數</span><b>${state.roomFreeGameEntries} 次</b></div>
       <div class="xinyaoRow"><span>本次完成轉數</span><b>${state.completedSpins}</b></div>
       <div class="xinyaoLine"></div>
       <div style="text-align:right;font-size:10px;opacity:.62;">最後同步 ${state.lastSync || '—'}</div>
-      <div style="margin-top:2px;text-align:right;font-size:9px;opacity:.45;">僅統計本次開啟遊戲後資料</div>
+      <div style="margin-top:2px;text-align:right;font-size:9px;opacity:.45;">本房免遊次數：換房歸零，同房重新整理保留</div>
       ${pairBox}
     `;
 
@@ -854,7 +1075,9 @@
     window.__XIANYAO_ATG_LIVE_TEST__ = {
       readFreeGameSignal,
       computeFreeGameState,
-      freeGameTextFor
+      freeGameTextFor,
+      evolveRoomFreeEntryCounter,
+      resolveRoomIdentityFromEngine
     };
   }
 
