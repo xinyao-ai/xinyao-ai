@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.5
+// @version      3.1.6
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -82,7 +82,19 @@
     if (!next.roomKey) return next;
 
     const active = Boolean(event.active);
+    const entrySignal = Boolean(event.entrySignal);
     const spinId = String(event.spinId || '');
+
+    // 真正的「開始免遊」訊號優先：同一個 spinId 只計一次。
+    // 這樣不需要依賴 ATG 是否會在後續封包持續維持 active=true。
+    if (entrySignal && (!spinId || spinId !== next.lastEntrySpinId)) {
+      next.count += 1;
+      next.inProgress = true;
+      next.lastEntrySpinId = spinId;
+      return next;
+    }
+
+    // 沒有明確 start 訊號時，以 active 的 false -> true 當 fallback。
     if (active) {
       if (!next.inProgress) {
         next.count += 1;
@@ -243,7 +255,7 @@
     return true;
   }
 
-  function updateRoomFreeEntryCounter(active, spinId) {
+  function updateRoomFreeEntryCounter(active, spinId, entrySignal = false) {
     const roomKey = state.currentRoomKey || '';
     if (!roomKey) return false;
     const next = evolveRoomFreeEntryCounter({
@@ -256,6 +268,7 @@
       roomKey,
       roomNumber: state.currentRoomNumber,
       active,
+      entrySignal,
       spinId
     });
 
@@ -386,31 +399,88 @@
     const states = Array.isArray(engine?.gameState) ? engine.gameState : [];
     let sawExplicit = false;
     let startSignal = false;
+    let activeFlag = null;
     let positiveCount = null;
     let lastCount = null;
 
-    for (const item of states) {
-      if (!item || typeof item !== 'object') continue;
+    const normalizeKey = key => String(key || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+    const startKeys = new Set([
+      'startfreegame','startfreespin','startfreespins','triggerfreegame','triggerfreespin','triggerfreespins',
+      'freegamestart','freespinstart','freespinsstart','freegametriggered','freespintriggered','freespinstriggered'
+    ]);
+    const activeKeys = new Set([
+      'isfreegame','isfreespin','isfreespins','infreegame','infreespin','infreespins',
+      'freegameactive','freespinactive','freespinsactive','isfreegameactive','isfreespinactive'
+    ]);
+    const countKeys = new Set([
+      'freegamecount','freegamescount','freespincount','freespinscount',
+      'freegamesleft','freegameleft','freespinsleft','freespinleft',
+      'remainingfreegame','remainingfreegames','remainingfreespin','remainingfreespins',
+      'freegameremaining','freegamesremaining','freespinremaining','freespinsremaining'
+    ]);
 
-      if (typeof item.startFreeGame === 'boolean') {
-        sawExplicit = true;
-        if (item.startFreeGame) startSignal = true;
-      }
+    const visit = (value, path = '', depth = 0, seen = new WeakSet()) => {
+      if (!value || typeof value !== 'object' || depth > 6 || seen.has(value)) return;
+      seen.add(value);
+      const entries = Array.isArray(value) ? value.entries() : Object.entries(value);
+      for (const [rawKey, rawValue] of entries) {
+        const key = normalizeKey(rawKey);
+        const nextPath = path ? `${path}.${key}` : key;
+        const pathLooksFree = /freegame|freespin/.test(nextPath);
 
-      const count = toNumber(item.freeGameCount);
-      if (count !== null) {
-        sawExplicit = true;
-        lastCount = Math.max(0, count);
-        if (count > 0) positiveCount = count;
+        if (startKeys.has(key) && typeof rawValue === 'boolean') {
+          sawExplicit = true;
+          if (rawValue) startSignal = true;
+        }
+
+        if (activeKeys.has(key) && typeof rawValue === 'boolean') {
+          sawExplicit = true;
+          activeFlag = activeFlag === true ? true : rawValue;
+        }
+
+        if (countKeys.has(key)) {
+          const n = toNumber(rawValue);
+          if (n !== null) {
+            sawExplicit = true;
+            const c = Math.max(0, n);
+            lastCount = c;
+            if (c > 0) positiveCount = c;
+          }
+        }
+
+        // 有些 ATG 遊戲會包成 freeGame/freeSpin 物件，內層只叫 start/active/count/left/remaining。
+        if (pathLooksFree) {
+          if ((key === 'start' || key === 'trigger' || key === 'triggered') && typeof rawValue === 'boolean') {
+            sawExplicit = true;
+            if (rawValue) startSignal = true;
+          }
+          if ((key === 'active' || key === 'isactive' || key === 'running' || key === 'inprogress') && typeof rawValue === 'boolean') {
+            sawExplicit = true;
+            activeFlag = activeFlag === true ? true : rawValue;
+          }
+          if (['count','left','remaining','remain','spins','times'].includes(key)) {
+            const n = toNumber(rawValue);
+            if (n !== null) {
+              sawExplicit = true;
+              const c = Math.max(0, n);
+              lastCount = c;
+              if (c > 0) positiveCount = c;
+            }
+          }
+        }
+
+        if (rawValue && typeof rawValue === 'object') visit(rawValue, nextPath, depth + 1, seen);
       }
-    }
+    };
+
+    for (const item of states) visit(item);
 
     const count = positiveCount !== null ? positiveCount : lastCount;
     return {
       sawExplicit,
       startSignal,
       count,
-      activeSignal: startSignal || (count !== null && count > 0)
+      activeSignal: startSignal || activeFlag === true || (count !== null && count > 0)
     };
   }
 
@@ -523,6 +593,7 @@
       }
     }
 
+    const freeGameSignal = readFreeGameSignal(engine);
     const nextFreeGame = computeFreeGameState(
       {
         active: state.freeGameActive,
@@ -535,7 +606,7 @@
       spinId
     );
 
-    if (updateRoomFreeEntryCounter(nextFreeGame.active, spinId)) changed = true;
+    if (updateRoomFreeEntryCounter(nextFreeGame.active, spinId, freeGameSignal.startSignal)) changed = true;
 
     if (state.freeGameActive !== nextFreeGame.active) {
       state.freeGameActive = nextFreeGame.active;
