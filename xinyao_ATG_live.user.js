@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.8
+// @version      3.1.9
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -38,6 +38,8 @@
     freeGameZeroSpinId: '',
     currentRoomKey: RUNTIME_ROOM_KEY,
     currentRoomNumber: null,
+    roomEntryBalance: null,
+    roomProfit: null,
     roomFreeGameEntries: 0,
     roomFreeGameInProgress: false,
     roomFreeGameLastEntrySpinId: '',
@@ -67,6 +69,43 @@
   let deviceToken = localStorage.getItem(TOKEN_KEY) || '';
   let fullScanRoomIndexRaw = '';
   let fullScanRoomIndexById = new Map();
+
+  function evolveRoomPlaySession(previous = {}, event = {}) {
+    const finite = value => {
+      if (value === null || value === undefined || value === '') return null;
+      const n = Number(value);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    const previousRoomKey = String(previous.roomKey || '');
+    const eventRoomKey = String(event.roomKey || previousRoomKey || '');
+    const upgradingRuntimeIdentity = Boolean(
+      previousRoomKey && eventRoomKey && previousRoomKey !== eventRoomKey &&
+      (previousRoomKey.startsWith('runtime:') || previousRoomKey === '__runtime__')
+    );
+    const roomChanged = Boolean(
+      previousRoomKey && eventRoomKey && previousRoomKey !== eventRoomKey && !upgradingRuntimeIdentity
+    );
+    const balance = finite(event.balance);
+    let entryBalance = finite(previous.entryBalance);
+
+    if (roomChanged) {
+      entryBalance = balance;
+    } else if (entryBalance === null && balance !== null) {
+      entryBalance = balance;
+    }
+
+    const profit = entryBalance !== null && balance !== null
+      ? Math.round((balance - entryBalance) * 100) / 100
+      : null;
+
+    return {
+      roomKey: eventRoomKey || previousRoomKey,
+      roomNumber: event.roomNumber ?? previous.roomNumber ?? null,
+      entryBalance,
+      profit
+    };
+  }
 
   function evolveRoomFreeEntryCounter(previous = {}, event = {}) {
     // ATG 的遊戲結果封包不一定帶 room/table id。
@@ -121,6 +160,7 @@
       return {
         roomKey: String(parsed.roomKey || ''),
         roomNumber: toNumber(parsed.roomNumber),
+        entryBalance: toNumber(parsed.entryBalance),
         count: Math.max(0, Math.trunc(toNumber(parsed.count) || 0)),
         inProgress: Boolean(parsed.inProgress),
         lastEntrySpinId: String(parsed.lastEntrySpinId || '')
@@ -137,6 +177,7 @@
       sessionStorage.setItem(ROOM_FREE_ENTRY_KEY, JSON.stringify({
         roomKey: state.currentRoomKey,
         roomNumber: state.currentRoomNumber,
+        entryBalance: state.roomEntryBalance,
         count: state.roomFreeGameEntries,
         inProgress: state.roomFreeGameInProgress,
         lastEntrySpinId: state.roomFreeGameLastEntrySpinId,
@@ -232,19 +273,48 @@
   function applyRoomIdentity(identity) {
     if (!identity?.key) return false;
     const nextKey = String(identity.key);
+    const nextRoomNumber = identity.roomNumber ?? null;
+
+    const upgradingRuntimeIdentity = Boolean(
+      String(state.currentRoomKey || '').startsWith('runtime:') &&
+      state.currentRoomKey !== nextKey
+    );
+    const genuineRoomChange = Boolean(
+      state.currentRoomKey && state.currentRoomKey !== nextKey && !upgradingRuntimeIdentity
+    );
+    const roomMoney = evolveRoomPlaySession({
+      roomKey: state.currentRoomKey,
+      roomNumber: state.currentRoomNumber,
+      entryBalance: state.roomEntryBalance
+    }, {
+      roomKey: nextKey,
+      roomNumber: nextRoomNumber,
+      balance: genuineRoomChange ? null : state.balance
+    });
+
     if (state.currentRoomKey === nextKey) {
+      let changed = false;
       if (identity.roomNumber !== null && identity.roomNumber !== undefined && state.currentRoomNumber !== identity.roomNumber) {
         state.currentRoomNumber = identity.roomNumber;
-        saveRoomFreeEntrySession();
-        return true;
+        changed = true;
       }
-      return false;
+      if (state.roomEntryBalance !== roomMoney.entryBalance) {
+        state.roomEntryBalance = roomMoney.entryBalance;
+        changed = true;
+      }
+      if (state.roomProfit !== roomMoney.profit) {
+        state.roomProfit = roomMoney.profit;
+        changed = true;
+      }
+      if (changed) saveRoomFreeEntrySession();
+      return changed;
     }
 
-    // 若目前只是 runtime fallback，現在才拿到真實房號：保留已累積的免遊次數，不視為換房。
-    const upgradingRuntimeIdentity = String(state.currentRoomKey || '').startsWith('runtime:');
+    // runtime fallback 升級成真實房號時，保留已記錄的進房金額與免遊次數；真正換房才重設。
     state.currentRoomKey = nextKey;
-    state.currentRoomNumber = identity.roomNumber ?? null;
+    state.currentRoomNumber = nextRoomNumber;
+    state.roomEntryBalance = roomMoney.entryBalance;
+    state.roomProfit = roomMoney.profit;
     if (!upgradingRuntimeIdentity) {
       state.roomFreeGameEntries = 0;
       state.roomFreeGameInProgress = false;
@@ -252,6 +322,26 @@
     }
     saveRoomFreeEntrySession();
     return true;
+  }
+
+  function updateRoomMoneyFromBalance() {
+    const next = evolveRoomPlaySession({
+      roomKey: state.currentRoomKey,
+      roomNumber: state.currentRoomNumber,
+      entryBalance: state.roomEntryBalance
+    }, {
+      roomKey: state.currentRoomKey || RUNTIME_ROOM_KEY,
+      roomNumber: state.currentRoomNumber,
+      balance: state.balance
+    });
+
+    const changed =
+      next.entryBalance !== state.roomEntryBalance ||
+      next.profit !== state.roomProfit;
+    state.roomEntryBalance = next.entryBalance;
+    state.roomProfit = next.profit;
+    if (changed) saveRoomFreeEntrySession();
+    return changed;
   }
 
   function restoreRoomFreeEntrySession(expectedRoomKey = '') {
@@ -262,6 +352,8 @@
     if (!expectedRoomKey) return false;
     state.currentRoomKey = saved.roomKey;
     state.currentRoomNumber = saved.roomNumber;
+    state.roomEntryBalance = saved.entryBalance;
+    state.roomProfit = null;
     state.roomFreeGameEntries = saved.count;
     state.roomFreeGameInProgress = saved.inProgress;
     state.roomFreeGameLastEntrySpinId = saved.lastEntrySpinId;
@@ -314,6 +406,19 @@
     if (value === null || value === undefined) return '—';
     const n = Number(value);
     return Number.isFinite(n) ? n.toFixed(2) : '—';
+  }
+
+  function signedMoney(value) {
+    if (value === null || value === undefined) return '—';
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '—';
+    return `${n > 0 ? '+' : ''}${n.toFixed(2)}`;
+  }
+
+  function roomNumberText(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 1 || n > 4100) return '—';
+    return String(Math.trunc(n)).padStart(4, '0');
   }
 
   function nowText() {
@@ -732,6 +837,9 @@
         if (processEngine(engine)) changed = true;
       }
 
+      // 房號可能與餘額出現在同一包資料。先完成房號判斷，再用這一包的餘額建立/更新本房盈虧。
+      if (balance !== null && updateRoomMoneyFromBalance()) changed = true;
+
       if (changed) sync();
     } catch (_) {}
   }
@@ -836,6 +944,8 @@
       completedSpins: state.completedSpins,
       currentRoomNumber: state.currentRoomNumber,
       currentRoomKey: state.currentRoomKey,
+      roomEntryBalance: state.roomEntryBalance,
+      roomProfit: state.roomProfit,
       roomFreeGameEntries: state.roomFreeGameEntries
     };
   }
@@ -975,7 +1085,10 @@
       <div style="margin-top:3px;font-size:10px;opacity:.82;">${connectionText()}</div>
       <div style="margin-top:2px;font-size:9px;opacity:.68;">${cloudText()}${state.cloudTime ? ` ${state.cloudTime}` : ''}</div>
       <div class="xinyaoLine"></div>
+      <div class="xinyaoRow"><span>目前房號</span><b>${roomNumberText(state.currentRoomNumber)}</b></div>
+      <div class="xinyaoRow"><span>進房金額</span><b>${money(state.roomEntryBalance)}</b></div>
       <div class="xinyaoRow"><span>目前點數</span><b>${money(state.balance)}</b></div>
+      <div class="xinyaoRow"><span>本房盈虧</span><b style="color:${state.roomProfit > 0 ? '#8ff0ad' : state.roomProfit < 0 ? '#ff8da8' : '#fff'};">${signedMoney(state.roomProfit)}</b></div>
       <div class="xinyaoRow"><span>目前押注</span><b>${money(state.stake)}</b></div>
       <div class="xinyaoRow"><span>最新一局派彩</span><b>${money(state.latestPayout)}</b></div>
       <div class="xinyaoRow"><span>本次最高派彩</span><b>${money(state.maxPayout)}</b></div>
@@ -983,7 +1096,7 @@
       <div class="xinyaoRow"><span>本次完成轉數</span><b>${state.completedSpins}</b></div>
       <div class="xinyaoLine"></div>
       <div style="text-align:right;font-size:10px;opacity:.62;">最後同步 ${state.lastSync || '—'}</div>
-      <div style="margin-top:2px;text-align:right;font-size:9px;opacity:.45;">本房免遊次數：有房號時依房計算；無房號時依本次進房工作階段計算</div>
+      <div style="margin-top:2px;text-align:right;font-size:9px;opacity:.45;">本房資料：換房時重新記錄進房金額；同房重新整理會保留</div>
       ${pairBox}
     `;
 
