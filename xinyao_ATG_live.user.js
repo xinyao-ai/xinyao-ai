@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.7
+// @version      3.1.8
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -833,7 +833,10 @@
       maxPayout: state.maxPayout,
       freeGameCount: state.freeGameCount,
       freeGameActive: state.freeGameActive,
-      completedSpins: state.completedSpins
+      completedSpins: state.completedSpins,
+      currentRoomNumber: state.currentRoomNumber,
+      currentRoomKey: state.currentRoomKey,
+      roomFreeGameEntries: state.roomFreeGameEntries
     };
   }
 
