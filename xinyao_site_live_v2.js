@@ -8,7 +8,7 @@
     'https://xinyao-atg-live.love06130430.workers.dev';
 
   const SCRIPT_URL =
-    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=317';
+    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=318';
 
   const GUIDE_IMAGES = {
     ios: './xinyao_guide_ios.png?v=203',
@@ -664,6 +664,12 @@
     if (!data) {
       return;
     }
+
+    // v318：提供「本房狀態／遊玩紀錄」共用最新即時資料。
+    window.__XIANYAO_LATEST_LIVE__ = data;
+    try {
+      window.dispatchEvent(new CustomEvent('xinyao:live-data', { detail: data }));
+    } catch (_) {}
 
     if (
       $('xinyaoLiveGame')
@@ -2969,7 +2975,7 @@
     if (!snapshot?.rooms?.length) {
       panel.innerHTML = `
         <div class="card">
-          <h2 class="section-title">📊 全房推薦</h2>
+          <h2 class="section-title">📊 全房分析</h2>
           <div style="padding:16px;border-radius:16px;background:#fff7fb;border:1px solid #ffd8e7;line-height:1.8;color:#735c66;">
             尚未收到 ATG 全房資料。<br>
             請先在 ATG 按 <b>【一鍵掃描 4100 房】</b>，完成後再按 <b>【同步到芯瑤】</b>。
@@ -3000,7 +3006,7 @@
     panel.innerHTML = `
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
-          <div><h2 class="section-title" style="margin-bottom:5px;">📊 全房推薦</h2><div style="font-size:12px;color:#9b7d89;">已同步 <b>${snapshot.rooms.length}</b> 房｜${esc(capturedText)}</div></div>
+          <div><h2 class="section-title" style="margin-bottom:5px;">📊 全房分析</h2><div style="font-size:12px;color:#9b7d89;">已同步 <b>${snapshot.rooms.length}</b> 房｜${esc(capturedText)}</div></div>
           <button id="xinyaoRoomClear" type="button" style="border:1px solid #efcddd;background:#fff;color:#d94c89;border-radius:12px;padding:9px 12px;font-weight:800;cursor:pointer;">清除此批資料</button>
         </div>
 
@@ -3038,7 +3044,7 @@
     const style = document.createElement('style');
     style.id = 'xinyaoRoomRecommendStyleV2';
     style.textContent = `
-      .xinyao-room-tab-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+      .xinyao-room-tab-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
       @media(max-width:760px){.xinyao-room-tab-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
       #xinyaoRoomRecommendPanel th,#xinyaoRoomRecommendPanel td{padding:9px 7px;border-bottom:1px solid #f3dbe5;text-align:left;white-space:nowrap}
       #xinyaoRoomRecommendPanel th{color:#9d7184;font-size:11px}
@@ -3050,7 +3056,7 @@
     navButton.className = 'mode-button';
     navButton.type = 'button';
     navButton.dataset.panel = 'xinyaoRoomRecommendPanel';
-    navButton.textContent = '📊 全房推薦';
+    navButton.textContent = '📊 全房分析';
     grid.appendChild(navButton);
 
     panel = document.createElement('section');
@@ -3123,3 +3129,447 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
   else start();
 })();
+
+/* ===== 芯瑤 ATG 精簡主介面 v318｜全房分析 / 本房狀態 / 遊玩紀錄 ===== */
+(() => {
+  'use strict';
+
+  if (window.__XIANYAO_SITE_STREAMLINED_V318__) return;
+  window.__XIANYAO_SITE_STREAMLINED_V318__ = true;
+
+  const ACTIVE_KEY = 'xinyao_atg_active_play_session_v1';
+  const HISTORY_KEY = 'xinyao_atg_play_history_v1';
+  const MAX_HISTORY = 50;
+
+  let roomButton = null;
+  let currentButton = null;
+  let historyButton = null;
+  let currentPanel = null;
+  let historyPanel = null;
+  let latestLive = window.__XIANYAO_LATEST_LIVE__ || null;
+
+  const finite = (v) => {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const int = (v) => {
+    const n = finite(v);
+    return n === null ? null : Math.trunc(n);
+  };
+
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+  }[ch]));
+
+  const money = (v, signed = false) => {
+    const n = finite(v);
+    if (n === null) return '—';
+    const text = n.toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return signed && n > 0 ? `+${text}` : text;
+  };
+
+  const roomNo = (v) => {
+    const n = int(v);
+    return n !== null && n > 0 ? String(n).padStart(4, '0') : '辨識中';
+  };
+
+  const timeText = (v) => {
+    const n = Number(v || 0);
+    const d = new Date(n || v || Date.now());
+    return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('zh-TW', { hour12: false });
+  };
+
+  const durationText = (ms) => {
+    const sec = Math.max(0, Math.floor(Number(ms || 0) / 1000));
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    if (h > 0) return `${h} 小時 ${m} 分`;
+    return `${m} 分`;
+  };
+
+  function readJson(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function writeJson(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
+  }
+
+  function loadActive() {
+    const value = readJson(ACTIVE_KEY, null);
+    return value && typeof value === 'object' ? value : null;
+  }
+
+  function saveActive(value) {
+    if (!value) {
+      try { localStorage.removeItem(ACTIVE_KEY); } catch (_) {}
+      return;
+    }
+    writeJson(ACTIVE_KEY, value);
+  }
+
+  function loadHistory() {
+    const rows = readJson(HISTORY_KEY, []);
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  function saveHistory(rows) {
+    writeJson(HISTORY_KEY, rows.slice(0, MAX_HISTORY));
+  }
+
+  function identityOf(data) {
+    const roomNumber = int(data?.currentRoomNumber);
+    const roomKey = String(data?.currentRoomKey || '').trim();
+    return {
+      roomNumber: roomNumber && roomNumber > 0 ? roomNumber : null,
+      roomKey,
+      id: roomNumber && roomNumber > 0 ? `room:${roomNumber}` : roomKey
+    };
+  }
+
+  function sessionHasActivity(session) {
+    if (!session) return false;
+    return Number(session.spins || 0) > 0 ||
+      Number(session.freeGameEntries || 0) > 0 ||
+      finite(session.maxPayout) > 0 ||
+      Math.abs(Number(session.profit || 0)) > 0.0001;
+  }
+
+  function finalizeActive(active, endedAt = Date.now()) {
+    if (!active) return null;
+    const row = { ...active, active: false, endedAt, updatedAt: endedAt };
+    if (sessionHasActivity(row) || row.roomNumber) {
+      const history = loadHistory();
+      history.unshift(row);
+      saveHistory(history);
+    }
+    saveActive(null);
+    return row;
+  }
+
+  function createSession(data, identity) {
+    const startBalance = finite(data?.balance);
+    const completedSpins = Math.max(0, int(data?.completedSpins) || 0);
+    const now = Number(data?.updatedAt || Date.now());
+    return {
+      id: identity.id,
+      roomKey: identity.roomKey,
+      roomNumber: identity.roomNumber,
+      active: true,
+      startedAt: now,
+      updatedAt: now,
+      startBalance,
+      currentBalance: startBalance,
+      profit: 0,
+      stake: finite(data?.stake),
+      startSpins: completedSpins,
+      completedSpins,
+      spins: 0,
+      freeGameEntries: Math.max(0, int(data?.roomFreeGameEntries) || 0),
+      latestPayout: finite(data?.latestPayout),
+      maxPayout: finite(data?.maxPayout)
+    };
+  }
+
+  function shouldStartSession(data, identity) {
+    if (!identity.id) return false;
+    if (identity.roomNumber) return true;
+    return Math.max(0, int(data?.completedSpins) || 0) > 0 ||
+      Math.max(0, int(data?.roomFreeGameEntries) || 0) > 0;
+  }
+
+  function sameOrUpgrade(active, identity) {
+    if (!active || !identity.id) return false;
+    if (active.id === identity.id) return true;
+    if (active.roomNumber && identity.roomNumber && Number(active.roomNumber) === Number(identity.roomNumber)) return true;
+    // ATG 一開始可能只有 runtime key，稍後才解析出真實房號；這不是換房。
+    if (!active.roomNumber && identity.roomNumber && String(active.roomKey || '').startsWith('runtime:')) return true;
+    return false;
+  }
+
+  function updateSessionFromLive(data) {
+    if (!data) return null;
+    const identity = identityOf(data);
+    let active = loadActive();
+
+    if (!active) {
+      if (!shouldStartSession(data, identity)) return null;
+      active = createSession(data, identity);
+    } else if (!sameOrUpgrade(active, identity)) {
+      finalizeActive(active, Number(data?.updatedAt || Date.now()));
+      if (!shouldStartSession(data, identity)) return null;
+      active = createSession(data, identity);
+    } else if (!active.roomNumber && identity.roomNumber) {
+      active.id = identity.id;
+      active.roomKey = identity.roomKey;
+      active.roomNumber = identity.roomNumber;
+    }
+
+    const balance = finite(data.balance);
+    const completedSpins = Math.max(0, int(data.completedSpins) || 0);
+    const startSpins = Math.max(0, int(active.startSpins) || 0);
+    active.currentBalance = balance;
+    active.profit = balance !== null && finite(active.startBalance) !== null ? balance - Number(active.startBalance) : 0;
+    active.stake = finite(data.stake);
+    active.completedSpins = completedSpins;
+    active.spins = Math.max(0, completedSpins - startSpins);
+    active.freeGameEntries = Math.max(0, int(data.roomFreeGameEntries) || 0);
+    active.latestPayout = finite(data.latestPayout);
+    active.maxPayout = finite(data.maxPayout);
+    active.updatedAt = Number(data.updatedAt || Date.now());
+    saveActive(active);
+    return active;
+  }
+
+  function refreshCopyForStreamlinedUi() {
+    document.querySelectorAll('p,div,span').forEach(el => {
+      if (el.children.length) return;
+      const text = String(el.textContent || '').trim();
+      if (text === '依據個人選房邏輯與即時數據進行分析，房號判讀、續玩評估與近期紀錄一次完成。') {
+        el.textContent = '整合 4100 房全房數據、本房即時狀態與遊玩紀錄，一個畫面直接查看。';
+      } else if (text === '選房分析會員系統') {
+        el.textContent = 'ATG 即時分析會員系統';
+      }
+    });
+  }
+
+  function hideLegacyManualAnalysis(grid) {
+    const legacy = /房號分析|續玩分析|分析紀錄/;
+    grid.querySelectorAll('.mode-button').forEach(button => {
+      if (!legacy.test(String(button.textContent || ''))) return;
+      const panelId = button.dataset.panel;
+      button.classList.remove('active');
+      button.style.display = 'none';
+      if (panelId) {
+        const legacyPanel = document.getElementById(panelId);
+        if (legacyPanel) {
+          legacyPanel.classList.remove('active');
+          legacyPanel.style.display = 'none';
+        }
+      }
+    });
+
+    // 舊的手動分析結果卡片也一起收起，但保留原程式與資料。
+    document.querySelectorAll('.section-title,h2,h3').forEach(title => {
+      if (!/分析結果/.test(String(title.textContent || ''))) return;
+      const card = title.closest('.card');
+      if (card && !card.closest('#xinyaoCurrentRoomPanel') && !card.closest('#xinyaoPlayHistoryPanel')) {
+        card.style.display = 'none';
+      }
+    });
+  }
+
+  function activate(panel, button) {
+    document.querySelectorAll('.mode-button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    button?.classList.add('active');
+    panel?.classList.add('active');
+  }
+
+  function currentCard(label, value, note = '') {
+    return `
+      <div class="xinyao-current-card">
+        <div class="xinyao-current-label">${esc(label)}</div>
+        <div class="xinyao-current-value">${value}</div>
+        ${note ? `<div class="xinyao-current-note">${esc(note)}</div>` : ''}
+      </div>`;
+  }
+
+  function renderCurrentRoom() {
+    if (!currentPanel) return;
+    const data = latestLive || window.__XIANYAO_LATEST_LIVE__ || null;
+    const active = loadActive();
+
+    if (!data) {
+      currentPanel.innerHTML = `
+        <div class="card">
+          <h2 class="section-title">🎮 本房狀態</h2>
+          <div class="xinyao-empty-box">尚未收到 ATG 即時資料。完成配對並進入 ATG 遊戲後，這裡會自動更新。</div>
+        </div>`;
+      return;
+    }
+
+    const roomNumber = int(data.currentRoomNumber) || active?.roomNumber || null;
+    const balance = finite(data.balance);
+    const profit = active && balance !== null && finite(active.startBalance) !== null ? balance - Number(active.startBalance) : null;
+    const spins = active ? Math.max(0, Number(active.spins || 0)) : Math.max(0, int(data.completedSpins) || 0);
+    const freeEntries = Math.max(0, int(data.roomFreeGameEntries) || 0);
+    const elapsed = active ? Date.now() - Number(active.startedAt || Date.now()) : 0;
+    const updatedAt = Number(data.updatedAt || 0);
+    const fresh = updatedAt > 0 && Date.now() - updatedAt < 30000;
+
+    currentPanel.innerHTML = `
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+          <div>
+            <h2 class="section-title" style="margin-bottom:5px;">🎮 本房狀態</h2>
+            <div style="font-size:12px;color:#9b7d89;">${fresh ? '🟢 即時更新中' : '🟠 等待最新資料'}｜最後同步 ${esc(timeText(updatedAt))}</div>
+          </div>
+          <div class="xinyao-room-badge">房號 ${roomNo(roomNumber)}</div>
+        </div>
+
+        <div class="xinyao-current-grid">
+          ${currentCard('目前點數', `<b>${money(balance)}</b>`)}
+          ${currentCard('本房盈虧', `<b class="${profit > 0 ? 'xinyao-positive' : profit < 0 ? 'xinyao-negative' : ''}">${money(profit, true)}</b>`, active ? `進房 ${money(active.startBalance)}` : '等待建立本房紀錄')}
+          ${currentCard('目前押注', `<b>${money(data.stake)}</b>`)}
+          ${currentCard('本房轉數', `<b>${spins} 轉</b>`)}
+          ${currentCard('本房免遊次數', `<b>${freeEntries} 次</b>`)}
+          ${currentCard('本房最高派彩', `<b>${money(data.maxPayout)}</b>`)}
+          ${currentCard('最新一局派彩', `<b>${money(data.latestPayout)}</b>`)}
+          ${currentCard('已遊玩時間', `<b>${active ? durationText(elapsed) : '—'}</b>`)}
+        </div>
+
+        ${roomNumber ? '' : '<div class="xinyao-current-warning">目前 ATG 尚未回傳可對應的房號；點數、押注、派彩、轉數與免遊次數仍會照常即時更新。</div>'}
+      </div>`;
+  }
+
+  function historyRow(row, isActive = false) {
+    const profit = finite(row?.profit);
+    const endBalance = finite(row?.currentBalance);
+    const room = roomNo(row?.roomNumber);
+    const ended = isActive ? '遊玩中' : timeText(row?.endedAt || row?.updatedAt);
+    return `
+      <div class="xinyao-history-row">
+        <div><b>${room}</b><span class="xinyao-history-status">${isActive ? '進行中' : '已離房'}</span></div>
+        <div><small>進房</small><b>${money(row?.startBalance)}</b></div>
+        <div><small>${isActive ? '目前' : '離房'}</small><b>${money(endBalance)}</b></div>
+        <div><small>盈虧</small><b class="${profit > 0 ? 'xinyao-positive' : profit < 0 ? 'xinyao-negative' : ''}">${money(profit, true)}</b></div>
+        <div><small>轉數</small><b>${Math.max(0, Number(row?.spins || 0))}</b></div>
+        <div><small>免遊</small><b>${Math.max(0, Number(row?.freeGameEntries || 0))} 次</b></div>
+        <div><small>最高派彩</small><b>${money(row?.maxPayout)}</b></div>
+        <div class="xinyao-history-time">${esc(ended)}</div>
+      </div>`;
+  }
+
+  function renderHistory() {
+    if (!historyPanel) return;
+    const active = loadActive();
+    const history = loadHistory();
+    historyPanel.innerHTML = `
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+          <div>
+            <h2 class="section-title" style="margin-bottom:5px;">📜 遊玩紀錄</h2>
+            <div style="font-size:12px;color:#9b7d89;">進房後由 ATG 即時資料自動建立，不需要手動輸入。</div>
+          </div>
+          <button id="xinyaoClearPlayHistory" type="button" class="xinyao-outline-button">清空紀錄</button>
+        </div>
+        ${active ? `<div style="margin-top:14px;"><div class="xinyao-history-heading">🎮 目前遊玩中</div>${historyRow(active, true)}</div>` : ''}
+        <div style="margin-top:14px;">
+          <div class="xinyao-history-heading">最近紀錄</div>
+          ${history.length ? history.map(row => historyRow(row, false)).join('') : '<div class="xinyao-empty-box">目前還沒有已完成的遊玩紀錄。</div>'}
+        </div>
+      </div>`;
+  }
+
+  function addStyles() {
+    if (document.getElementById('xinyaoStreamlinedStyleV318')) return;
+    const style = document.createElement('style');
+    style.id = 'xinyaoStreamlinedStyleV318';
+    style.textContent = `
+      .xinyao-room-tab-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+      @media(max-width:760px){.xinyao-room-tab-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:6px!important}.xinyao-room-tab-grid .mode-button{font-size:12px!important;padding:10px 5px!important}}
+      .xinyao-current-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}
+      .xinyao-current-card{padding:13px;border:1px solid #f2d6e2;border-radius:15px;background:#fffafd;min-width:0}
+      .xinyao-current-label{font-size:11px;color:#9b7d89;font-weight:800;margin-bottom:5px}
+      .xinyao-current-value{font-size:18px;color:#513d47;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .xinyao-current-note{font-size:10px;color:#ad929e;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .xinyao-room-badge{padding:8px 12px;border-radius:999px;background:#ffeff6;color:#d94c89;font-weight:900;font-size:13px;border:1px solid #ffd2e4}
+      .xinyao-current-warning,.xinyao-empty-box{margin-top:12px;padding:13px;border-radius:14px;background:#fff8fb;border:1px solid #f2d8e4;color:#806773;font-size:12px;line-height:1.7}
+      .xinyao-positive{color:#15966f!important}.xinyao-negative{color:#e14e62!important}
+      .xinyao-outline-button{border:1px solid #efcddd;background:#fff;color:#d94c89;border-radius:12px;padding:9px 12px;font-weight:800;cursor:pointer}
+      .xinyao-history-heading{font-size:12px;color:#d94c89;font-weight:900;margin-bottom:7px}
+      .xinyao-history-row{display:grid;grid-template-columns:90px repeat(6,minmax(72px,1fr)) 130px;gap:8px;align-items:center;padding:11px;border:1px solid #f2dbe5;border-radius:14px;background:#fff;margin-bottom:8px;font-size:12px;overflow:auto}
+      .xinyao-history-row>div{display:flex;flex-direction:column;gap:2px;white-space:nowrap}.xinyao-history-row small{font-size:10px;color:#a88c99}.xinyao-history-status{font-size:10px;color:#d94c89}.xinyao-history-time{color:#9b7d89;font-size:10px}
+      @media(max-width:900px){.xinyao-current-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.xinyao-history-row{grid-template-columns:repeat(4,minmax(80px,1fr));}}
+    `;
+    document.head.appendChild(style);
+  }
+
+  function inject() {
+    if (document.getElementById('xinyaoCurrentRoomPanel')) return true;
+    const roomPanel = document.getElementById('xinyaoRoomRecommendPanel');
+    roomButton = document.querySelector('.mode-button[data-panel="xinyaoRoomRecommendPanel"]');
+    const grid = roomButton?.closest('.mode-grid');
+    if (!roomPanel || !roomButton || !grid) return false;
+
+    addStyles();
+    refreshCopyForStreamlinedUi();
+    hideLegacyManualAnalysis(grid);
+    grid.classList.add('xinyao-room-tab-grid');
+    roomButton.textContent = '📊 全房分析';
+
+    currentButton = document.createElement('button');
+    currentButton.className = 'mode-button';
+    currentButton.type = 'button';
+    currentButton.dataset.panel = 'xinyaoCurrentRoomPanel';
+    currentButton.textContent = '🎮 本房狀態';
+
+    historyButton = document.createElement('button');
+    historyButton.className = 'mode-button';
+    historyButton.type = 'button';
+    historyButton.dataset.panel = 'xinyaoPlayHistoryPanel';
+    historyButton.textContent = '📜 遊玩紀錄';
+
+    grid.append(currentButton, historyButton);
+
+    currentPanel = document.createElement('section');
+    currentPanel.className = 'panel';
+    currentPanel.id = 'xinyaoCurrentRoomPanel';
+
+    historyPanel = document.createElement('section');
+    historyPanel.className = 'panel';
+    historyPanel.id = 'xinyaoPlayHistoryPanel';
+
+    roomPanel.insertAdjacentElement('afterend', currentPanel);
+    currentPanel.insertAdjacentElement('afterend', historyPanel);
+
+    currentButton.addEventListener('click', () => {
+      activate(currentPanel, currentButton);
+      renderCurrentRoom();
+    });
+    historyButton.addEventListener('click', () => {
+      activate(historyPanel, historyButton);
+      renderHistory();
+    });
+    historyPanel.addEventListener('click', (event) => {
+      if (event.target?.id !== 'xinyaoClearPlayHistory') return;
+      if (!confirm('確定要清空已完成的遊玩紀錄嗎？目前遊玩中的本房資料會保留。')) return;
+      saveHistory([]);
+      renderHistory();
+    });
+
+    latestLive = window.__XIANYAO_LATEST_LIVE__ || latestLive;
+    if (latestLive) updateSessionFromLive(latestLive);
+    renderCurrentRoom();
+    renderHistory();
+
+    // 精簡版預設直接進全房分析，不再回到手動房號分析。
+    roomButton.click();
+    return true;
+  }
+
+  window.addEventListener('xinyao:live-data', (event) => {
+    latestLive = event.detail || null;
+    if (latestLive) updateSessionFromLive(latestLive);
+    renderCurrentRoom();
+    renderHistory();
+  });
+
+  function start() {
+    if (inject()) return;
+    const timer = setInterval(() => { if (inject()) clearInterval(timer); }, 250);
+    setTimeout(() => clearInterval(timer), 20000);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
+  else start();
+})();
+
