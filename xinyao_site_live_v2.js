@@ -8,7 +8,7 @@
     'https://xinyao-atg-live.love06130430.workers.dev';
 
   const SCRIPT_URL =
-    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=318';
+    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=319';
 
   const GUIDE_IMAGES = {
     ios: './xinyao_guide_ios.png?v=203',
@@ -665,7 +665,7 @@
       return;
     }
 
-    // v318：提供「本房狀態／遊玩紀錄」共用最新即時資料。
+    // v318：提供「本房狀態／遊玩紀錄」共用最新即時資料；安裝連結更新至 ATG 3.1.9。
     window.__XIANYAO_LATEST_LIVE__ = data;
     try {
       window.dispatchEvent(new CustomEvent('xinyao:live-data', { detail: data }));
@@ -3130,7 +3130,7 @@
   else start();
 })();
 
-/* ===== 芯瑤 ATG 精簡主介面 v318｜全房分析 / 本房狀態 / 遊玩紀錄 ===== */
+/* ===== 芯瑤 ATG 精簡主介面 v319｜全房分析 / 本房狀態 / 遊玩紀錄 ===== */
 (() => {
   'use strict';
 
