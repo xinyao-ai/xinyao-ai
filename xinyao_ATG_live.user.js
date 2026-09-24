@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.10
+// @version      3.1.11
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -271,54 +271,95 @@
   }
 
 
-  // ATG 進房時，房號/roomId 常出現在瀏覽器「送出去」的 Socket.IO / WebSocket 訊息；
-  // 後續遊戲結果不一定再帶房號。因此另外解析 outbound payload，避免左側一直顯示「—」。
+  // ATG 進房/換房時，房號可能走 WebSocket / Socket.IO / fetch / XHR，且 body 不一定是純字串。
+  // 所有 outbound 通道統一走這個解析器，避免第一次進房抓到、換房後又變回「—」。
+  function resolveRoomIdentityFromOutboundObject(value, eventHint = '') {
+    if (!value || typeof value !== 'object') return null;
+
+    const numberNames = new Set([
+      'room','roomnumber','roomno','roomnum','tablenumber','tableno','tablenum',
+      'machinenumber','machineno','machinenum'
+    ]);
+    const directNumber = findNamedNumber(value, numberNames);
+    if (directNumber !== null && directNumber >= 1 && directNumber <= 4100) {
+      return { key: `room:${directNumber}`, roomNumber: directNumber };
+    }
+
+    const idNames = new Set(['roomid','tableid','slottableid','machineid']);
+    let roomId = findNamedNumber(value, idNames);
+
+    // Socket.IO 有些進房事件是 emit('enterRoom', 1003) 或 emit('joinTable', { id: ... })。
+    // 只有事件名稱明確像「進/換房」時，才接受裸數字或 generic id，避免把頁碼/下注額誤認成房號。
+    const hint = String(eventHint || (Array.isArray(value) && typeof value[0] === 'string' ? value[0] : ''));
+    const roomActionHint = /(?:(?:enter|join|select|switch|change|open|play).*(?:room|table|slot|machine)|(?:room|table|slot|machine).*(?:enter|join|select|switch|change|open|play))/i.test(hint);
+
+    if (roomActionHint && Array.isArray(value)) {
+      for (const item of value.slice(1)) {
+        const n = toNumber(item);
+        if (n !== null) {
+          if (n >= 1 && n <= 4100) return { key: `room:${n}`, roomNumber: n };
+          if (roomId === null) roomId = n;
+        }
+      }
+    }
+
+    if (roomActionHint && roomId === null) {
+      const genericId = findNamedNumber(value, new Set(['id']));
+      if (genericId !== null) roomId = genericId;
+    }
+
+    if (roomId !== null) {
+      const mapped = fullScanRoomNumberByRoomId(roomId);
+      return mapped !== null
+        ? { key: `room:${mapped}`, roomNumber: mapped }
+        : { key: `roomId:${roomId}`, roomNumber: null };
+    }
+
+    // room/table 物件常見 { room: { number: 1003 } } / { table: { id: ... } }
+    for (const [rawKey, child] of Object.entries(value)) {
+      const key = String(rawKey).replace(/[^a-z0-9]/gi, '').toLowerCase();
+      if (!['room','table','slottable','machine'].includes(key) || !child || typeof child !== 'object') continue;
+      const nestedNumber = findNamedNumber(child, new Set(['number','no','num','roomnumber','tablenumber','machinenumber']));
+      if (nestedNumber !== null && nestedNumber >= 1 && nestedNumber <= 4100) {
+        return { key: `room:${nestedNumber}`, roomNumber: nestedNumber };
+      }
+      const nestedId = findNamedNumber(child, new Set(['id','roomid','tableid','slottableid','machineid']));
+      if (nestedId !== null) {
+        const mapped = fullScanRoomNumberByRoomId(nestedId);
+        return mapped !== null
+          ? { key: `room:${mapped}`, roomNumber: mapped }
+          : { key: `roomId:${nestedId}`, roomNumber: null };
+      }
+    }
+
+    return null;
+  }
+
   function resolveRoomIdentityFromOutboundText(data) {
     if (typeof data !== 'string') return null;
     const raw = String(data || '').trim();
     if (!raw) return null;
 
-    const identityFromObject = value => {
-      if (!value || typeof value !== 'object') return null;
-      const numberNames = new Set([
-        'roomnumber','roomno','roomnum','tablenumber','tableno','tablenum',
-        'machinenumber','machineno','machinenum'
-      ]);
-      const directNumber = findNamedNumber(value, numberNames);
-      if (directNumber !== null && directNumber >= 1 && directNumber <= 4100) {
-        return { key: `room:${directNumber}`, roomNumber: directNumber };
-      }
-
-      const roomId = findNamedNumber(value, new Set(['roomid','tableid','slottableid']));
-      if (roomId !== null) {
-        const mapped = fullScanRoomNumberByRoomId(roomId);
-        return mapped !== null
-          ? { key: `room:${mapped}`, roomNumber: mapped }
-          : { key: `roomId:${roomId}`, roomNumber: null };
-      }
-      return null;
-    };
-
-    // Socket.IO 常見格式：42["eventName", {...}]；一般 JSON 也一併處理。
     const positions = [raw.indexOf('['), raw.indexOf('{')].filter(index => index >= 0);
     if (positions.length) {
       const start = Math.min(...positions);
       try {
         const parsed = nativeJSONParse(raw.slice(start));
-        const found = identityFromObject(parsed);
+        const hint = Array.isArray(parsed) && typeof parsed[0] === 'string' ? parsed[0] : '';
+        const found = resolveRoomIdentityFromOutboundObject(parsed, hint);
         if (found) return found;
       } catch (_) {}
     }
 
-    // 少數送出資料是 query/form 文字，JSON.parse 不會成功；只接受明確房號欄位名稱。
+    // query/form/text 格式。
     const decoded = (() => { try { return decodeURIComponent(raw); } catch (_) { return raw; } })();
-    const numberMatch = decoded.match(/(?:roomNumber|roomNo|roomNum|tableNumber|tableNo|tableNum|machineNumber|machineNo)\s*["']?\s*[:=]\s*["']?(\d{1,4})/i);
+    const numberMatch = decoded.match(/(?:roomNumber|roomNo|roomNum|tableNumber|tableNo|tableNum|machineNumber|machineNo|(?:^|[?&\s,{])room|(?:^|[?&\s,{])table)\s*["']?\s*[:=]\s*["']?(\d{1,4})/i);
     if (numberMatch) {
       const n = toNumber(numberMatch[1]);
       if (n !== null && n >= 1 && n <= 4100) return { key: `room:${n}`, roomNumber: n };
     }
 
-    const idMatch = decoded.match(/(?:roomId|tableId|slotTableId)\s*["']?\s*[:=]\s*["']?(\d+)/i);
+    const idMatch = decoded.match(/(?:roomId|tableId|slotTableId|machineId)\s*["']?\s*[:=]\s*["']?(\d+)/i);
     if (idMatch) {
       const roomId = toNumber(idMatch[1]);
       if (roomId !== null) {
@@ -332,12 +373,56 @@
     return null;
   }
 
-  function applyOutboundRoomIdentity(data) {
-    const identity = resolveRoomIdentityFromOutboundText(data);
+  function applyResolvedOutboundRoomIdentity(identity) {
     if (!identity) return false;
     const changed = applyRoomIdentity(identity);
     if (changed) sync();
     return changed;
+  }
+
+  function applyOutboundRoomIdentity(data, eventHint = '') {
+    if (typeof data === 'string') {
+      return applyResolvedOutboundRoomIdentity(resolveRoomIdentityFromOutboundText(data));
+    }
+    if (data && typeof data === 'object' && !(data instanceof ArrayBuffer) && !ArrayBuffer.isView(data) && !(typeof Blob !== 'undefined' && data instanceof Blob)) {
+      return applyResolvedOutboundRoomIdentity(resolveRoomIdentityFromOutboundObject(data, eventHint));
+    }
+    return false;
+  }
+
+  // 統一處理所有送出資料型別；Blob 需要非同步讀取，其餘同步處理。
+  function inspectOutboundRoomData(data, eventHint = '') {
+    try {
+      if (data === null || data === undefined) return false;
+      if (typeof data === 'string') return applyOutboundRoomIdentity(data, eventHint);
+      if (typeof URLSearchParams !== 'undefined' && data instanceof URLSearchParams) {
+        return applyOutboundRoomIdentity(data.toString(), eventHint);
+      }
+      if (typeof FormData !== 'undefined' && data instanceof FormData) {
+        const obj = {};
+        for (const [key, value] of data.entries()) {
+          if (typeof value === 'string') obj[key] = value;
+        }
+        return applyOutboundRoomIdentity(obj, eventHint);
+      }
+      if (data instanceof ArrayBuffer) {
+        return applyOutboundRoomIdentity(new TextDecoder().decode(new Uint8Array(data)), eventHint);
+      }
+      if (ArrayBuffer.isView(data)) {
+        return applyOutboundRoomIdentity(new TextDecoder().decode(new Uint8Array(data.buffer, data.byteOffset, data.byteLength)), eventHint);
+      }
+      if (typeof Blob !== 'undefined' && data instanceof Blob) {
+        data.text().then(text => applyOutboundRoomIdentity(text, eventHint)).catch(() => {});
+        return false;
+      }
+      return applyOutboundRoomIdentity(data, eventHint);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function applyOutboundRoomFromTransport(data, eventHint = '') {
+    return inspectOutboundRoomData(data, eventHint);
   }
 
   function applyRoomIdentity(identity) {
@@ -1270,7 +1355,7 @@
           ws.send = function(data) {
             // 先從進房/遊戲送出訊息抓 roomId/tableId，再處理 spin。
             // 這條路徑是 3.1.10 的房號來源；不使用右側排行榜猜房號。
-            applyOutboundRoomIdentity(data);
+            applyOutboundRoomFromTransport(data);
             startNewRound(data);
             return nativeSend.call(this, data);
           };
@@ -1333,15 +1418,84 @@
   function patchSocketIO() {
     try {
       const proto = window.io?.Socket?.prototype;
-      if (!proto || proto.__xinyaoLiveV200Wrapped) return;
-      if (typeof proto.onevent === 'function') {
+      if (!proto) return;
+
+      if (typeof proto.onevent === 'function' && !proto.onevent.__xinyaoLiveV200Wrapped) {
         const nativeOnevent = proto.onevent;
-        proto.onevent = function(packet) {
+        const wrappedOnevent = function(packet) {
           try { if (packet?.data) inspectObject(packet.data); } catch (_) {}
           return nativeOnevent.call(this, packet);
         };
+        try { Object.defineProperty(wrappedOnevent, '__xinyaoLiveV200Wrapped', { value: true }); } catch (_) {}
+        proto.onevent = wrappedOnevent;
       }
-      proto.__xinyaoLiveV200Wrapped = true;
+
+      if (typeof proto.emit === 'function' && !proto.emit.__xinyaoRoomOutboundWrapped) {
+        const nativeEmit = proto.emit;
+        const wrappedEmit = function(...args) {
+          try {
+            const eventHint = typeof args[0] === 'string' ? args[0] : '';
+            applyOutboundRoomFromTransport(args, eventHint);
+          } catch (_) {}
+          return nativeEmit.apply(this, args);
+        };
+        try { Object.defineProperty(wrappedEmit, '__xinyaoRoomOutboundWrapped', { value: true }); } catch (_) {}
+        proto.emit = wrappedEmit;
+      }
+    } catch (_) {}
+  }
+
+  function patchFetchOutboundRoom() {
+    try {
+      const currentFetch = window.fetch;
+      if (!currentFetch || currentFetch.__xinyaoRoomOutboundWrapped) return;
+      const wrappedFetch = function(input, init = {}) {
+        try {
+          const url = typeof input === 'string' ? input : input?.url || '';
+          if (url) applyOutboundRoomFromTransport(url, 'fetch:url');
+          if (init?.body !== undefined && init?.body !== null) {
+            applyOutboundRoomFromTransport(init.body, 'fetch:body');
+          } else if (typeof Request !== 'undefined' && input instanceof Request) {
+            try {
+              input.clone().text().then(text => {
+                if (text) applyOutboundRoomFromTransport(text, 'fetch:request');
+              }).catch(() => {});
+            } catch (_) {}
+          }
+        } catch (_) {}
+        return currentFetch.apply(this, arguments);
+      };
+      try { Object.defineProperty(wrappedFetch, '__xinyaoRoomOutboundWrapped', { value: true }); } catch (_) {}
+      window.fetch = wrappedFetch;
+    } catch (_) {}
+  }
+
+  function patchXHROutboundRoom() {
+    try {
+      const XHR = window.XMLHttpRequest;
+      if (!XHR?.prototype) return;
+      const proto = XHR.prototype;
+      if (typeof proto.open === 'function' && !proto.open.__xinyaoRoomOutboundWrapped) {
+        const nativeOpen = proto.open;
+        const wrappedOpen = function(method, url, ...rest) {
+          try { this.__xinyaoRoomOutboundUrl = String(url || ''); } catch (_) {}
+          return nativeOpen.call(this, method, url, ...rest);
+        };
+        try { Object.defineProperty(wrappedOpen, '__xinyaoRoomOutboundWrapped', { value: true }); } catch (_) {}
+        proto.open = wrappedOpen;
+      }
+      if (typeof proto.send === 'function' && !proto.send.__xinyaoRoomOutboundWrapped) {
+        const nativeSend = proto.send;
+        const wrappedSend = function(body) {
+          try {
+            if (this.__xinyaoRoomOutboundUrl) applyOutboundRoomFromTransport(this.__xinyaoRoomOutboundUrl, 'xhr:url');
+            if (body !== undefined && body !== null) applyOutboundRoomFromTransport(body, 'xhr:body');
+          } catch (_) {}
+          return nativeSend.call(this, body);
+        };
+        try { Object.defineProperty(wrappedSend, '__xinyaoRoomOutboundWrapped', { value: true }); } catch (_) {}
+        proto.send = wrappedSend;
+      }
     } catch (_) {}
   }
 
@@ -1353,7 +1507,9 @@
       freeGameTextFor,
       evolveRoomFreeEntryCounter,
       resolveRoomIdentityFromEngine,
-      resolveRoomIdentityFromOutboundText
+      resolveRoomIdentityFromOutboundText,
+      resolveRoomIdentityFromOutboundObject,
+      inspectOutboundRoomData
     };
   }
 
@@ -1361,6 +1517,9 @@
   patchWebSocket();
   patchJSON();
   patchTextDecoder();
+  patchSocketIO();
+  patchFetchOutboundRoom();
+  patchXHROutboundRoom();
 
   const patchTimer = setInterval(() => {
     mountPanel();
@@ -1368,6 +1527,8 @@
     patchJSON();
     patchTextDecoder();
     patchSocketIO();
+    patchFetchOutboundRoom();
+    patchXHROutboundRoom();
   }, 100);
   setTimeout(() => clearInterval(patchTimer), 60000);
 
