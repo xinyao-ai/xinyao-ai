@@ -8,7 +8,7 @@
     'https://xinyao-atg-live.love06130430.workers.dev';
 
   const SCRIPT_URL =
-    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=324';
+    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=325';
 
   const GUIDE_IMAGES = {
     ios: './xinyao_guide_ios.png?v=203',
@@ -3130,7 +3130,7 @@
   else start();
 })();
 
-/* ===== 芯瑤 ATG 精簡主介面 v324｜全房分析 / 本房狀態 / 遊玩紀錄 ===== */
+/* ===== 芯瑤 ATG 精簡主介面 v325｜全房分析 / 本房狀態 / 遊玩紀錄 ===== */
 (() => {
   'use strict';
 
@@ -3245,7 +3245,7 @@
   function finalizeActive(active, endedAt = Date.now()) {
     if (!active) return null;
     const row = { ...active, active: false, endedAt, updatedAt: endedAt };
-    if (sessionHasActivity(row) || row.roomNumber) {
+    if (sessionHasActivity(row)) {
       const history = loadHistory();
       history.unshift(row);
       saveHistory(history);
@@ -3254,10 +3254,21 @@
     return row;
   }
 
+  function advanceCumulativeCounter(total, previousRaw, nextRaw) {
+    const currentTotal = Math.max(0, Number(total || 0));
+    const prev = Math.max(0, int(previousRaw) || 0);
+    const next = Math.max(0, int(nextRaw) || 0);
+    // 同一房內 Userscript / 遊戲重載時原始計數器可能歸 0。
+    // 歸 0 不代表本房歷史也要清空；之後從 1 開始時再繼續往上累加。
+    const delta = next >= prev ? next - prev : next;
+    return currentTotal + Math.max(0, delta);
+  }
+
   function createSession(data, identity) {
     // ATG 即時助手已保存真正進房金額；網站優先使用它，避免房號稍晚辨識時把中途餘額誤當進房金額。
     const startBalance = finite(data?.roomEntryBalance) ?? finite(data?.balance);
     const completedSpins = Math.max(0, int(data?.completedSpins) || 0);
+    const rawFreeGameEntries = Math.max(0, int(data?.roomFreeGameEntries) || 0);
     const now = Number(data?.updatedAt || Date.now());
     return {
       id: identity.id,
@@ -3272,8 +3283,10 @@
       stake: finite(data?.stake),
       startSpins: completedSpins,
       completedSpins,
+      lastRawCompletedSpins: completedSpins,
       spins: 0,
-      freeGameEntries: Math.max(0, int(data?.roomFreeGameEntries) || 0),
+      freeGameEntries: rawFreeGameEntries,
+      lastRawFreeGameEntries: rawFreeGameEntries,
       latestPayout: finite(data?.latestPayout),
       maxPayout: finite(data?.maxPayout)
     };
@@ -3318,21 +3331,48 @@
     }
 
     const balance = finite(data.balance);
-    const completedSpins = Math.max(0, int(data.completedSpins) || 0);
-    const startSpins = Math.max(0, int(active.startSpins) || 0);
-    const authoritativeEntryBalance = finite(data.roomEntryBalance);
-    const authoritativeProfit = finite(data.roomProfit);
-    if (authoritativeEntryBalance !== null) active.startBalance = authoritativeEntryBalance;
-    active.currentBalance = balance;
-    active.profit = authoritativeProfit !== null
-      ? authoritativeProfit
-      : (balance !== null && finite(active.startBalance) !== null ? balance - Number(active.startBalance) : 0);
-    active.stake = finite(data.stake);
-    active.completedSpins = completedSpins;
-    active.spins = Math.max(0, completedSpins - startSpins);
-    active.freeGameEntries = Math.max(0, int(data.roomFreeGameEntries) || 0);
-    active.latestPayout = finite(data.latestPayout);
-    active.maxPayout = finite(data.maxPayout);
+    const completedSpins = int(data.completedSpins);
+    const rawFreeGameEntries = int(data.roomFreeGameEntries);
+    const incomingEntryBalance = finite(data.roomEntryBalance);
+
+    // 進房金額只建立一次；同房後續封包不得改寫。
+    // 但若舊版 Worker 曾把 null 誤轉成 0，且本房尚無任何活動，允許第一筆真實正數修復一次。
+    const currentStartBalance = finite(active.startBalance);
+    const canRepairLegacyZeroStart = currentStartBalance === 0 && !sessionHasActivity(active) && incomingEntryBalance !== null && incomingEntryBalance > 0;
+    if (currentStartBalance === null || canRepairLegacyZeroStart) {
+      const initialBalance = incomingEntryBalance ?? balance;
+      if (initialBalance !== null) active.startBalance = initialBalance;
+    }
+
+    if (balance !== null) {
+      active.currentBalance = balance;
+      active.profit = finite(active.startBalance) !== null
+        ? balance - Number(active.startBalance)
+        : Number(active.profit || 0);
+    }
+
+    const incomingStake = finite(data.stake);
+    if (incomingStake !== null) active.stake = incomingStake;
+
+    if (completedSpins !== null) {
+      const previousRawSpins = int(active.lastRawCompletedSpins ?? active.completedSpins);
+      active.spins = advanceCumulativeCounter(active.spins, previousRawSpins, completedSpins);
+      active.completedSpins = completedSpins;
+      active.lastRawCompletedSpins = completedSpins;
+    }
+
+    if (rawFreeGameEntries !== null) {
+      const previousRawFree = int(active.lastRawFreeGameEntries ?? active.freeGameEntries);
+      active.freeGameEntries = advanceCumulativeCounter(active.freeGameEntries, previousRawFree, rawFreeGameEntries);
+      active.lastRawFreeGameEntries = rawFreeGameEntries;
+    }
+
+    const incomingLatestPayout = finite(data.latestPayout);
+    const incomingMaxPayout = finite(data.maxPayout);
+    if (incomingLatestPayout !== null) active.latestPayout = incomingLatestPayout;
+    if (incomingMaxPayout !== null) {
+      active.maxPayout = Math.max(0, finite(active.maxPayout) || 0, incomingMaxPayout);
+    }
     active.updatedAt = Number(data.updatedAt || Date.now());
     saveActive(active);
     return active;
@@ -3407,13 +3447,16 @@
     }
 
     const roomNumber = int(data.currentRoomNumber) || active?.roomNumber || null;
-    const balance = finite(data.balance);
-    const liveProfit = finite(data.roomProfit);
-    const profit = liveProfit !== null
-      ? liveProfit
-      : (active && balance !== null && finite(active.startBalance) !== null ? balance - Number(active.startBalance) : null);
+    const balance = finite(data.balance) ?? finite(active?.currentBalance);
+    const profit = active
+      ? finite(active.profit)
+      : finite(data.roomProfit);
     const spins = active ? Math.max(0, Number(active.spins || 0)) : Math.max(0, int(data.completedSpins) || 0);
-    const freeEntries = Math.max(0, int(data.roomFreeGameEntries) || 0);
+    const freeEntries = active
+      ? Math.max(0, Number(active.freeGameEntries || 0))
+      : Math.max(0, int(data.roomFreeGameEntries) || 0);
+    const maxPayout = active ? finite(active.maxPayout) : finite(data.maxPayout);
+    const latestPayout = active ? finite(active.latestPayout) : finite(data.latestPayout);
     const elapsed = active ? Date.now() - Number(active.startedAt || Date.now()) : 0;
     const updatedAt = Number(data.updatedAt || 0);
     const fresh = updatedAt > 0 && Date.now() - updatedAt < 30000;
@@ -3434,8 +3477,8 @@
           ${currentCard('目前押注', `<b>${money(data.stake)}</b>`)}
           ${currentCard('本房轉數', `<b>${spins} 轉</b>`)}
           ${currentCard('本房免遊次數', `<b>${freeEntries} 次</b>`)}
-          ${currentCard('本房最高派彩', `<b>${money(data.maxPayout)}</b>`)}
-          ${currentCard('最新一局派彩', `<b>${money(data.latestPayout)}</b>`)}
+          ${currentCard('本房最高派彩', `<b>${money(maxPayout)}</b>`)}
+          ${currentCard('最新一局派彩', `<b>${money(latestPayout)}</b>`)}
           ${currentCard('已遊玩時間', `<b>${active ? durationText(elapsed) : '—'}</b>`)}
         </div>
 
