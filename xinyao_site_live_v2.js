@@ -8,7 +8,7 @@
     'https://xinyao-atg-live.love06130430.workers.dev';
 
   const SCRIPT_URL =
-    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=320';
+    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=322';
 
   const GUIDE_IMAGES = {
     ios: './xinyao_guide_ios.png?v=203',
@@ -665,7 +665,7 @@
       return;
     }
 
-    // v318：提供「本房狀態／遊玩紀錄」共用最新即時資料；安裝連結更新至 ATG 3.1.10。
+    // v318：提供「本房狀態／遊玩紀錄」共用最新即時資料；安裝連結更新至 ATG 3.1.11。
     window.__XIANYAO_LATEST_LIVE__ = data;
     try {
       window.dispatchEvent(new CustomEvent('xinyao:live-data', { detail: data }));
@@ -3130,7 +3130,7 @@
   else start();
 })();
 
-/* ===== 芯瑤 ATG 精簡主介面 v320｜全房分析 / 本房狀態 / 遊玩紀錄 ===== */
+/* ===== 芯瑤 ATG 精簡主介面 v322｜全房分析 / 本房狀態 / 遊玩紀錄 ===== */
 (() => {
   'use strict';
 
@@ -3255,7 +3255,8 @@
   }
 
   function createSession(data, identity) {
-    const startBalance = finite(data?.balance);
+    // ATG 即時助手已保存真正進房金額；網站優先使用它，避免房號稍晚辨識時把中途餘額誤當進房金額。
+    const startBalance = finite(data?.roomEntryBalance) ?? finite(data?.balance);
     const completedSpins = Math.max(0, int(data?.completedSpins) || 0);
     const now = Number(data?.updatedAt || Date.now());
     return {
@@ -3286,7 +3287,11 @@
   }
 
   function sameOrUpgrade(active, identity) {
-    if (!active || !identity.id) return false;
+    if (!active) return false;
+    // 已經有真實房號時，短暫拿不到房號（runtime / roomId 未映射）不可視為換房。
+    // 等下一個明確房號到達，再決定是否真的換房。
+    if (active.roomNumber && !identity?.roomNumber) return true;
+    if (!identity?.id) return Boolean(active.roomNumber);
     if (active.id === identity.id) return true;
     if (active.roomNumber && identity.roomNumber && Number(active.roomNumber) === Number(identity.roomNumber)) return true;
     // ATG 一開始可能只有 runtime key，稍後才解析出真實房號；這不是換房。
@@ -3315,8 +3320,13 @@
     const balance = finite(data.balance);
     const completedSpins = Math.max(0, int(data.completedSpins) || 0);
     const startSpins = Math.max(0, int(active.startSpins) || 0);
+    const authoritativeEntryBalance = finite(data.roomEntryBalance);
+    const authoritativeProfit = finite(data.roomProfit);
+    if (authoritativeEntryBalance !== null) active.startBalance = authoritativeEntryBalance;
     active.currentBalance = balance;
-    active.profit = balance !== null && finite(active.startBalance) !== null ? balance - Number(active.startBalance) : 0;
+    active.profit = authoritativeProfit !== null
+      ? authoritativeProfit
+      : (balance !== null && finite(active.startBalance) !== null ? balance - Number(active.startBalance) : 0);
     active.stake = finite(data.stake);
     active.completedSpins = completedSpins;
     active.spins = Math.max(0, completedSpins - startSpins);
@@ -3398,7 +3408,10 @@
 
     const roomNumber = int(data.currentRoomNumber) || active?.roomNumber || null;
     const balance = finite(data.balance);
-    const profit = active && balance !== null && finite(active.startBalance) !== null ? balance - Number(active.startBalance) : null;
+    const liveProfit = finite(data.roomProfit);
+    const profit = liveProfit !== null
+      ? liveProfit
+      : (active && balance !== null && finite(active.startBalance) !== null ? balance - Number(active.startBalance) : null);
     const spins = active ? Math.max(0, Number(active.spins || 0)) : Math.max(0, int(data.completedSpins) || 0);
     const freeEntries = Math.max(0, int(data.roomFreeGameEntries) || 0);
     const elapsed = active ? Date.now() - Number(active.startedAt || Date.now()) : 0;
