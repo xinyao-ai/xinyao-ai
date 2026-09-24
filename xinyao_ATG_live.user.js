@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.9
+// @version      3.1.10
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -268,6 +268,76 @@
         : { key: `roomId:${roomId}`, roomNumber: null };
     }
     return resolveRoomIdentityFromUrl();
+  }
+
+
+  // ATG 進房時，房號/roomId 常出現在瀏覽器「送出去」的 Socket.IO / WebSocket 訊息；
+  // 後續遊戲結果不一定再帶房號。因此另外解析 outbound payload，避免左側一直顯示「—」。
+  function resolveRoomIdentityFromOutboundText(data) {
+    if (typeof data !== 'string') return null;
+    const raw = String(data || '').trim();
+    if (!raw) return null;
+
+    const identityFromObject = value => {
+      if (!value || typeof value !== 'object') return null;
+      const numberNames = new Set([
+        'roomnumber','roomno','roomnum','tablenumber','tableno','tablenum',
+        'machinenumber','machineno','machinenum'
+      ]);
+      const directNumber = findNamedNumber(value, numberNames);
+      if (directNumber !== null && directNumber >= 1 && directNumber <= 4100) {
+        return { key: `room:${directNumber}`, roomNumber: directNumber };
+      }
+
+      const roomId = findNamedNumber(value, new Set(['roomid','tableid','slottableid']));
+      if (roomId !== null) {
+        const mapped = fullScanRoomNumberByRoomId(roomId);
+        return mapped !== null
+          ? { key: `room:${mapped}`, roomNumber: mapped }
+          : { key: `roomId:${roomId}`, roomNumber: null };
+      }
+      return null;
+    };
+
+    // Socket.IO 常見格式：42["eventName", {...}]；一般 JSON 也一併處理。
+    const positions = [raw.indexOf('['), raw.indexOf('{')].filter(index => index >= 0);
+    if (positions.length) {
+      const start = Math.min(...positions);
+      try {
+        const parsed = nativeJSONParse(raw.slice(start));
+        const found = identityFromObject(parsed);
+        if (found) return found;
+      } catch (_) {}
+    }
+
+    // 少數送出資料是 query/form 文字，JSON.parse 不會成功；只接受明確房號欄位名稱。
+    const decoded = (() => { try { return decodeURIComponent(raw); } catch (_) { return raw; } })();
+    const numberMatch = decoded.match(/(?:roomNumber|roomNo|roomNum|tableNumber|tableNo|tableNum|machineNumber|machineNo)\s*["']?\s*[:=]\s*["']?(\d{1,4})/i);
+    if (numberMatch) {
+      const n = toNumber(numberMatch[1]);
+      if (n !== null && n >= 1 && n <= 4100) return { key: `room:${n}`, roomNumber: n };
+    }
+
+    const idMatch = decoded.match(/(?:roomId|tableId|slotTableId)\s*["']?\s*[:=]\s*["']?(\d+)/i);
+    if (idMatch) {
+      const roomId = toNumber(idMatch[1]);
+      if (roomId !== null) {
+        const mapped = fullScanRoomNumberByRoomId(roomId);
+        return mapped !== null
+          ? { key: `room:${mapped}`, roomNumber: mapped }
+          : { key: `roomId:${roomId}`, roomNumber: null };
+      }
+    }
+
+    return null;
+  }
+
+  function applyOutboundRoomIdentity(data) {
+    const identity = resolveRoomIdentityFromOutboundText(data);
+    if (!identity) return false;
+    const changed = applyRoomIdentity(identity);
+    if (changed) sync();
+    return changed;
   }
 
   function applyRoomIdentity(identity) {
@@ -1198,6 +1268,9 @@
         try {
           const nativeSend = ws.send;
           ws.send = function(data) {
+            // 先從進房/遊戲送出訊息抓 roomId/tableId，再處理 spin。
+            // 這條路徑是 3.1.10 的房號來源；不使用右側排行榜猜房號。
+            applyOutboundRoomIdentity(data);
             startNewRound(data);
             return nativeSend.call(this, data);
           };
@@ -1279,7 +1352,8 @@
       computeFreeGameState,
       freeGameTextFor,
       evolveRoomFreeEntryCounter,
-      resolveRoomIdentityFromEngine
+      resolveRoomIdentityFromEngine,
+      resolveRoomIdentityFromOutboundText
     };
   }
 
