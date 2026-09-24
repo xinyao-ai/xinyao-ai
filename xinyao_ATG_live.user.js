@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.13
+// @version      3.1.14
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -475,7 +475,14 @@
     return inspectOutboundRoomData(data, eventHint);
   }
 
+  function shouldIgnoreIdentityAgainstCocos(identity, cocosIdentity = resolveRoomIdentityFromCocos()) {
+    if (!identity?.key || identity?.source === 'cocos') return false;
+    if (!cocosIdentity?.key) return false;
+    return String(identity.key) !== String(cocosIdentity.key);
+  }
+
   function applyRoomIdentity(identity) {
+    if (shouldIgnoreIdentityAgainstCocos(identity)) return false;
     if (!identity?.key) return false;
     const nextKey = String(identity.key);
     const nextRoomNumber = identity.roomNumber ?? null;
@@ -526,6 +533,8 @@
       state.roomFreeGameEntries = 0;
       state.roomFreeGameInProgress = false;
       state.roomFreeGameLastEntrySpinId = '';
+      state.latestPayout = null;
+      state.maxPayout = null;
     }
     saveRoomFreeEntrySession();
     return true;
@@ -968,7 +977,12 @@
 
     let changed = false;
     const roomIdentity = resolveRoomIdentityFromEngine(engine);
-    if (roomIdentity && applyRoomIdentity(roomIdentity)) changed = true;
+    const cocosIdentity = resolveRoomIdentityFromCocos();
+    // 換房後上一房可能還有延遲結果封包；若封包房號與 Cocos 畫面不一致，整包忽略，
+    // 避免舊房的轉數 / 派彩 / 免遊污染新房，或再開出一筆假的空紀錄。
+    if (shouldIgnoreIdentityAgainstCocos(roomIdentity, cocosIdentity)) return false;
+    if (cocosIdentity && applyRoomIdentity(cocosIdentity)) changed = true;
+    else if (roomIdentity && applyRoomIdentity(roomIdentity)) changed = true;
     if (updateGeneralFromEngine(engine, finalState, spinId)) changed = true;
     if (!state.waitingResult) return changed;
 
@@ -1560,6 +1574,7 @@
       evolveRoomFreeEntryCounter,
       resolveRoomIdentityFromEngine,
       resolveRoomIdentityFromCocos,
+      shouldIgnoreIdentityAgainstCocos,
       resolveRoomIdentityFromOutboundText,
       resolveRoomIdentityFromOutboundObject,
       inspectOutboundRoomData
