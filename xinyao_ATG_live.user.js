@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.11
+// @version      3.1.12
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -373,6 +373,42 @@
     return null;
   }
 
+  // Cocos Creator 畫面上的目前機台房號：實機已確認節點路徑為 spinContent > slotTableBtn > num。
+  // 這是目前房號的第一優先來源；讀不到時才繼續使用既有封包 / URL 備援。
+  function resolveRoomIdentityFromCocos() {
+    try {
+      const cocos = window.cc;
+      const scene = cocos?.director?.getScene?.();
+      const Label = cocos?.Label;
+      if (!scene || !Label || typeof scene.getComponentsInChildren !== 'function') return null;
+
+      const labels = scene.getComponentsInChildren(Label) || [];
+      for (const label of labels) {
+        const node = label?.node;
+        if (!node || node.activeInHierarchy === false) continue;
+        if (String(node.name || '') !== 'num') continue;
+        if (String(node.parent?.name || '') !== 'slotTableBtn') continue;
+        if (String(node.parent?.parent?.name || '') !== 'spinContent') continue;
+
+        const text = String(label?.string ?? '').trim();
+        if (!/^\d{1,4}$/.test(text)) continue;
+        const roomNumber = Number(text);
+        if (!Number.isFinite(roomNumber) || roomNumber < 1 || roomNumber > 4100) continue;
+
+        return { key: `room:${roomNumber}`, roomNumber, source: 'cocos' };
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function syncCocosRoomIdentity() {
+    const identity = resolveRoomIdentityFromCocos();
+    if (!identity) return false;
+    const changed = applyRoomIdentity(identity);
+    if (changed) sync();
+    return changed;
+  }
+
   function applyResolvedOutboundRoomIdentity(identity) {
     if (!identity) return false;
     const changed = applyRoomIdentity(identity);
@@ -444,7 +480,9 @@
     }, {
       roomKey: nextKey,
       roomNumber: nextRoomNumber,
-      balance: genuineRoomChange ? null : state.balance
+      // Cocos 節點是在目前機台畫面已建立後才讀到；此時目前 wallet 點數就是新房進房點數。
+      // 其他較早到達的封包型 roomId 仍維持原本延後抓餘額的策略。
+      balance: genuineRoomChange ? (identity?.source === 'cocos' ? state.balance : null) : state.balance
     });
 
     if (state.currentRoomKey === nextKey) {
@@ -1507,6 +1545,7 @@
       freeGameTextFor,
       evolveRoomFreeEntryCounter,
       resolveRoomIdentityFromEngine,
+      resolveRoomIdentityFromCocos,
       resolveRoomIdentityFromOutboundText,
       resolveRoomIdentityFromOutboundObject,
       inspectOutboundRoomData
@@ -1514,6 +1553,8 @@
   }
 
   mountPanel();
+  syncCocosRoomIdentity();
+  setInterval(syncCocosRoomIdentity, 200);
   patchWebSocket();
   patchJSON();
   patchTextDecoder();
