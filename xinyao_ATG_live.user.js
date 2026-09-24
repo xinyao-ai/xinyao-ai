@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.12
+// @version      3.1.13
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -411,6 +411,20 @@
 
   function applyResolvedOutboundRoomIdentity(identity) {
     if (!identity) return false;
+
+    // Cocos 有有效房號時，封包不得覆蓋目前畫面上的真實機台。
+    // 換房瞬間可能仍收到上一房延遲的 WebSocket / XHR / Socket.IO 訊息；
+    // 若任由舊封包改回房號，網站會誤開一筆 0 轉 / 0 免遊 / 0 派彩的假紀錄。
+    const cocosIdentity = resolveRoomIdentityFromCocos();
+    if (cocosIdentity?.key) {
+      if (String(cocosIdentity.key) !== String(identity.key || '')) {
+        const changed = applyRoomIdentity(cocosIdentity);
+        if (changed) sync();
+        return false;
+      }
+      identity = cocosIdentity;
+    }
+
     const changed = applyRoomIdentity(identity);
     if (changed) sync();
     return changed;
