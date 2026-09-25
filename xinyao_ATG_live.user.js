@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.15
-// @description  電腦 / iOS / Android 共用 ATG 即時資料助手；新增自動分階段資金配置建議。
+// @version      3.1.16
+// @description  電腦 / iOS / Android 共用 ATG 即時資料助手；新增自動分階段資金配置建議；選擇機台畫面不提前產生配置。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -375,9 +375,30 @@
     return null;
   }
 
+  // ATG 的「選擇機台」彈窗本身也包含大量 slotTableBtn > num。
+  // 彈窗開啟期間不可把清單中的任一機台誤認為會員已經進入的房號。
+  function isMachineSelectionOpenFromCocos() {
+    try {
+      const cocos = window.cc;
+      const scene = cocos?.director?.getScene?.();
+      const Label = cocos?.Label;
+      if (!scene || !Label || typeof scene.getComponentsInChildren !== 'function') return false;
+
+      const labels = scene.getComponentsInChildren(Label) || [];
+      return labels.some((label) => {
+        const node = label?.node;
+        if (!node || node.activeInHierarchy === false) return false;
+        const text = String(label?.string ?? '').replace(/\s+/g, '');
+        return text.includes('選擇機台');
+      });
+    } catch (_) {}
+    return false;
+  }
+
   // Cocos Creator 畫面上的目前機台房號：實機已確認節點路徑為 spinContent > slotTableBtn > num。
   // 這是目前房號的第一優先來源；讀不到時才繼續使用既有封包 / URL 備援。
   function resolveRoomIdentityFromCocos() {
+    if (isMachineSelectionOpenFromCocos()) return null;
     try {
       const cocos = window.cc;
       const scene = cocos?.director?.getScene?.();
@@ -484,8 +505,16 @@
   }
 
   function applyRoomIdentity(identity) {
-    if (shouldIgnoreIdentityAgainstCocos(identity)) return false;
     if (!identity?.key) return false;
+
+    // 選擇機台視窗開啟時，只保留已存在的同房 identity；
+    // 不允許清單中的候選房號或換房請求提前污染目前房號。
+    if (isMachineSelectionOpenFromCocos()) {
+      const currentKey = String(state.currentRoomKey || '');
+      if (!currentKey || currentKey.startsWith('runtime:') || String(identity.key) !== currentKey) return false;
+    }
+
+    if (shouldIgnoreIdentityAgainstCocos(identity)) return false;
     const nextKey = String(identity.key);
     const nextRoomNumber = identity.roomNumber ?? null;
 
@@ -812,6 +841,9 @@
   }
 
   function syncStagePlanner() {
+    // 還在選擇機台時，不建立也不推進任何資金配置。
+    if (isMachineSelectionOpenFromCocos()) return false;
+
     const entryBalance = toNumber(state.roomEntryBalance);
     const currentBalance = toNumber(state.balance);
     const roomKey = String(state.currentRoomKey || '');
@@ -900,6 +932,9 @@
   }
 
   function stagePlannerHtml() {
+    // 選房畫面完全隱藏建議，避免會員尚未進房就看到下注 / 轉數。
+    if (isMachineSelectionOpenFromCocos()) return '';
+
     if (!stagePlan || String(stagePlan.roomKey || '') !== String(state.currentRoomKey || '')) {
       return `
         <div class="xinyaoLine"></div>
