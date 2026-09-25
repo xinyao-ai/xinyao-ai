@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.14
-// @description  電腦 / iOS / Android 共用 ATG 即時資料助手；一次配對後自動同步至芯瑤會員帳號。
+// @version      3.1.15
+// @description  電腦 / iOS / Android 共用 ATG 即時資料助手；新增自動分階段資金配置建議。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -20,6 +20,7 @@
   const TOKEN_KEY = 'xinyao_atg_device_token_v2';
   const DEVICE_ID_KEY = 'xinyao_atg_device_id_v2';
   const ROOM_FREE_ENTRY_KEY = 'xinyao_atg_room_free_entry_v1';
+  const STAGE_PLAN_KEY = 'xinyao_atg_stage_plan_v1';
   const FULL_SCAN_SESSION_KEY_LIVE = 'xinyao_atg_full_scan_session_v1';
   const RUNTIME_ROOM_KEY = `runtime:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
   const nativeJSONParse = JSON.parse.bind(JSON);
@@ -69,6 +70,7 @@
   let deviceToken = localStorage.getItem(TOKEN_KEY) || '';
   let fullScanRoomIndexRaw = '';
   let fullScanRoomIndexById = new Map();
+  let stagePlan = loadStagePlan();
 
   function evolveRoomPlaySession(previous = {}, event = {}) {
     const finite = value => {
@@ -637,6 +639,321 @@
     return String(Math.trunc(n)).padStart(4, '0');
   }
 
+
+  function nearestAllowedStake(target, allowed = [
+    1,2,3,4,5,6,7,8,9,10,12,14,16,18,20,24,28,30,32,36,
+    40,42,48,54,56,60,64,72,80,96,100,112,120,128,140,144,
+    160,180,200,240,280,300,320,360,400,420,480,500,540,560,
+    600,640,700,720,800,840,900,960,980,1000,1080,1120,1200,
+    1260,1280,1400,1440,1600,1800,2000
+  ]) {
+    const n = Number(target);
+    const list = (Array.isArray(allowed) ? allowed : [])
+      .map(Number).filter(v => Number.isFinite(v) && v > 0).sort((a, b) => a - b);
+    if (!list.length || !Number.isFinite(n)) return null;
+    let best = list[0];
+    let bestDistance = Math.abs(best - n);
+    for (const value of list) {
+      const distance = Math.abs(value - n);
+      if (distance < bestDistance || (distance === bestDistance && value < best)) {
+        best = value;
+        bestDistance = distance;
+      }
+    }
+    return best;
+  }
+
+  function buildStageRecommendation(input = {}) {
+    const finite = value => {
+      if (value === null || value === undefined || value === '') return null;
+      const n = Number(value);
+      return Number.isFinite(n) ? n : null;
+    };
+    const BETS = [
+      1,2,3,4,5,6,7,8,9,10,12,14,16,18,20,24,28,30,32,36,
+      40,42,48,54,56,60,64,72,80,96,100,112,120,128,140,144,
+      160,180,200,240,280,300,320,360,400,420,480,500,540,560,
+      600,640,700,720,800,840,900,960,980,1000,1080,1120,1200,
+      1260,1280,1400,1440,1600,1800,2000
+    ];
+    const TURN_OPTIONS = [10, 50, 100, 200, 500];
+    const entryBalance = finite(input.entryBalance);
+    const currentBalance = finite(input.currentBalance);
+    const previousStake = finite(input.previousStake);
+    const previousStageStartBalance = finite(input.previousStageStartBalance);
+
+    if (entryBalance === null || entryBalance <= 0 || currentBalance === null) {
+      return { status: 'waiting', stake: null, turns: null, plannedSpend: null, direction: 'waiting' };
+    }
+    if (currentBalance < 1 || currentBalance <= entryBalance * 0.5) {
+      return {
+        status: 'paused', stake: null, turns: null, plannedSpend: 0,
+        direction: 'paused', balanceRatio: currentBalance / entryBalance,
+        reason: '目前點數已低於進房金額 50%，暫停下一階段配置'
+      };
+    }
+
+    const ratio = currentBalance / entryBalance;
+    let desiredTurns = 50;
+    let budgetRate = 0.10;
+    if (ratio <= 0.60) {
+      desiredTurns = 500;
+      budgetRate = 0.08;
+    } else if (ratio <= 0.80) {
+      desiredTurns = 200;
+      budgetRate = 0.08;
+    } else if (ratio <= 0.95) {
+      desiredTurns = 100;
+      budgetRate = 0.10;
+    } else if (ratio <= 1.05) {
+      desiredTurns = 50;
+      budgetRate = 0.10;
+    } else if (ratio <= 1.30) {
+      desiredTurns = 50;
+      budgetRate = 0.12;
+    } else {
+      desiredTurns = 10;
+      budgetRate = 0.08;
+    }
+
+    const stageBudget = currentBalance * budgetRate;
+    const maxSpend = stageBudget * 1.12;
+    const orderedTurns = [desiredTurns, ...TURN_OPTIONS.filter(v => v < desiredTurns).sort((a, b) => b - a)];
+    let turns = orderedTurns.find(v => v * BETS[0] <= maxSpend && v * BETS[0] <= currentBalance) || 10;
+    if (turns * BETS[0] > currentBalance) {
+      return {
+        status: 'paused', stake: null, turns: null, plannedSpend: 0,
+        direction: 'paused', balanceRatio: ratio,
+        reason: '目前點數不足以配置下一階段'
+      };
+    }
+
+    const targetStake = stageBudget / turns;
+    let stake = nearestAllowedStake(targetStake, BETS);
+    let stakeIndex = Math.max(0, BETS.indexOf(stake));
+    while (stakeIndex > 0 && (BETS[stakeIndex] * turns > maxSpend || BETS[stakeIndex] * turns > currentBalance)) {
+      stakeIndex -= 1;
+    }
+    stake = BETS[stakeIndex];
+
+    let direction = previousStake === null ? 'start' : 'hold';
+    if (previousStake !== null) {
+      const previousIndex = Math.max(0, BETS.indexOf(nearestAllowedStake(previousStake, BETS)));
+      const stageWon = previousStageStartBalance !== null && currentBalance > previousStageStartBalance;
+      const overallProfit = currentBalance > entryBalance;
+      const maxIncreaseIndex = stageWon && overallProfit
+        ? Math.min(BETS.length - 1, previousIndex + 2)
+        : previousIndex;
+      if (stakeIndex > maxIncreaseIndex) {
+        stakeIndex = maxIncreaseIndex;
+        stake = BETS[stakeIndex];
+      }
+      if (stake > previousStake) direction = 'up';
+      else if (stake < previousStake) direction = 'down';
+    }
+
+    return {
+      status: 'active',
+      stake,
+      turns,
+      plannedSpend: stake * turns,
+      stageBudget,
+      balanceRatio: ratio,
+      direction
+    };
+  }
+
+  function advanceResetResilientCounter(previous = {}, observedValue = 0) {
+    const observed = Math.max(0, Math.trunc(Number(observedValue) || 0));
+    const raw = Math.max(0, Math.trunc(Number(previous.raw) || 0));
+    const total = Math.max(0, Math.trunc(Number(previous.total) || 0));
+    return observed >= raw
+      ? { raw: observed, total: total + (observed - raw) }
+      : { raw: observed, total: total + observed };
+  }
+
+  function loadStagePlan() {
+    try {
+      const raw = sessionStorage.getItem(STAGE_PLAN_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function saveStagePlan() {
+    try {
+      if (!stagePlan) sessionStorage.removeItem(STAGE_PLAN_KEY);
+      else sessionStorage.setItem(STAGE_PLAN_KEY, JSON.stringify(stagePlan));
+    } catch (_) {}
+  }
+
+  function createStagePlan() {
+    const recommendation = buildStageRecommendation({
+      entryBalance: state.roomEntryBalance,
+      currentBalance: state.balance,
+      previousStake: null,
+      previousStageStartBalance: null
+    });
+    return {
+      roomKey: state.currentRoomKey,
+      roomNumber: state.currentRoomNumber,
+      entryBalance: state.roomEntryBalance,
+      stageNumber: 1,
+      stageStartBalance: state.balance,
+      stageStartRoomSpin: 0,
+      counter: { raw: Math.max(0, Math.trunc(Number(state.completedSpins) || 0)), total: 0 },
+      recommendation,
+      lastCompleted: null,
+      updatedAt: Date.now()
+    };
+  }
+
+  function syncStagePlanner() {
+    const entryBalance = toNumber(state.roomEntryBalance);
+    const currentBalance = toNumber(state.balance);
+    const roomKey = String(state.currentRoomKey || '');
+    if (!roomKey || roomKey.startsWith('runtime:') || entryBalance === null || entryBalance <= 0 || currentBalance === null) {
+      return false;
+    }
+
+    const sameRoom = stagePlan && String(stagePlan.roomKey || '') === roomKey;
+    const sameEntry = sameRoom && Math.abs((toNumber(stagePlan.entryBalance) ?? entryBalance) - entryBalance) < 0.01;
+    if (!sameRoom || !sameEntry) {
+      stagePlan = createStagePlan();
+      saveStagePlan();
+      return true;
+    }
+
+    const previousCounterRaw = Math.max(0, Math.trunc(Number(stagePlan.counter?.raw) || 0));
+    const previousCounterTotal = Math.max(0, Math.trunc(Number(stagePlan.counter?.total) || 0));
+    stagePlan.counter = advanceResetResilientCounter(stagePlan.counter, state.completedSpins);
+    const counterChanged =
+      previousCounterRaw !== Math.max(0, Math.trunc(Number(stagePlan.counter?.raw) || 0)) ||
+      previousCounterTotal !== Math.max(0, Math.trunc(Number(stagePlan.counter?.total) || 0));
+    const recommendation = stagePlan.recommendation || {};
+    const roomSpinTotal = Math.max(0, Math.trunc(Number(stagePlan.counter?.total) || 0));
+    const stageStartRoomSpin = Math.max(0, Math.trunc(Number(stagePlan.stageStartRoomSpin) || 0));
+    const progress = Math.max(0, roomSpinTotal - stageStartRoomSpin);
+
+    // 安全線是即時的；一旦低於進房 50%，不必等原階段轉完才停止建議。
+    if (currentBalance <= entryBalance * 0.5) {
+      const paused = buildStageRecommendation({
+        entryBalance,
+        currentBalance,
+        previousStake: recommendation.stake,
+        previousStageStartBalance: stagePlan.stageStartBalance
+      });
+      if (recommendation.status !== 'paused') stagePlan.recommendation = paused;
+      stagePlan.updatedAt = Date.now();
+      saveStagePlan();
+      return true;
+    }
+
+    if (recommendation.status === 'paused') {
+      stagePlan.stageStartRoomSpin = roomSpinTotal;
+      stagePlan.stageStartBalance = currentBalance;
+      stagePlan.recommendation = buildStageRecommendation({
+        entryBalance,
+        currentBalance,
+        previousStake: null,
+        previousStageStartBalance: null
+      });
+      stagePlan.updatedAt = Date.now();
+      saveStagePlan();
+      return true;
+    }
+
+    const requiredTurns = Math.max(0, Math.trunc(Number(recommendation.turns) || 0));
+    if (recommendation.status === 'active' && requiredTurns > 0 && progress >= requiredTurns) {
+      const previousStake = toNumber(recommendation.stake);
+      const previousStartBalance = toNumber(stagePlan.stageStartBalance);
+      stagePlan.lastCompleted = {
+        stageNumber: Math.max(1, Math.trunc(Number(stagePlan.stageNumber) || 1)),
+        stake: previousStake,
+        turns: requiredTurns,
+        startBalance: previousStartBalance,
+        endBalance: currentBalance,
+        delta: previousStartBalance === null ? null : currentBalance - previousStartBalance
+      };
+      stagePlan.stageNumber = Math.max(1, Math.trunc(Number(stagePlan.stageNumber) || 1)) + 1;
+      stagePlan.stageStartRoomSpin = roomSpinTotal;
+      stagePlan.stageStartBalance = currentBalance;
+      stagePlan.recommendation = buildStageRecommendation({
+        entryBalance,
+        currentBalance,
+        previousStake,
+        previousStageStartBalance: previousStartBalance
+      });
+      stagePlan.updatedAt = Date.now();
+      saveStagePlan();
+      return true;
+    }
+
+    if (counterChanged) {
+      stagePlan.updatedAt = Date.now();
+      saveStagePlan();
+    }
+    return counterChanged;
+  }
+
+  function stagePlannerHtml() {
+    if (!stagePlan || String(stagePlan.roomKey || '') !== String(state.currentRoomKey || '')) {
+      return `
+        <div class="xinyaoLine"></div>
+        <div style="font-size:11px;font-weight:800;margin-bottom:5px;">💰 自動資金配置</div>
+        <div style="font-size:10px;opacity:.68;line-height:1.45;">等待進房金額與目前點數…</div>
+      `;
+    }
+
+    const recommendation = stagePlan.recommendation || {};
+    if (recommendation.status === 'paused') {
+      return `
+        <div class="xinyaoLine"></div>
+        <div style="font-size:11px;font-weight:800;margin-bottom:5px;">💰 自動資金配置</div>
+        <div style="font-size:11px;font-weight:800;color:#ffd09b;">⏸ 暫停下一階段配置</div>
+        <div style="font-size:9px;opacity:.68;margin-top:3px;line-height:1.45;">${recommendation.reason || '目前點數不足，暫停配置'}</div>
+      `;
+    }
+
+    if (recommendation.status !== 'active') return '';
+    const roomSpinTotal = Math.max(0, Math.trunc(Number(stagePlan.counter?.total) || 0));
+    const startSpin = Math.max(0, Math.trunc(Number(stagePlan.stageStartRoomSpin) || 0));
+    const progress = Math.max(0, Math.min(Number(recommendation.turns) || 0, roomSpinTotal - startSpin));
+    const remaining = Math.max(0, (Number(recommendation.turns) || 0) - progress);
+    const directionText = recommendation.direction === 'up'
+      ? '⬆️ 上一階段有盈利，本階段提高一級'
+      : recommendation.direction === 'down'
+        ? '⬇️ 依目前本金，本階段降低金額'
+        : recommendation.direction === 'hold'
+          ? '➡️ 本階段維持目前建議級距'
+          : '▶️ 依進房本金建立第一階段配置';
+    const last = stagePlan.lastCompleted;
+    const lastLine = last ? `
+      <div style="margin-top:5px;padding-top:5px;border-top:1px dashed rgba(255,255,255,.12);font-size:9px;opacity:.66;line-height:1.45;">
+        上一階段：${money(last.stake)} × ${last.turns}｜${money(last.startBalance)} → ${money(last.endBalance)}｜${signedMoney(last.delta)}
+      </div>
+    ` : '';
+
+    return `
+      <div class="xinyaoLine"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;">
+        <div style="font-size:11px;font-weight:800;">💰 自動資金配置</div>
+        <div style="font-size:9px;opacity:.65;">第 ${Math.max(1, Math.trunc(Number(stagePlan.stageNumber) || 1))} 階段</div>
+      </div>
+      <div class="xinyaoRow"><span>建議單轉</span><b>${money(recommendation.stake)}</b></div>
+      <div class="xinyaoRow"><span>建議自動轉</span><b>${Math.trunc(Number(recommendation.turns) || 0)} 次</b></div>
+      <div class="xinyaoRow"><span>本階段進度</span><b>${progress} / ${Math.trunc(Number(recommendation.turns) || 0)}</b></div>
+      <div class="xinyaoRow"><span>剩餘建議</span><b>${remaining} 次</b></div>
+      <div class="xinyaoRow"><span>預計階段投注</span><b>${money(recommendation.plannedSpend)}</b></div>
+      <div style="font-size:9px;opacity:.72;margin-top:5px;line-height:1.45;">${directionText}</div>
+      ${lastLine}
+      <div style="font-size:9px;opacity:.5;margin-top:4px;line-height:1.4;">完成本階段後，會依當下點數自動重新分配下一組金額與轉數。</div>
+    `;
+  }
+
   function nowText() {
     return new Date().toLocaleTimeString('zh-TW', {
       hour12: false,
@@ -683,6 +1000,7 @@
   }
 
   function sync() {
+    syncStagePlanner();
     state.lastSync = nowText();
     render();
     schedulePush();
@@ -1315,6 +1633,7 @@
       <div class="xinyaoRow"><span>本次最高派彩</span><b>${money(state.maxPayout)}</b></div>
       <div class="xinyaoRow"><span>本房免遊次數</span><b>${state.roomFreeGameEntries} 次</b></div>
       <div class="xinyaoRow"><span>本次完成轉數</span><b>${state.completedSpins}</b></div>
+      ${stagePlannerHtml()}
       <div class="xinyaoLine"></div>
       <div style="text-align:right;font-size:10px;opacity:.62;">最後同步 ${state.lastSync || '—'}</div>
       <div style="margin-top:2px;text-align:right;font-size:9px;opacity:.45;">本房資料：換房時重新記錄進房金額；同房重新整理會保留</div>
@@ -1577,7 +1896,10 @@
       shouldIgnoreIdentityAgainstCocos,
       resolveRoomIdentityFromOutboundText,
       resolveRoomIdentityFromOutboundObject,
-      inspectOutboundRoomData
+      inspectOutboundRoomData,
+      nearestAllowedStake,
+      buildStageRecommendation,
+      advanceResetResilientCounter
     };
   }
 
