@@ -8,7 +8,7 @@
     'https://xinyao-atg-live.love06130430.workers.dev';
 
   const SCRIPT_URL =
-    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=326';
+    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=327';
 
   const GUIDE_IMAGES = {
     ios: './xinyao_guide_ios.png?v=203',
@@ -3130,7 +3130,7 @@
   else start();
 })();
 
-/* ===== 芯瑤 ATG 精簡主介面 v326｜全房分析 / 本房狀態 / 遊玩紀錄 ===== */
+/* ===== 芯瑤 ATG 精簡主介面 v327｜全房分析 / 本房狀態 / 遊玩紀錄 ===== */
 (() => {
   'use strict';
 
