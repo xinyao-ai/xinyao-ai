@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.16
-// @description  電腦 / iOS / Android 共用 ATG 即時資料助手；新增自動分階段資金配置建議；選擇機台畫面不提前產生配置。
+// @version      3.1.17
+// @description  電腦 / iOS / Android 共用 ATG 即時資料助手；新增自動分階段資金配置建議；選房畫面不提前配置；真正進房後讀取遊戲內房號。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -395,8 +395,10 @@
     return false;
   }
 
-  // Cocos Creator 畫面上的目前機台房號：實機已確認節點路徑為 spinContent > slotTableBtn > num。
-  // 這是目前房號的第一優先來源；讀不到時才繼續使用既有封包 / URL 備援。
+  // Cocos Creator 真正進房後的目前機台房號：
+  // 實機已確認為 uiLayer > spinBar* > buttons > slotTable2Btn > num。
+  // spinBar 名稱可能依桌機 / 手機版型改變，因此只鎖定穩定的 buttons > slotTable2Btn > num 結構。
+  // 選擇機台彈窗裡的 spinContent > slotTableBtn > num 只代表候選房，不可當作目前房號。
   function resolveRoomIdentityFromCocos() {
     if (isMachineSelectionOpenFromCocos()) return null;
     try {
@@ -410,8 +412,8 @@
         const node = label?.node;
         if (!node || node.activeInHierarchy === false) continue;
         if (String(node.name || '') !== 'num') continue;
-        if (String(node.parent?.name || '') !== 'slotTableBtn') continue;
-        if (String(node.parent?.parent?.name || '') !== 'spinContent') continue;
+        if (String(node.parent?.name || '') !== 'slotTable2Btn') continue;
+        if (String(node.parent?.parent?.name || '') !== 'buttons') continue;
 
         const text = String(label?.string ?? '').trim();
         if (!/^\d{1,4}$/.test(text)) continue;
