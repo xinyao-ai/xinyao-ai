@@ -2413,6 +2413,15 @@ setInterval(xinyaoCheckMaintenance, 10000);
     };
   }
 
+  function buildScanInteractionPolicy(summary = {}) {
+    const plan = buildDynamicScanPlan(summary);
+    const singlePage = plan.totalPages === 1;
+    return {
+      usePager: !singlePage,
+      preserveLoadedRooms: singlePage
+    };
+  }
+
   function scanMetaChanged(previous = {}, next = {}) {
     const prevTotal = finiteNumber(previous.totalTableCount);
     const nextTotal = finiteNumber(next.totalTableCount);
@@ -2854,6 +2863,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     selectFixedPagerProfile,
     buildPagerYProbeList,
     buildDynamicScanPlan,
+    buildScanInteractionPolicy,
     scanMetaChanged,
     buildScanSequence,
     buildMissingScanSequence,
@@ -2978,6 +2988,18 @@ setInterval(xinyaoCheckMaintenance, 10000);
     state.rankingSnapshotAt = '';
     state.latestTableNumbers = [];
     state.latestInferredPage = null;
+  }
+
+  function resetFullScanProgressPreservingRooms({ clearStored = true } = {}) {
+    if (clearStored) clearStoredFullScanSession();
+    state.pagesSeen = new Set();
+    state.dataPagesSeen = new Set();
+    state.pageIntent = null;
+    state.preferClickedPage = false;
+    state.pageLoadSeq = 0;
+    state.scanVisited = new Set();
+    state.rankingSnapshotRooms = null;
+    state.rankingSnapshotAt = '';
   }
 
   function saveFullScanSession() {
@@ -4025,6 +4047,33 @@ setInterval(xinyaoCheckMaintenance, 10000);
     });
   }
 
+  async function collectSinglePageWithoutPager(page = 1) {
+    const target = expectedBandCount(page);
+    const current = roomBandCount(page);
+
+    if (current >= target && target > 0) {
+      state.scanVisited.add(page);
+      state.pagesSeen.add(page);
+      state.dataPagesSeen.add(page);
+      return { ok: true, count: current, target, cached: true, singlePage: true };
+    }
+
+    const settled = await waitForPageBand(page, 8000);
+    if (settled.ok) {
+      state.scanVisited.add(page);
+      state.pagesSeen.add(page);
+      state.dataPagesSeen.add(page);
+      return { ok: true, ...settled, singlePage: true };
+    }
+
+    return {
+      ok: false,
+      reason: 'single-page-data-timeout',
+      count: settled.count,
+      target: settled.target
+    };
+  }
+
   function deepClickableByText(text) {
     for (const root of collectDeepRoots()) {
       let nodes = [];
@@ -4256,8 +4305,13 @@ setInterval(xinyaoCheckMaintenance, 10000);
   async function scanAllPages({ auto = false } = {}) {
     if (state.scanRunning) return;
 
-    // 使用者主動重新掃描時才清除上一輪持久化結果；進房/重載不會清除。
-    if (!auto) resetFullScanData({ clearStored: true, preserveMeta: true });
+    // 單頁遊戲沒有可點的頁碼列；若先清空 roomMap，就沒有任何翻頁動作能把資料重新載回來。
+    // 因此單頁手動掃描保留目前已載入的房號，只重設掃描進度／排行榜。
+    const preScanPolicy = buildScanInteractionPolicy(state);
+    if (!auto) {
+      if (preScanPolicy.preserveLoadedRooms) resetFullScanProgressPreservingRooms({ clearStored: true });
+      else resetFullScanData({ clearStored: true, preserveMeta: true });
+    }
 
     state.scanRunning = true;
     state.scanAbort = false;
@@ -4267,7 +4321,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     scheduleRender();
 
     const plan = buildDynamicScanPlan(state);
-    if (!plan.totalTableCount || !state.totalPages) {
+    if (!plan.totalTableCount || !plan.totalPages) {
       state.scanRunning = false;
       state.scanError = '尚未取得此遊戲的房數／頁數，請停留在「選擇機台」畫面 1～2 秒後再按一次。';
       state.scanMessage = '等待 ATG 回傳房號資料…';
@@ -4277,11 +4331,13 @@ setInterval(xinyaoCheckMaintenance, 10000);
     const expected = plan.totalTableCount;
     const pages = plan.pages;
     const totalPages = plan.totalPages;
-    const profile = fixedPagerProfile();
+    const interactionPolicy = buildScanInteractionPolicy(plan);
+    const profile = interactionPolicy.usePager ? fixedPagerProfile() : null;
 
-    // 全房資料來自 ATG 的 tables 回傳，與畫面「顯示全部 / 顯示空桌」篩選無關。
-    // 因此不再為了切篩選器去猜座標，避免不同裝置誤點；只定位遊戲區與頁碼列。
-    state.scanMessage = `🤖 ${profile.layout}｜正在自動定位遊戲區與頁碼列…`;
+    // 多頁遊戲才需要定位頁碼列；單頁遊戲直接使用 ATG 已載入的房號資料。
+    state.scanMessage = interactionPolicy.usePager
+      ? `🤖 ${profile.layout}｜正在自動定位遊戲區與頁碼列…`
+      : `🤖 單頁遊戲｜直接讀取目前房號資料…`;
     scheduleRender();
 
     for (const page of pages) {
@@ -4291,11 +4347,15 @@ setInterval(xinyaoCheckMaintenance, 10000);
       state.scanMessage = `🤖 第 ${page} / ${totalPages} 頁｜等待房號資料 ${roomBandCount(page)} / ${target}｜總計 ${numberedCount()} / ${expected}`;
       scheduleRender();
 
-      const result = await clickFixedPage(profile, page);
+      const result = interactionPolicy.usePager
+        ? await clickFixedPage(profile, page)
+        : await collectSinglePageWithoutPager(page);
       if (!result.ok) {
         state.scanError = result.reason === 'pager-auto-locate-failed'
           ? `第 ${page} 頁未能自動切換成功；程式已嘗試頁碼列安全範圍，掃描停在此頁。`
-          : `第 ${page} 頁資料收取失敗：目前 ${result.count ?? roomBandCount(page)} / ${result.target ?? target}。掃描已停在此頁，不會跳過。`;
+          : result.reason === 'single-page-data-timeout'
+            ? `單頁遊戲資料尚未收完整：目前 ${result.count ?? roomBandCount(page)} / ${result.target ?? target}。請停留在選擇機台畫面數秒後再掃描。`
+            : `第 ${page} 頁資料收取失敗：目前 ${result.count ?? roomBandCount(page)} / ${result.target ?? target}。掃描已停在此頁，不會跳過。`;
         state.scanMessage = `掃描暫停｜總計 ${numberedCount()} / ${expected}`;
         state.scanRunning = false;
         scheduleRender();
