@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.18
+// @version      3.1.19
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；支援後台一鍵維護模式。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -2369,6 +2369,65 @@ setInterval(xinyaoCheckMaintenance, 10000);
     };
   }
 
+  function buildDynamicScanPlan(summary = {}) {
+    const totalTableCountRaw = finiteNumber(summary.totalTableCount);
+    const tablePerPageRaw = finiteNumber(summary.tablePerPage);
+    const totalPagesRaw = finiteNumber(summary.totalPages);
+
+    const totalTableCount = totalTableCountRaw !== null && totalTableCountRaw > 0
+      ? Math.max(1, Math.trunc(totalTableCountRaw))
+      : 0;
+    const tablePerPage = tablePerPageRaw !== null && tablePerPageRaw > 0
+      ? Math.max(1, Math.trunc(tablePerPageRaw))
+      : 500;
+    const inferredPages = totalTableCount > 0
+      ? Math.ceil(totalTableCount / tablePerPage)
+      : 0;
+    const totalPages = totalPagesRaw !== null && totalPagesRaw > 0
+      ? Math.max(1, Math.trunc(totalPagesRaw))
+      : Math.max(1, inferredPages || 1);
+    const pages = Array.from({ length: totalPages }, (_, index) => index + 1);
+
+    const rangeForPage = page => {
+      const p = Math.trunc(finiteNumber(page) || 0);
+      if (p < 1 || p > totalPages) return null;
+      const min = (p - 1) * tablePerPage + 1;
+      const naturalMax = p * tablePerPage;
+      const max = totalTableCount > 0 ? Math.min(totalTableCount, naturalMax) : naturalMax;
+      return { min, max };
+    };
+
+    const expectedBandCount = page => {
+      const range = rangeForPage(page);
+      if (!range) return 0;
+      return Math.max(0, range.max - range.min + 1);
+    };
+
+    return {
+      totalTableCount,
+      tablePerPage,
+      totalPages,
+      pages,
+      rangeForPage,
+      expectedBandCount
+    };
+  }
+
+  function scanMetaChanged(previous = {}, next = {}) {
+    const prevTotal = finiteNumber(previous.totalTableCount);
+    const nextTotal = finiteNumber(next.totalTableCount);
+    if (prevTotal === null || prevTotal <= 0 || nextTotal === null || nextTotal <= 0) return false;
+
+    const prevPerPage = finiteNumber(previous.tablePerPage);
+    const nextPerPage = finiteNumber(next.tablePerPage);
+    const prevPages = finiteNumber(previous.totalPages);
+    const nextPages = finiteNumber(next.totalPages);
+
+    return prevTotal !== nextTotal ||
+      (prevPerPage !== null && prevPerPage > 0 && nextPerPage !== null && nextPerPage > 0 && prevPerPage !== nextPerPage) ||
+      (prevPages !== null && prevPages > 0 && nextPages !== null && nextPages > 0 && prevPages !== nextPages);
+  }
+
   function buildScanSequence(startPage, totalPages) {
     const total = Math.max(1, finiteNumber(totalPages) || 1);
     const start = clamp(finiteNumber(startPage) || 1, 1, total);
@@ -2620,7 +2679,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     return scored[0]?.ordered || [];
   }
 
-  const SCRIPT_VERSION = '3.1.4';
+  const SCRIPT_VERSION = '3.1.5';
 
   function getVersion() {
     return SCRIPT_VERSION;
@@ -2661,11 +2720,12 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
   const FULL_SCAN_SESSION_TYPE = 'XIANYAO_ATG_FULL_SCAN_SESSION_V1';
 
-  function normalizePageList(value) {
+  function normalizePageList(value, maxPage = 99) {
     const source = value instanceof Set ? [...value] : (Array.isArray(value) ? value : []);
+    const max = Math.max(1, Math.trunc(finiteNumber(maxPage) || 99));
     return [...new Set(source
       .map(finiteNumber)
-      .filter(page => page !== null && page >= 1 && page <= 9)
+      .filter(page => page !== null && page >= 1 && page <= max)
       .map(page => Math.trunc(page)))]
       .sort((a, b) => a - b);
   }
@@ -2693,17 +2753,22 @@ setInterval(xinyaoCheckMaintenance, 10000);
     const rooms = [...roomMap.values()]
       .filter(room => finiteNumber(room.number) !== null)
       .sort((a, b) => a.number - b.number);
-    const pagesSeen = normalizePageList(summary.pagesSeen);
-    const dataPagesSeen = normalizePageList(summary.dataPagesSeen);
+    const plan = buildDynamicScanPlan({
+      totalTableCount: finiteNumber(summary.totalTableCount) ?? rooms.length,
+      tablePerPage: finiteNumber(summary.tablePerPage) ?? 500,
+      totalPages: finiteNumber(summary.totalPages)
+    });
+    const pagesSeen = normalizePageList(summary.pagesSeen, plan.totalPages);
+    const dataPagesSeen = normalizePageList(summary.dataPagesSeen, plan.totalPages);
 
     return {
       type: FULL_SCAN_SESSION_TYPE,
       version: SCRIPT_VERSION,
       capturedAt: new Date().toISOString(),
       rankingSnapshotAt: String(summary.rankingSnapshotAt || new Date().toISOString()),
-      totalTableCount: finiteNumber(summary.totalTableCount) ?? rooms.length,
-      tablePerPage: finiteNumber(summary.tablePerPage) ?? 500,
-      totalPages: finiteNumber(summary.totalPages) ?? 9,
+      totalTableCount: plan.totalTableCount || rooms.length,
+      tablePerPage: plan.tablePerPage,
+      totalPages: plan.totalPages,
       currentPage: finiteNumber(summary.currentPage),
       pagesSeen,
       dataPagesSeen,
@@ -2731,10 +2796,10 @@ setInterval(xinyaoCheckMaintenance, 10000);
       dataPagesSeen: parsed.dataPagesSeen
     });
 
-    const requiredPages = [1,2,3,4,5,6,7,8,9];
-    const complete = snapshot.rooms.length >= 4100 &&
-      snapshot.totalTableCount >= 4100 &&
-      snapshot.totalPages >= 9 &&
+    const plan = buildDynamicScanPlan(snapshot);
+    const requiredPages = plan.pages;
+    const complete = plan.totalTableCount > 0 &&
+      snapshot.rooms.length >= plan.totalTableCount &&
       requiredPages.every(page => snapshot.pagesSeen.includes(page)) &&
       requiredPages.every(page => snapshot.dataPagesSeen.includes(page));
 
@@ -2788,6 +2853,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
     buildAdaptivePagerHypotheses,
     selectFixedPagerProfile,
     buildPagerYProbeList,
+    buildDynamicScanPlan,
+    scanMetaChanged,
     buildScanSequence,
     buildMissingScanSequence,
     getVersion,
@@ -2888,15 +2955,21 @@ setInterval(xinyaoCheckMaintenance, 10000);
     try { sessionStorage.removeItem(FULL_SCAN_SESSION_KEY); } catch (_) {}
   }
 
-  function resetFullScanData({ clearStored = true } = {}) {
+  function resetFullScanData({ clearStored = true, preserveMeta = false } = {}) {
+    const meta = preserveMeta ? {
+      totalTableCount: state.totalTableCount,
+      tablePerPage: state.tablePerPage,
+      totalPages: state.totalPages,
+      currentPage: state.currentPage
+    } : null;
     if (clearStored) clearStoredFullScanSession();
     state.roomMap.clear();
     state.pagesSeen = new Set();
     state.dataPagesSeen = new Set();
-    state.totalTableCount = 0;
-    state.tablePerPage = 0;
-    state.totalPages = 0;
-    state.currentPage = null;
+    state.totalTableCount = meta?.totalTableCount || 0;
+    state.tablePerPage = meta?.tablePerPage || 0;
+    state.totalPages = meta?.totalPages || 0;
+    state.currentPage = meta?.currentPage ?? null;
     state.pageIntent = null;
     state.preferClickedPage = false;
     state.pageLoadSeq = 0;
@@ -2919,7 +2992,12 @@ setInterval(xinyaoCheckMaintenance, 10000);
       dataPagesSeen: state.dataPagesSeen
     });
 
-    if (snapshot.rooms.length < 4100 || snapshot.totalPages < 9) return false;
+    const plan = buildDynamicScanPlan(snapshot);
+    const complete = plan.totalTableCount > 0 &&
+      snapshot.rooms.length >= plan.totalTableCount &&
+      plan.pages.every(page => snapshot.pagesSeen.includes(page)) &&
+      plan.pages.every(page => snapshot.dataPagesSeen.includes(page));
+    if (!complete) return false;
     try {
       sessionStorage.setItem(FULL_SCAN_SESSION_KEY, JSON.stringify(snapshot));
       return true;
@@ -2952,12 +3030,12 @@ setInterval(xinyaoCheckMaintenance, 10000);
     state.totalTableCount = snapshot.totalTableCount;
     state.tablePerPage = snapshot.tablePerPage;
     state.totalPages = snapshot.totalPages;
-    state.currentPage = snapshot.currentPage ?? 9;
+    state.currentPage = snapshot.currentPage ?? snapshot.totalPages;
     state.scanVisited = new Set(snapshot.pagesSeen);
     state.rankingSnapshotRooms = snapshot.rankingSnapshotRooms;
     state.rankingSnapshotAt = snapshot.rankingSnapshotAt;
     state.scanError = '';
-    state.scanMessage = `✅ 已還原全房掃描｜${snapshot.rooms.length} / ${snapshot.totalTableCount}｜9 / 9 頁｜排行榜維持掃描完成時結果`;
+    state.scanMessage = `✅ 已還原全房掃描｜${snapshot.rooms.length} / ${snapshot.totalTableCount}｜${snapshot.totalPages} / ${snapshot.totalPages} 頁｜排行榜維持掃描完成時結果`;
     state.lastSource = 'sessionStorage 還原';
     return true;
   }
@@ -2966,7 +3044,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
   function setPageIntent(page) {
     const p = finiteNumber(page);
-    if (p === null || p < 1 || p > 9) return null;
+    const maxPage = Math.max(1, Math.trunc(finiteNumber(state.totalPages) || 99));
+    if (p === null || p < 1 || p > maxPage) return null;
     state.pageIntent = { page: p, ts: Date.now() };
     state.preferClickedPage = true;
     return p;
@@ -3043,7 +3122,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     state.calibrationPendingPointer = null;
     state.scanMessage = state.calibrationThenScan
       ? `✅ 頁碼校準完成（${calibration.samplePages.join('、')}）｜正在掃描尚未抓取的頁面…`
-      : `✅ 頁碼校準完成（${calibration.samplePages.join('、')}）｜可按「一鍵掃描 4100 房」`;
+      : `✅ 頁碼校準完成（${calibration.samplePages.join('、')}）｜可按「一鍵掃描全部房間」`;
     scheduleRender();
     if (state.calibrationThenScan) {
       state.calibrationThenScan = false;
@@ -3080,7 +3159,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
       const pages = state.calibrationSamples.map(sample => sample.page).sort((a, b) => a - b);
       state.scanMessage = pages.length === 1
-        ? `🧭 校準中 1/2：已記錄第 ${pages[0]} 頁，請再點另一個不同頁碼（建議第 9 頁）`
+        ? `🧭 校準中 1/2：已記錄第 ${pages[0]} 頁，請再點另一個不同頁碼（建議最後一頁）`
         : `🧭 已記錄頁碼 ${pages.join('、')}`;
       finishPageCalibrationIfReady();
       scheduleRender();
@@ -3125,16 +3204,20 @@ setInterval(xinyaoCheckMaintenance, 10000);
   }
 
 
-  // ATG 4100 房固定按 500 房分頁：001–500=1、501–1000=2 … 4001–4100=9。
-  // 直接從伺服器回傳的房號判定實際頁面，不再依賴 tableMeta.currentPage。
+  // 依目前遊戲回傳的 tablePerPage / totalPages 推算房號所在頁，
+  // 不再假設所有遊戲都是 4100 房、固定 9 頁。
   function inferPageFromRoomNumbers(numbers) {
+    const plan = buildDynamicScanPlan(state);
+    const maxRoom = plan.totalTableCount > 0
+      ? plan.totalTableCount
+      : plan.tablePerPage * plan.totalPages;
     const clean = (Array.isArray(numbers) ? numbers : [])
       .map(finiteNumber)
-      .filter(n => n !== null && n >= 1 && n <= 4100)
+      .filter(n => n !== null && n >= 1 && n <= maxRoom)
       .sort((a, b) => a - b);
     if (!clean.length) return null;
     const pivot = clean[Math.floor(clean.length / 2)];
-    return clamp(Math.floor((pivot - 1) / 500) + 1, 1, 9);
+    return clamp(Math.floor((pivot - 1) / plan.tablePerPage) + 1, 1, plan.totalPages);
   }
 
   function recordEvent(type, payload = {}) {
@@ -3233,6 +3316,24 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
     if ([totalTableCount, metaCurrentPage, tablePerPage, totalPages].every(v => v === null)) return false;
 
+    const previousMeta = {
+      totalTableCount: finiteNumber(state.totalTableCount),
+      tablePerPage: finiteNumber(state.tablePerPage),
+      totalPages: finiteNumber(state.totalPages)
+    };
+    const nextMeta = {
+      totalTableCount: totalTableCount ?? previousMeta.totalTableCount,
+      tablePerPage: tablePerPage ?? previousMeta.tablePerPage,
+      totalPages: totalPages ?? previousMeta.totalPages
+    };
+    const metaChanged = scanMetaChanged(previousMeta, nextMeta);
+
+    if (metaChanged && (state.roomMap.size || state.pagesSeen.size || state.rankingSnapshotRooms)) {
+      resetFullScanData({ clearStored: true, preserveMeta: false });
+      state.scanMessage = '🔄 已偵測切換遊戲，舊房號分析已清除';
+      state.scanError = '';
+    }
+
     if (totalTableCount !== null) state.totalTableCount = totalTableCount;
     if (tablePerPage !== null) state.tablePerPage = tablePerPage;
     if (totalPages !== null) state.totalPages = totalPages;
@@ -3248,7 +3349,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
           state.calibrationPendingPointer = null;
           const pages = state.calibrationSamples.map(s => s.page).sort((a, b) => a - b);
           state.scanMessage = pages.length === 1
-            ? `🧭 校準中 1/2：已記錄第 ${pages[0]} 頁，請再點另一個不同頁碼（建議第 9 頁）`
+            ? `🧭 校準中 1/2：已記錄第 ${pages[0]} 頁，請再點另一個不同頁碼（建議最後一頁）`
             : `🧭 已記錄頁碼 ${pages.join('、')}`;
           finishPageCalibrationIfReady();
         }
@@ -3773,7 +3874,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
   function pointForFixedProfile(profile, page, hypothesis = null, xOverrideRatio = null, yOverrideRatio = null) {
     const p = finiteNumber(page);
-    if (!profile || p === null || p < 1 || p > 9) return null;
+    const maxPage = Math.max(1, Math.trunc(finiteNumber(state.totalPages) || 9));
+    if (!profile || p === null || p < 1 || p > maxPage) return null;
     const r = profile.rect;
     const calibration = activePagerCalibration(profile);
     let ratioPoint = calibration ? pagePoint(calibration, p) : null;
@@ -3889,20 +3991,19 @@ setInterval(xinyaoCheckMaintenance, 10000);
   }
 
   function roomBandCount(page) {
-    const p = finiteNumber(page);
-    if (p === null || p < 1 || p > 9) return 0;
-    const min = (p - 1) * 500 + 1;
-    const max = p === 9 ? 4100 : p * 500;
+    const plan = buildDynamicScanPlan(state);
+    const range = plan.rangeForPage(page);
+    if (!range) return 0;
     let count = 0;
     for (const room of state.roomMap.values()) {
       const n = finiteNumber(room?.number);
-      if (n !== null && n >= min && n <= max) count++;
+      if (n !== null && n >= range.min && n <= range.max) count++;
     }
     return count;
   }
 
   function expectedBandCount(page) {
-    return Number(page) === 9 ? 100 : 500;
+    return buildDynamicScanPlan(state).expectedBandCount(page);
   }
 
   function waitForPageBand(page, timeout = 8000) {
@@ -4032,7 +4133,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
             }
           }
 
-          if (landed !== null && landed >= 1 && landed <= 9 && landed !== page) {
+          if (landed !== null && landed >= 1 && landed <= buildDynamicScanPlan(state).totalPages && landed !== page) {
             // 點到鄰近頁時，不換裝置模板；直接依真實落頁修正 X。
             xRatio = clamp(xRatio + (page - landed) * step, 0.025, 0.965);
             state.pageIntent = null;
@@ -4156,17 +4257,26 @@ setInterval(xinyaoCheckMaintenance, 10000);
     if (state.scanRunning) return;
 
     // 使用者主動重新掃描時才清除上一輪持久化結果；進房/重載不會清除。
-    if (!auto) resetFullScanData({ clearStored: true });
+    if (!auto) resetFullScanData({ clearStored: true, preserveMeta: true });
 
     state.scanRunning = true;
     state.scanAbort = false;
     state.scanVisited = new Set();
     state.scanError = '';
-    state.scanMessage = auto ? '自動刷新掃描中…' : '🤖 一鍵掃描中｜1～9 頁逐頁收完整資料';
+    state.scanMessage = auto ? '自動刷新掃描中…' : '🤖 一鍵掃描中｜正在讀取此遊戲房數…';
     scheduleRender();
 
-    const expected = state.totalTableCount || 4100;
-    const pages = [1,2,3,4,5,6,7,8,9];
+    const plan = buildDynamicScanPlan(state);
+    if (!plan.totalTableCount || !state.totalPages) {
+      state.scanRunning = false;
+      state.scanError = '尚未取得此遊戲的房數／頁數，請停留在「選擇機台」畫面 1～2 秒後再按一次。';
+      state.scanMessage = '等待 ATG 回傳房號資料…';
+      scheduleRender();
+      return;
+    }
+    const expected = plan.totalTableCount;
+    const pages = plan.pages;
+    const totalPages = plan.totalPages;
     const profile = fixedPagerProfile();
 
     // 全房資料來自 ATG 的 tables 回傳，與畫面「顯示全部 / 顯示空桌」篩選無關。
@@ -4178,7 +4288,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
       if (state.scanAbort) break;
 
       const target = expectedBandCount(page);
-      state.scanMessage = `🤖 第 ${page} / 9 頁｜等待房號資料 ${roomBandCount(page)} / ${target}｜總計 ${numberedCount()} / ${expected}`;
+      state.scanMessage = `🤖 第 ${page} / ${totalPages} 頁｜等待房號資料 ${roomBandCount(page)} / ${target}｜總計 ${numberedCount()} / ${expected}`;
       scheduleRender();
 
       const result = await clickFixedPage(profile, page);
@@ -4203,11 +4313,11 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
     if (state.scanAbort) {
       state.scanMessage = `已停止｜目前 ${count} / ${expected}`;
-    } else if (completePages.length === 9 && count >= 4100) {
+    } else if (completePages.length === pages.length && count >= expected) {
       const snapshotCount = captureRankingSnapshot();
       const persisted = saveFullScanSession();
       state.scanError = persisted ? '' : '掃描已完成，但瀏覽器未能保存本次全房資料；進房或重新整理後可能需要重新掃描。';
-      state.scanMessage = `✅ 1～9 頁資料全部完成｜${count} / ${expected}｜排行榜已固定 ${snapshotCount} 個空房${persisted ? '｜已保存進房後可還原' : ''}`;
+      state.scanMessage = `✅ 1～${totalPages} 頁資料全部完成｜${count} / ${expected}｜排行榜已固定 ${snapshotCount} 個空房${persisted ? '｜已保存進房後可還原' : ''}`;
     } else {
       const missing = pages.filter(page => roomBandCount(page) < expectedBandCount(page));
       state.scanError = `資料仍未完整：第 ${missing.join('、')} 頁。`;
@@ -4700,14 +4810,14 @@ setInterval(xinyaoCheckMaintenance, 10000);
         <span>${state.enabled ? '🟢 偵測中' : '⚪ 已暫停'}</span><br>
         已抓房號：<b>${count}</b> / ${expected}　頁數：<b>${pageKnown}</b> / ${pages}<br>
         目前頁：${state.currentPage ?? '—'}　已看頁：${escapeHtml(pageList)}<br>
-        掃描方式：🤖 一鍵自動掃描 1～9｜共用 JSON / WebSocket 攔截｜不需校準<br>
+        掃描方式：🤖 自動依目前遊戲房數／頁數掃描｜共用 JSON / WebSocket 攔截｜不需校準<br>
         <span style="${state.scanError ? 'color:#ff9a9a;' : 'color:#a7f3d0;'}">${escapeHtml(state.scanError || state.scanMessage)}</span>
       </div>
 
       <div style="margin-top:7px;background:rgba(255,255,255,.06);padding:7px 8px;border-radius:9px;font-size:10.5px;">${escapeHtml(bestText)}</div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;">
-        <button id="xinyao-scan-all" style="${buttonStyle()}">${state.scanRunning ? '掃描中…' : '一鍵掃描 4100 房'}</button>
+        <button id="xinyao-scan-all" style="${buttonStyle()}">${state.scanRunning ? '掃描中…' : '一鍵掃描全部房間'}</button>
         <button id="xinyao-stop" style="${secondaryButtonStyle()}">停止掃描</button>
         <button id="xinyao-expand" style="${secondaryButtonStyle()}">${ui.expanded ? '收合分析' : '完整分析'}</button>
         <a id="xinyao-sync-site" href="https://xinyao-ai.github.io/xinyao-ai/?atgRooms=1" target="xinyao-atg-ai" style="${buttonStyle('grid-column:1 / -1;display:block;text-decoration:none;text-align:center;box-sizing:border-box;')}">🌸 同步到芯瑤</a>
