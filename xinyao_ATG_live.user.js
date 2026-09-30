@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.19
+// @version      3.1.20
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；支援後台一鍵維護模式。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -485,10 +485,62 @@ setInterval(xinyaoCheckMaintenance, 10000);
     return false;
   }
 
-  // Cocos Creator 真正進房後的目前機台房號：
-  // 實機已確認為 uiLayer > spinBar* > buttons > slotTable2Btn > num。
-  // spinBar 名稱可能依桌機 / 手機版型改變，因此只鎖定穩定的 buttons > slotTable2Btn > num 結構。
-  // 選擇機台彈窗裡的 spinContent > slotTableBtn > num 只代表候選房，不可當作目前房號。
+  // Cocos Creator 真正進房後的目前機台房號。
+  // 橫式已知結構：buttons > slotTable2Btn > num；直式版可能在 num 與按鈕中間多包一層，
+  // 或使用不同的 slotTable*Btn 名稱，因此不能只鎖死「直系父節點」。
+  // 選擇機台清單位於 spinContent 底下，任何該路徑的房號一律排除，避免把候選房誤當目前房。
+  function resolveRoomIdentityFromCocosLabels(labels = []) {
+    const candidates = [];
+
+    for (const label of (Array.isArray(labels) ? labels : [])) {
+      const node = label?.node;
+      if (!node || node.activeInHierarchy === false) continue;
+
+      const text = String(label?.string ?? '').trim();
+      if (!/^\d{1,4}$/.test(text)) continue;
+      const roomNumber = Number(text);
+      if (!Number.isFinite(roomNumber) || roomNumber < 1 || roomNumber > 9999) continue;
+
+      const names = [];
+      let cursor = node;
+      for (let depth = 0; cursor && depth < 8; depth += 1) {
+        names.push(String(cursor.name || ''));
+        cursor = cursor.parent || null;
+      }
+      const lower = names.map(name => name.toLowerCase());
+
+      // 選機台彈窗的清單只能代表候選房。
+      if (lower.some(name => name === 'spincontent' || name.includes('spincontent'))) continue;
+
+      let score = 0;
+      const nodeName = lower[0] || '';
+      const hasExactCurrentButton = lower.some(name => name === 'slottable2btn');
+      const hasSlotTableButton = lower.some(name => /slot.*table.*btn/.test(name));
+      const hasCurrentRoomButton = lower.some(name =>
+        /(?:current|selected|playing).*(?:room|table|machine)|(?:room|table|machine).*(?:current|selected|playing)/.test(name)
+      );
+      const hasButtonsGroup = lower.some(name => name === 'buttons' || name.endsWith('buttons'));
+
+      if (hasExactCurrentButton) score += 100;
+      else if (hasCurrentRoomButton) score += 90;
+      else if (hasSlotTableButton) score += 80;
+      else continue;
+
+      if (nodeName === 'num') score += 10;
+      if (hasButtonsGroup) score += 5;
+      // 越接近 label 的按鈕節點優先，避免畫面其他資訊區剛好有相似名稱。
+      const buttonDepth = lower.findIndex(name => /(?:slot.*table|room|machine).*btn/.test(name));
+      if (buttonDepth >= 0) score += Math.max(0, 8 - buttonDepth);
+
+      candidates.push({ roomNumber, score });
+    }
+
+    if (!candidates.length) return null;
+    candidates.sort((a, b) => b.score - a.score);
+    const best = candidates[0];
+    return { key: `room:${best.roomNumber}`, roomNumber: best.roomNumber, source: 'cocos' };
+  }
+
   function resolveRoomIdentityFromCocos() {
     if (isMachineSelectionOpenFromCocos()) return null;
     try {
@@ -496,22 +548,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
       const scene = cocos?.director?.getScene?.();
       const Label = cocos?.Label;
       if (!scene || !Label || typeof scene.getComponentsInChildren !== 'function') return null;
-
-      const labels = scene.getComponentsInChildren(Label) || [];
-      for (const label of labels) {
-        const node = label?.node;
-        if (!node || node.activeInHierarchy === false) continue;
-        if (String(node.name || '') !== 'num') continue;
-        if (String(node.parent?.name || '') !== 'slotTable2Btn') continue;
-        if (String(node.parent?.parent?.name || '') !== 'buttons') continue;
-
-        const text = String(label?.string ?? '').trim();
-        if (!/^\d{1,4}$/.test(text)) continue;
-        const roomNumber = Number(text);
-        if (!Number.isFinite(roomNumber) || roomNumber < 1 || roomNumber > 4100) continue;
-
-        return { key: `room:${roomNumber}`, roomNumber, source: 'cocos' };
-      }
+      return resolveRoomIdentityFromCocosLabels(scene.getComponentsInChildren(Label) || []);
     } catch (_) {}
     return null;
   }
@@ -2021,6 +2058,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
       freeGameTextFor,
       evolveRoomFreeEntryCounter,
       resolveRoomIdentityFromEngine,
+      resolveRoomIdentityFromCocosLabels,
       resolveRoomIdentityFromCocos,
       shouldIgnoreIdentityAgainstCocos,
       resolveRoomIdentityFromOutboundText,
