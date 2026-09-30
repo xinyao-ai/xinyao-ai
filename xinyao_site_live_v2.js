@@ -7,8 +7,60 @@
   const WORKER =
     'https://xinyao-atg-live.love06130430.workers.dev';
 
+  const MAINTENANCE_ENDPOINT = `${WORKER}/maintenance`;
+  let maintenanceState = { enabled:false, message:'', updatedAt:null };
+
+  function renderMaintenanceOverlay() {
+    let overlay = document.getElementById('xinyaoSiteMaintenanceOverlay');
+    if (!maintenanceState.enabled) {
+      overlay?.remove();
+      document.documentElement.style.removeProperty('overflow');
+      return;
+    }
+
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'xinyaoSiteMaintenanceOverlay';
+      overlay.setAttribute('role','status');
+      overlay.setAttribute('aria-live','polite');
+      overlay.style.cssText = `position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:22px;box-sizing:border-box;background:linear-gradient(135deg,#fff7fb,#ffeaf3);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;`;
+      overlay.innerHTML = `
+        <div style="width:min(520px,100%);background:#fff;border:1px solid #f2dbe6;border-radius:24px;padding:30px 24px;box-shadow:0 24px 80px rgba(118,45,78,.18);text-align:center;">
+          <div style="font-size:42px;margin-bottom:8px;">🛠️</div>
+          <div style="font-size:22px;font-weight:900;color:#513d47;">芯瑤 ATG 系統維護中</div>
+          <div id="xinyaoSiteMaintenanceMessage" style="margin-top:12px;color:#806773;font-size:14px;line-height:1.8;"></div>
+          <div style="margin-top:18px;font-size:12px;color:#b08d9d;">維護完成後將自動恢復，不需要重新安裝程式。</div>
+        </div>`;
+      document.body.appendChild(overlay);
+    }
+    const msg = overlay.querySelector('#xinyaoSiteMaintenanceMessage');
+    if (msg) msg.textContent = maintenanceState.message || '為提供更穩定的使用體驗，目前正在進行系統升級維護。';
+    document.documentElement.style.overflow = 'hidden';
+  }
+
+  async function checkMaintenance() {
+    try {
+      const response = await fetch(`${MAINTENANCE_ENDPOINT}?t=${Date.now()}`, { cache:'no-store', credentials:'omit' });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!data?.ok) return;
+      maintenanceState = {
+        enabled:Boolean(data.enabled),
+        message:String(data.message || ''),
+        updatedAt:data.updatedAt ?? null
+      };
+      if (document.body) renderMaintenanceOverlay();
+      else document.addEventListener('DOMContentLoaded', renderMaintenanceOverlay, { once:true });
+    } catch (_) {
+      // fail-open：狀態服務暫時失聯時，不把會員誤鎖在維護畫面。
+    }
+  }
+
+  checkMaintenance();
+  setInterval(checkMaintenance, 10000);
+
   const SCRIPT_URL =
-    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=328';
+    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=329';
 
   const GUIDE_IMAGES = {
     ios: './xinyao_guide_ios.png?v=203',
