@@ -60,7 +60,7 @@
   setInterval(checkMaintenance, 10000);
 
   const SCRIPT_URL =
-    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=329';
+    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=330';
 
   const GUIDE_IMAGES = {
     ios: './xinyao_guide_ios.png?v=203',
@@ -3680,4 +3680,3 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
   else start();
 })();
-
