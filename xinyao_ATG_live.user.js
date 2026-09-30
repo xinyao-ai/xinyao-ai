@@ -1,14 +1,104 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.17
-// @description  電腦 / iOS / Android 共用 ATG 即時資料助手；新增自動分階段資金配置建議；選房畫面不提前配置；真正進房後讀取遊戲內房號。
+// @version      3.1.18
+// @description  電腦 / iOS / Android 共用 ATG 即時資料助手；支援後台一鍵維護模式。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
 // @weight       999
 // @grant        none
 // ==/UserScript==
+
+// ===== 芯瑤 ATG 全域維護控制 =====
+const XIANYAO_MAINTENANCE_ENDPOINT = 'https://xinyao-atg-live.love06130430.workers.dev/maintenance';
+window.__XIANYAO_MAINTENANCE_STATE__ = window.__XIANYAO_MAINTENANCE_STATE__ || {
+  enabled: false,
+  message: '',
+  updatedAt: null
+};
+
+function xinyaoMaintenanceMessage(state) {
+  return String(state?.message || '芯瑤 ATG 系統升級維護中，完成後將立即開放使用。');
+}
+
+function xinyaoRenderMaintenance(state) {
+  const enabled = Boolean(state?.enabled);
+  const apply = () => {
+    if (!document.body) return false;
+    document.body.classList.toggle('xinyao-atg-maintenance-active', enabled);
+
+    let style = document.getElementById('xinyao-atg-maintenance-style');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'xinyao-atg-maintenance-style';
+      style.textContent = `
+        body.xinyao-atg-maintenance-active #xinyaoATGLiveV200,
+        body.xinyao-atg-maintenance-active #xinyao-atg-room-scanner,
+        body.xinyao-atg-maintenance-active #xinyao-room-mini,
+        body.xinyao-atg-maintenance-active #xinyao-copy-modal { display:none !important; }
+        #xinyao-atg-maintenance-notice{
+          position:fixed;top:16px;left:50%;transform:translateX(-50%);
+          z-index:2147483647;width:min(420px,calc(100vw - 24px));box-sizing:border-box;
+          padding:14px 16px;border-radius:16px;background:rgba(35,22,30,.96);color:#fff;
+          box-shadow:0 14px 40px rgba(0,0,0,.35);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+          text-align:center;line-height:1.55;pointer-events:none;
+        }
+        #xinyao-atg-maintenance-notice b{display:block;font-size:14px;margin-bottom:4px;color:#ffb8d4}
+        #xinyao-atg-maintenance-notice span{font-size:11px;opacity:.88}
+      `;
+      (document.head || document.documentElement).appendChild(style);
+    }
+
+    let notice = document.getElementById('xinyao-atg-maintenance-notice');
+    if (!enabled) {
+      notice?.remove();
+      return true;
+    }
+    if (!notice) {
+      notice = document.createElement('div');
+      notice.id = 'xinyao-atg-maintenance-notice';
+      notice.setAttribute('role','status');
+      notice.setAttribute('aria-live','polite');
+      document.body.appendChild(notice);
+    }
+    notice.innerHTML = `<b>🛠️ 芯瑤 ATG 系統維護中</b><span></span>`;
+    const text = notice.querySelector('span');
+    if (text) text.textContent = xinyaoMaintenanceMessage(state);
+    return true;
+  };
+
+  if (!apply()) {
+    document.addEventListener('DOMContentLoaded', apply, { once:true });
+  }
+}
+
+async function xinyaoCheckMaintenance() {
+  try {
+    const response = await fetch(`${XIANYAO_MAINTENANCE_ENDPOINT}?t=${Date.now()}`, {
+      method:'GET', cache:'no-store', credentials:'omit'
+    });
+    if (!response.ok) return;
+    const data = await response.json();
+    if (!data?.ok) return;
+    const next = {
+      enabled:Boolean(data.enabled),
+      message:String(data.message || ''),
+      updatedAt:data.updatedAt ?? null
+    };
+    const previousEnabled = Boolean(window.__XIANYAO_MAINTENANCE_STATE__?.enabled);
+    window.__XIANYAO_MAINTENANCE_STATE__ = next;
+    xinyaoRenderMaintenance(next);
+    if (previousEnabled !== next.enabled) {
+      window.dispatchEvent(new CustomEvent('xinyao:maintenance', { detail: next }));
+    }
+  } catch (_) {
+    // 維護狀態查詢失敗時 fail-open，不因網路問題誤鎖會員。
+  }
+}
+
+xinyaoCheckMaintenance();
+setInterval(xinyaoCheckMaintenance, 10000);
 
 (() => {
   'use strict';
@@ -1037,6 +1127,7 @@
   }
 
   function sync() {
+    if (window.__XIANYAO_MAINTENANCE_STATE__?.enabled) return;
     syncStagePlanner();
     state.lastSync = nowText();
     render();
@@ -1539,6 +1630,7 @@
   }
 
   async function pushCloud(force = false) {
+    if (window.__XIANYAO_MAINTENANCE_STATE__?.enabled) return;
     if (!deviceToken || pushBusy) return;
     const signature = payloadSignature();
     if (!force && signature === lastPushSignature) return;
@@ -4744,6 +4836,15 @@
       }
     }, 500);
   }
+
+  window.addEventListener('xinyao:maintenance', (event) => {
+    if (!event.detail?.enabled) return;
+    try {
+      state.scanAbort = true;
+      if (state.scanRunning) stopScan();
+      setAutoRefresh(0);
+    } catch (_) {}
+  });
 
   window.addEventListener('resize', () => {
     resetAdaptivePagerLearning();
