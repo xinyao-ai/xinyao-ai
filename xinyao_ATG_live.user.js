@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.20
+// @version      3.1.21
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；支援後台一鍵維護模式。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -520,14 +520,25 @@ setInterval(xinyaoCheckMaintenance, 10000);
         /(?:current|selected|playing).*(?:room|table|machine)|(?:room|table|machine).*(?:current|selected|playing)/.test(name)
       );
       const hasButtonsGroup = lower.some(name => name === 'buttons' || name.endsWith('buttons'));
+      const hasControlBar = lower.some(name => /(?:spin|control|bottom).*bar/.test(name));
+      const roomishNode = /^(?:num|roomnum|roomnumber|tablenum|tablenumber|machinenum|machinenumber)$/.test(nodeName);
+      const hasNonRoomUi = lower.some(name =>
+        /(?:balance|credit|wallet|amount|stake|bet|payout|jackpot|prize|score|autoplay|linecount)/.test(name)
+      );
 
       if (hasExactCurrentButton) score += 100;
       else if (hasCurrentRoomButton) score += 90;
       else if (hasSlotTableButton) score += 80;
-      else continue;
+      // 直式版實機會把目前房號按鈕換成一般包裝名稱；畫面上的房號仍是
+      // 純數字 Label，位於底部 buttons / control bar。這裡只接受 3～4 位
+      // 顯示值（例如 060、2545），避免把押注 8、線數等短數字誤認成房號。
+      else if (!hasNonRoomUi && roomishNode && text.length >= 3 && text.length <= 4 && (hasButtonsGroup || hasControlBar)) {
+        score += hasButtonsGroup ? 65 : 55;
+      } else continue;
 
       if (nodeName === 'num') score += 10;
       if (hasButtonsGroup) score += 5;
+      if (hasControlBar) score += 3;
       // 越接近 label 的按鈕節點優先，避免畫面其他資訊區剛好有相似名稱。
       const buttonDepth = lower.findIndex(name => /(?:slot.*table|room|machine).*btn/.test(name));
       if (buttonDepth >= 0) score += Math.max(0, 8 - buttonDepth);
