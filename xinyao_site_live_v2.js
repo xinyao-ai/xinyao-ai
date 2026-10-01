@@ -60,7 +60,7 @@
   setInterval(checkMaintenance, 10000);
 
   const SCRIPT_URL =
-    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=333';
+    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=335';
 
   const GUIDE_IMAGES = {
     ios: './xinyao_guide_ios.png?v=203',
