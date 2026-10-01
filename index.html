@@ -2397,15 +2397,26 @@
 }
 .public-win-list{
   display:flex;
+  align-items:flex-start;
   gap:10px;
   overflow-x:auto;
+  overflow-y:hidden;
   scroll-snap-type:x mandatory;
-  padding-bottom:3px;
-  scrollbar-width:none;
+  scroll-behavior:smooth;
+  padding-bottom:6px;
+  scrollbar-width:thin;
+  scrollbar-color:#ef9fbe transparent;
+  cursor:grab;
+  overscroll-behavior-x:contain;
 }
-.public-win-list::-webkit-scrollbar{display:none}
+.public-win-list:active{cursor:grabbing}
+.public-win-list::-webkit-scrollbar{height:6px}
+.public-win-list::-webkit-scrollbar-track{background:transparent}
+.public-win-list::-webkit-scrollbar-thumb{background:#efb4ca;border-radius:999px}
 .public-win-card{
   flex:0 0 88%;
+  align-self:flex-start;
+  height:max-content;
   scroll-snap-align:start;
   padding:12px;
   border:1px solid #f2d9e4;
@@ -2423,15 +2434,55 @@
   font-size:18px;
   font-weight:1000;
 }
-.public-win-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px}
+.public-win-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:7px;margin-top:10px}
+.public-win-gallery.single{grid-template-columns:minmax(0,1fr)}
 .public-win-card img{
   display:block;
   width:100%;
-  max-height:210px;
-  object-fit:cover;
-  margin-top:10px;
+  height:auto;
+  max-height:240px;
+  object-fit:contain;
+  margin:0;
   border-radius:12px;
   background:#fff8fb;
+  cursor:zoom-in;
+}
+.public-win-lightbox{
+  position:fixed;
+  inset:0;
+  z-index:2147483646;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:22px;
+  background:rgba(20,10,16,.88);
+  backdrop-filter:blur(6px);
+}
+.public-win-lightbox.show{display:flex}
+.public-win-lightbox img{
+  display:block;
+  width:auto;
+  height:auto;
+  max-width:min(96vw,1200px);
+  max-height:90vh;
+  object-fit:contain;
+  border-radius:14px;
+  box-shadow:0 24px 70px rgba(0,0,0,.45);
+}
+.public-win-lightbox-close{
+  position:fixed;
+  top:16px;
+  right:18px;
+  width:44px;
+  height:44px;
+  border:0;
+  border-radius:999px;
+  background:rgba(255,255,255,.94);
+  color:#4b3842;
+  font-size:28px;
+  line-height:1;
+  cursor:pointer;
+  box-shadow:0 8px 24px rgba(0,0,0,.22);
 }
 .public-win-empty{
   color:#9b8590;
@@ -2948,12 +2999,13 @@
           const amount = Number(win.amount || 0).toLocaleString("zh-TW");
           const images = parsePublicWinImages(win.image_url);
           const imageHtml = images.length
-            ? `<div class="public-win-gallery">
+            ? `<div class="public-win-gallery${images.length === 1 ? ' single' : ''}">
                 ${images.map((src) => `
                   <img
                     src="${escapeWinText(src)}"
                     alt="會員喜報照片"
                     loading="lazy"
+                    draggable="false"
                   >
                 `).join("")}
               </div>`
@@ -2973,6 +3025,105 @@
         publicWinList.innerHTML =
           '<div class="public-win-empty">會員紀錄暫時讀取不到，稍後重新整理即可。</div>';
       }
+    }
+
+    function setupPublicWinScroller() {
+      if (!publicWinList || publicWinList.dataset.desktopScrollReady === "1") return;
+      publicWinList.dataset.desktopScrollReady = "1";
+
+      let dragging = false;
+      let startX = 0;
+      let startScrollLeft = 0;
+      let moved = false;
+
+      publicWinList.addEventListener('pointerdown', (event) => {
+        if (event.pointerType && event.pointerType !== 'mouse') return;
+        if (event.button !== 0) return;
+        dragging = true;
+        moved = false;
+        startX = event.clientX;
+        startScrollLeft = publicWinList.scrollLeft;
+        publicWinList.setPointerCapture?.(event.pointerId);
+      });
+
+      publicWinList.addEventListener('pointermove', (event) => {
+        if (!dragging) return;
+        const dx = event.clientX - startX;
+        if (Math.abs(dx) > 4) moved = true;
+        publicWinList.scrollLeft = startScrollLeft - dx;
+      });
+
+      const stopDrag = (event) => {
+        if (!dragging) return;
+        dragging = false;
+        try { publicWinList.releasePointerCapture?.(event.pointerId); } catch (_) {}
+      };
+      publicWinList.addEventListener('pointerup', stopDrag);
+      publicWinList.addEventListener('pointercancel', stopDrag);
+      publicWinList.addEventListener('pointerleave', (event) => {
+        if (dragging && !(event.buttons & 1)) stopDrag(event);
+      });
+
+      publicWinList.addEventListener('wheel', (event) => {
+        const maxScroll = publicWinList.scrollWidth - publicWinList.clientWidth;
+        if (maxScroll <= 2) return;
+        const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
+          ? event.deltaX
+          : event.deltaY;
+        if (!delta) return;
+        event.preventDefault();
+        publicWinList.scrollBy({ left: delta, behavior: 'auto' });
+      }, { passive:false });
+
+      publicWinList.addEventListener('click', (event) => {
+        if (moved) {
+          moved = false;
+          event.preventDefault();
+          return;
+        }
+        const image = event.target.closest?.('.public-win-card img');
+        if (image) openPublicWinPreview(image.currentSrc || image.src, image.alt || '會員喜報照片');
+      });
+    }
+
+    function ensurePublicWinLightbox() {
+      let box = document.getElementById('publicWinLightbox');
+      if (box) return box;
+
+      box = document.createElement('div');
+      box.id = 'publicWinLightbox';
+      box.className = 'public-win-lightbox';
+      box.setAttribute('role', 'dialog');
+      box.setAttribute('aria-modal', 'true');
+      box.setAttribute('aria-label', '會員喜報圖片預覽');
+      box.innerHTML = `
+        <button class="public-win-lightbox-close" type="button" aria-label="關閉預覽">×</button>
+        <img alt="會員喜報圖片預覽">
+      `;
+      document.body.appendChild(box);
+
+      const close = () => {
+        box.classList.remove('show');
+        document.documentElement.style.removeProperty('overflow');
+      };
+      box.querySelector('.public-win-lightbox-close')?.addEventListener('click', close);
+      box.addEventListener('click', (event) => {
+        if (event.target === box) close();
+      });
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && box.classList.contains('show')) close();
+      });
+      return box;
+    }
+
+    function openPublicWinPreview(src, alt) {
+      if (!src) return;
+      const box = ensurePublicWinLightbox();
+      const image = box.querySelector('img');
+      image.src = src;
+      image.alt = alt || '會員喜報圖片預覽';
+      box.classList.add('show');
+      document.documentElement.style.overflow = 'hidden';
     }
 
     async function verifyMember() {
@@ -3511,6 +3662,7 @@
 
 
     // 登入頁開啟時直接顯示並載入公開會員喜報。
+    setupPublicWinScroller();
     loadPublicWins();
 
     loginButton.addEventListener("click", verifyMember);
