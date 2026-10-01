@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.21
+// @version      3.1.23
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；支援後台一鍵維護模式。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -2329,7 +2329,16 @@ setInterval(xinyaoCheckMaintenance, 10000);
       .filter(r => r.width >= Math.min(300, vw * 0.45) && r.height >= Math.min(260, vh * 0.45));
 
     const ranked = rows
-      .filter(r => r.coverage >= 0.34 && r.widthRatio >= 0.45 && r.heightRatio >= 0.45)
+      .filter(r => {
+        const aspect = r.width / Math.max(1, r.height);
+        const largeGeneralSurface = r.coverage >= 0.34 && r.widthRatio >= 0.45 && r.heightRatio >= 0.45;
+        // 桌機瀏覽器可以是橫向寬畫面，但 ATG 遊戲本體仍是置中的直式 Canvas。
+        // 這種情況寬度只佔整個瀏覽器約 25～40%，舊門檻會誤把整個 viewport 當成遊戲 surface。
+        const centeredPortraitSurface = aspect <= 0.90 &&
+          r.heightRatio >= 0.70 && r.widthRatio >= 0.22 && r.coverage >= 0.18 &&
+          r.centerDistance <= 0.32;
+        return largeGeneralSurface || centeredPortraitSurface;
+      })
       .map(r => ({
         ...r,
         score: r.coverage * 6 + Math.min(r.widthRatio, 1) + Math.min(r.heightRatio, 1) - r.centerDistance * 2.5
@@ -2373,7 +2382,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
       hypotheses.push({ id, x0, step, y, showAllX, showAllY });
     };
 
-    if (ratio >= 1.35 || viewportRatio >= 1.25) {
+    // rect 已經是實際遊戲 surface；桌機外層 viewport 再寬，也不能把置中的直式遊戲誤判成橫式。
+    if (ratio >= 1.35) {
       // 已驗證的兩種 ATG landscape 排版 + 中間值。
       // 實際裝置若不是其中任何一種，後續 landing feedback 仍會自動修正。
       add('landscape-compact', 0.1771, 0.0528, 0.1814, 0.2430, 0.1050);
@@ -2403,10 +2413,10 @@ setInterval(xinyaoCheckMaintenance, 10000);
       id: 'fallback', x0: 0.12, step: 0.07, y: 0.21, showAllX: 0.18, showAllY: 0.13
     };
     const aspect = surface.rect.width / Math.max(1, surface.rect.height);
-    const viewportAspect = vw / vh;
-    const layout = (aspect >= 1.35 || viewportAspect >= 1.25)
+    // surface 若是 Canvas 就以 Canvas 自身比例判斷；若找不到 Canvas，surface 本身就是 viewport。
+    const layout = aspect >= 1.35
       ? '橫版自適應'
-      : ((aspect <= 0.90 || viewportAspect <= 0.85) ? '直版自適應' : '平板自適應');
+      : (aspect <= 0.90 ? '直版自適應' : '平板自適應');
     return {
       key: 'adaptive-surface',
       layout,
@@ -2467,7 +2477,9 @@ setInterval(xinyaoCheckMaintenance, 10000);
     const singlePage = plan.totalPages === 1;
     return {
       usePager: !singlePage,
-      preserveLoadedRooms: singlePage
+      // 不論單頁或多頁，都保留目前已載入的房號。
+      // 這樣目前所在頁不需要靠「再點一次同一頁」才能重新觸發資料載入。
+      preserveLoadedRooms: true
     };
   }
 
@@ -2665,7 +2677,9 @@ setInterval(xinyaoCheckMaintenance, 10000);
   }
 
 
-  function selectPagerRow(records) {
+  function selectPagerRow(records, totalPages = 9) {
+    const total = Math.max(1, Math.min(99, Math.trunc(finiteNumber(totalPages) || 1)));
+    const requiredPages = Array.from({ length: total }, (_, index) => index + 1);
     const items = (Array.isArray(records) ? records : [])
       .map(item => ({
         ...item,
@@ -2678,7 +2692,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
       .filter(item =>
         item.page !== null &&
         item.page >= 1 &&
-        item.page <= 9 &&
+        item.page <= total &&
         item.x !== null &&
         item.y !== null &&
         item.width !== null &&
@@ -2710,6 +2724,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
         }
         const ordered = [...unique.values()].sort((a, b) => a.x - b.x);
         const pages = ordered.map(item => item.page);
+        const hasAllRequired = requiredPages.every(page => unique.has(page));
+        const exactSequence = hasAllRequired && pages.length === total && pages.every((page, index) => page === index + 1);
         let increasing = true;
         for (let i = 1; i < pages.length; i++) {
           if (pages[i] <= pages[i - 1]) {
@@ -2724,20 +2740,67 @@ setInterval(xinyaoCheckMaintenance, 10000);
           ? ordered.reduce((sum, item) => sum + item.width * item.height, 0) / ordered.length
           : Infinity;
         const score =
+          (hasAllRequired ? 100000 : 0) +
+          (exactSequence ? 20000 : 0) +
           ordered.length * 10000 +
           (increasing ? 5000 : 0) +
           Math.min(3000, Math.max(0, span)) -
           Math.min(2000, avgArea / 10);
 
-        return { ordered, increasing, score };
+        return { ordered, increasing, hasAllRequired, exactSequence, score };
       })
-      .filter(row => row.ordered.length >= 4 && row.increasing)
+      .filter(row => row.hasAllRequired && row.increasing)
       .sort((a, b) => b.score - a.score);
 
-    return scored[0]?.ordered || [];
+    if (!scored.length) return [];
+    const selected = scored[0].ordered;
+    const byPage = new Map(selected.map(item => [item.page, item]));
+    return requiredPages.map(page => byPage.get(page)).filter(Boolean);
   }
 
-  const SCRIPT_VERSION = '3.1.5';
+
+  function selectPagerAncestorGroup(records, totalPages = 9) {
+    const total = Math.max(1, Math.min(99, Math.trunc(finiteNumber(totalPages) || 1)));
+    const requiredPages = Array.from({ length: total }, (_, index) => index + 1);
+    const groups = new Map();
+
+    for (const record of (Array.isArray(records) ? records : [])) {
+      const page = finiteNumber(record?.page);
+      if (page === null || page < 1 || page > total) continue;
+      const ancestors = Array.isArray(record?.ancestors) ? record.ancestors : [];
+      ancestors.forEach((ancestor, depth) => {
+        if (!ancestor) return;
+        if (!groups.has(ancestor)) groups.set(ancestor, { ancestor, pages: new Map(), depthSum: 0, maxDepth: 0 });
+        const group = groups.get(ancestor);
+        if (!group.pages.has(page) || depth < group.pages.get(page).depth) {
+          group.pages.set(page, { record, depth });
+        }
+      });
+    }
+
+    const candidates = [];
+    for (const group of groups.values()) {
+      if (!requiredPages.every(page => group.pages.has(page))) continue;
+      const selected = requiredPages.map(page => group.pages.get(page));
+      group.depthSum = selected.reduce((sum, entry) => sum + entry.depth, 0);
+      group.maxDepth = Math.max(...selected.map(entry => entry.depth));
+      const targets = new Map(selected.map((entry, index) => [index + 1, entry.record.target]));
+      candidates.push({
+        ancestor: group.ancestor,
+        targets,
+        depthSum: group.depthSum,
+        maxDepth: group.maxDepth
+      });
+    }
+
+    candidates.sort((a, b) =>
+      a.maxDepth - b.maxDepth ||
+      a.depthSum - b.depthSum
+    );
+    return candidates[0] || null;
+  }
+
+  const SCRIPT_VERSION = '3.1.7';
 
   function getVersion() {
     return SCRIPT_VERSION;
@@ -2930,6 +2993,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     buildAutoPagerSequence,
     acceptPageTransitionEvidence,
     selectPagerRow,
+    selectPagerAncestorGroup,
     buildSyncPayload,
     buildFullScanSessionSnapshot,
     parseFullScanSessionSnapshot
@@ -3738,7 +3802,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
   function isVisible(el) {
     if (!el || !el.isConnected) return false;
     const r = el.getBoundingClientRect();
-    const cs = getComputedStyle(el);
+    const view = el.ownerDocument?.defaultView || window;
+    const cs = view.getComputedStyle(el);
     return r.width > 12 && r.height > 12 && cs.display !== 'none' && cs.visibility !== 'hidden' && Number(cs.opacity || 1) > 0;
   }
 
@@ -3765,56 +3830,250 @@ setInterval(xinyaoCheckMaintenance, 10000);
     return roots;
   }
 
-  function findPagerButtons() {
-    // 先找一般 DOM，再穿透 open Shadow DOM / 同源 iframe。
-    // 找不到也沒關係：scanAllPages 會自動切到 Canvas 點擊模式。
+  function collectSameOriginWindows() {
+    const windows = [];
+    const seen = new Set();
+    const visit = (win) => {
+      if (!win || seen.has(win)) return;
+      seen.add(win);
+      windows.push(win);
+      let frames = [];
+      try { frames = [...win.document.querySelectorAll('iframe')]; } catch (_) {}
+      for (const frame of frames) {
+        try {
+          const child = frame.contentWindow;
+          if (!child) continue;
+          // 讀 document 會在跨來源 iframe 直接丟錯；只有同源才納入。
+          void child.document;
+          visit(child);
+        } catch (_) {}
+      }
+    };
+    visit(window);
+    return windows;
+  }
+
+  function findPagerButtons(totalPages = buildDynamicScanPlan(state).totalPages) {
+    // 完全依「實際頁碼文字 + 真實可點元素」辨識，不使用螢幕尺寸或固定座標。
+    const total = Math.max(2, Math.min(99, Math.trunc(finiteNumber(totalPages) || 2)));
     const selector = 'button,[role="button"],a,li,div,span';
-    const candidates = [];
 
     for (const root of collectDeepRoots()) {
       let nodes = [];
       try { nodes = [...root.querySelectorAll(selector)]; } catch (_) {}
+      const records = [];
       for (const el of nodes) {
         try {
           if (el.closest?.('#xinyao-atg-room-scanner,#xinyao-room-mini,#xinyao-atg-live-panel,#xinyao-copy-modal')) continue;
           if (!isVisible(el)) continue;
           const text = String(el.textContent || '').trim();
-          if (!/^(?:[1-9])$/.test(text)) continue;
-          candidates.push({ el, text });
+          if (!/^\d{1,2}$/.test(text)) continue;
+          const page = Number(text);
+          if (!Number.isFinite(page) || page < 1 || page > total) continue;
+          const rect = el.getBoundingClientRect();
+          if (!rect.width || !rect.height) continue;
+          records.push({ page, x: rect.left, y: rect.top, width: rect.width, height: rect.height, el });
         } catch (_) {}
       }
-    }
 
-    const groups = new Map();
-    for (const c of candidates) {
-      let ancestor = c.el.parentElement;
-      for (let depth = 0; ancestor && depth < 8; depth++, ancestor = ancestor.parentElement) {
-        if (!groups.has(ancestor)) groups.set(ancestor, new Map());
-        const map = groups.get(ancestor);
-        const page = Number(c.text);
-        if (!map.has(page)) map.set(page, c.el);
+      const row = selectPagerRow(records, total);
+      if (row.length !== total) continue;
+      const out = new Map();
+      for (const record of row) {
+        const clickable = record.el?.closest?.('button,[role="button"],a') || record.el;
+        if (clickable) out.set(record.page, clickable);
       }
+      if (out.size === total) return out;
     }
+    return null;
+  }
 
-    const viable = [...groups.entries()]
-      .filter(([, map]) => map.size >= 7 && [2,3,4,5,6,7,8].every(n => map.has(n)))
-      .map(([ancestor, map]) => {
-        let area = Number.MAX_SAFE_INTEGER;
-        try {
-          const r = ancestor.getBoundingClientRect();
-          area = Math.max(1, r.width * r.height);
-        } catch (_) {}
-        return { ancestor, map, area };
-      })
-      .sort((a, b) => a.area - b.area);
+  function cocosPagerRecords(totalPages) {
+    const total = Math.max(2, Math.min(99, Math.trunc(finiteNumber(totalPages) || 2)));
+    const records = [];
+    for (const gameWindow of collectSameOriginWindows()) {
+      try {
+        const cocos = gameWindow.cc;
+        const scene = cocos?.director?.getScene?.();
+        const Label = cocos?.Label;
+        if (!scene || !Label || typeof scene.getComponentsInChildren !== 'function') continue;
+        const labels = scene.getComponentsInChildren(Label) || [];
+        for (const label of labels) {
+          const node = label?.node;
+          if (!node || node.activeInHierarchy === false) continue;
+          const text = String(label?.string ?? '').trim();
+          if (!/^\d{1,2}$/.test(text)) continue;
+          const page = Number(text);
+          if (!Number.isFinite(page) || page < 1 || page > total) continue;
 
-    if (!viable.length) return null;
+          const ancestors = [];
+          let cursor = node.parent || node;
+          for (let depth = 0; cursor && depth < 10; depth += 1) {
+            ancestors.push(cursor);
+            cursor = cursor.parent || null;
+          }
+          records.push({ page, target: { label, cocos, gameWindow }, ancestors });
+        }
+      } catch (_) {}
+    }
+    return records;
+  }
+
+  function cocosClickableForLabel(targetRecord, commonAncestor = null) {
+    try {
+      const label = targetRecord?.label || targetRecord;
+      const cocos = targetRecord?.cocos || window.cc;
+      const gameWindow = targetRecord?.gameWindow || window;
+      const Button = cocos?.Button;
+      let node = label?.node || null;
+      for (let depth = 0; node && depth < 10; depth += 1) {
+        let button = null;
+        try { if (Button && typeof node.getComponent === 'function') button = node.getComponent(Button); } catch (_) {}
+        const components = Array.isArray(node.components)
+          ? node.components
+          : (Array.isArray(node._components) ? node._components : []);
+        if (!button) {
+          button = components.find(component =>
+            component && (
+              (Array.isArray(component.clickEvents) && component.clickEvents.length) ||
+              /button/i.test(String(component.constructor?.name || ''))
+            )
+          ) || null;
+        }
+        if (button) return { node, button, label, cocos, gameWindow };
+        if (node === commonAncestor) break;
+        node = node.parent || null;
+      }
+      return { node: label?.node?.parent || label?.node || null, button: null, label, cocos, gameWindow };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function findCocosPagerButtons(totalPages = buildDynamicScanPlan(state).totalPages) {
+    const total = Math.max(2, Math.min(99, Math.trunc(finiteNumber(totalPages) || 2)));
+    const group = selectPagerAncestorGroup(cocosPagerRecords(total), total);
+    if (!group || group.targets.size !== total) return null;
     const out = new Map();
-    for (const [page, el] of viable[0].map.entries()) {
-      const clickable = el.closest?.('button,[role="button"],a') || el;
-      out.set(page, clickable);
+    for (let page = 1; page <= total; page += 1) {
+      const label = group.targets.get(page);
+      const target = cocosClickableForLabel(label, group.ancestor);
+      if (!target?.node) return null;
+      out.set(page, target);
     }
     return out;
+  }
+
+  function emitCocosClick(target) {
+    if (!target?.node) return false;
+    try {
+      const cocos = target.cocos || window.cc;
+      const button = target.button;
+      const clickEvents = Array.isArray(button?.clickEvents) ? button.clickEvents : [];
+      const EventHandler = cocos?.Component?.EventHandler || cocos?.EventHandler;
+
+      if (clickEvents.length && typeof EventHandler?.emitEvents === 'function') {
+        try {
+          EventHandler.emitEvents(clickEvents, button);
+          return true;
+        } catch (_) {}
+      }
+
+      let emitted = false;
+      for (const handler of clickEvents) {
+        try {
+          if (typeof handler?.emit === 'function') {
+            handler.emit([button]);
+            emitted = true;
+            continue;
+          }
+          const targetNode = handler?.target;
+          const componentName = handler?.component;
+          const methodName = handler?.handler;
+          if (!targetNode || !methodName) continue;
+          let component = null;
+          try {
+            if (componentName && typeof targetNode.getComponent === 'function') component = targetNode.getComponent(componentName);
+          } catch (_) {}
+          const receiver = component || targetNode;
+          const fn = receiver?.[methodName];
+          if (typeof fn === 'function') {
+            fn.call(receiver, button, handler?.customEventData);
+            emitted = true;
+          }
+        } catch (_) {}
+      }
+      if (emitted) return true;
+
+      // 自訂頁碼控制 fallback：直接發送語意 click，不換算任何螢幕座標。
+      if (typeof target.node.emit === 'function') {
+        try { target.node.emit('click', button || target.node); return true; } catch (_) {}
+        try { target.node.emit('touch-end', { target: target.node, currentTarget: target.node }); return true; } catch (_) {}
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  function findSemanticPagerTargets(totalPages = buildDynamicScanPlan(state).totalPages) {
+    const dom = findPagerButtons(totalPages);
+    if (dom?.size) return { kind: 'dom', targets: dom };
+    const cocos = findCocosPagerButtons(totalPages);
+    if (cocos?.size) return { kind: 'cocos', targets: cocos };
+    return null;
+  }
+
+  function activateSemanticPagerTarget(targetSet, page) {
+    const target = targetSet?.targets?.get?.(page);
+    if (!target) return false;
+    if (targetSet.kind === 'dom') return clickPagerElement(target);
+    if (targetSet.kind === 'cocos') return emitCocosClick(target);
+    return false;
+  }
+
+  async function clickSemanticPage(page, totalPages) {
+    const targetCount = expectedBandCount(page);
+    const beforeBand = roomBandCount(page);
+    if (beforeBand >= targetCount && targetCount > 0) {
+      state.scanVisited.add(page);
+      state.pagesSeen.add(page);
+      state.dataPagesSeen.add(page);
+      return { ok: true, count: beforeBand, target: targetCount, cached: true, semantic: true };
+    }
+
+    const targetSet = findSemanticPagerTargets(totalPages);
+    if (!targetSet) {
+      return { ok: false, reason: 'semantic-pager-not-found', count: beforeBand, target: targetCount };
+    }
+
+    const beforeSeq = state.pageLoadSeq;
+    const beforePage = state.latestInferredPage;
+    setPageIntent(page);
+    const sent = activateSemanticPagerTarget(targetSet, page);
+    if (!sent) {
+      state.pageIntent = null;
+      return { ok: false, reason: 'semantic-pager-click-failed', count: beforeBand, target: targetCount };
+    }
+
+    state.scanMessage = `🤖 語意翻頁｜第 ${page} / ${totalPages} 頁｜${beforeBand}/${targetCount}`;
+    scheduleRender();
+
+    const landing = await waitForPagerLanding(beforeSeq, beforePage, page, 2500);
+    const landed = finiteNumber(landing.landedPage);
+    if (landed !== null && landed !== page && roomBandCount(page) <= beforeBand) {
+      state.pageIntent = null;
+      return { ok: false, reason: 'semantic-pager-wrong-page', landedPage: landed, count: roomBandCount(page), target: targetCount };
+    }
+
+    const settled = await waitForPageBand(page, 10000);
+    state.pageIntent = null;
+    if (!settled.ok) {
+      return { ok: false, reason: 'semantic-page-data-timeout', count: settled.count, target: settled.target };
+    }
+
+    state.scanVisited.add(page);
+    state.pagesSeen.add(page);
+    state.dataPagesSeen.add(page);
+    return { ok: true, ...settled, pagerKind: targetSet.kind, semantic: true };
   }
 
   function dispatchNormalizedPoint(xNorm, yNorm) {
@@ -3852,7 +4111,9 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
     const x = Math.round(rect.left + rect.width / 2);
     const y = Math.round(rect.top + rect.height / 2);
-    const target = document.elementFromPoint(x, y) || el;
+    const ownerDocument = el.ownerDocument || document;
+    const ownerWindow = ownerDocument.defaultView || window;
+    const target = ownerDocument.elementFromPoint?.(x, y) || el;
 
     const pointerInit = {
       bubbles: true,
@@ -3868,12 +4129,12 @@ setInterval(xinyaoCheckMaintenance, 10000);
       button: 0
     };
 
-    try { target.dispatchEvent(new PointerEvent('pointermove', { ...pointerInit, buttons: 0 })); } catch {}
-    try { target.dispatchEvent(new PointerEvent('pointerdown', { ...pointerInit, buttons: 1 })); } catch {}
-    try { target.dispatchEvent(new MouseEvent('mousedown', { ...pointerInit, buttons: 1 })); } catch {}
-    try { target.dispatchEvent(new PointerEvent('pointerup', { ...pointerInit, buttons: 0 })); } catch {}
-    try { target.dispatchEvent(new MouseEvent('mouseup', { ...pointerInit, buttons: 0 })); } catch {}
-    try { target.dispatchEvent(new MouseEvent('click', { ...pointerInit, buttons: 0 })); } catch {}
+    try { target.dispatchEvent(new (ownerWindow.PointerEvent || PointerEvent)('pointermove', { ...pointerInit, buttons: 0 })); } catch {}
+    try { target.dispatchEvent(new (ownerWindow.PointerEvent || PointerEvent)('pointerdown', { ...pointerInit, buttons: 1 })); } catch {}
+    try { target.dispatchEvent(new (ownerWindow.MouseEvent || MouseEvent)('mousedown', { ...pointerInit, buttons: 1 })); } catch {}
+    try { target.dispatchEvent(new (ownerWindow.PointerEvent || PointerEvent)('pointerup', { ...pointerInit, buttons: 0 })); } catch {}
+    try { target.dispatchEvent(new (ownerWindow.MouseEvent || MouseEvent)('mouseup', { ...pointerInit, buttons: 0 })); } catch {}
+    try { target.dispatchEvent(new (ownerWindow.MouseEvent || MouseEvent)('click', { ...pointerInit, buttons: 0 })); } catch {}
 
     return true;
   }
@@ -4381,11 +4642,10 @@ setInterval(xinyaoCheckMaintenance, 10000);
     const pages = plan.pages;
     const totalPages = plan.totalPages;
     const interactionPolicy = buildScanInteractionPolicy(plan);
-    const profile = interactionPolicy.usePager ? fixedPagerProfile() : null;
 
-    // 多頁遊戲才需要定位頁碼列；單頁遊戲直接使用 ATG 已載入的房號資料。
+    // 多頁遊戲直接找「真正的頁碼控制」並觸發，不再依螢幕尺寸、Canvas 比例或固定座標猜位置。
     state.scanMessage = interactionPolicy.usePager
-      ? `🤖 ${profile.layout}｜正在自動定位遊戲區與頁碼列…`
+      ? `🤖 全裝置語意掃描｜正在辨識此遊戲的 ${totalPages} 個頁碼…`
       : `🤖 單頁遊戲｜直接讀取目前房號資料…`;
     scheduleRender();
 
@@ -4397,11 +4657,11 @@ setInterval(xinyaoCheckMaintenance, 10000);
       scheduleRender();
 
       const result = interactionPolicy.usePager
-        ? await clickFixedPage(profile, page)
+        ? await clickSemanticPage(page, totalPages)
         : await collectSinglePageWithoutPager(page);
       if (!result.ok) {
-        state.scanError = result.reason === 'pager-auto-locate-failed'
-          ? `第 ${page} 頁未能自動切換成功；程式已嘗試頁碼列安全範圍，掃描停在此頁。`
+        state.scanError = ['semantic-pager-not-found','semantic-pager-click-failed','semantic-pager-wrong-page'].includes(result.reason)
+          ? `第 ${page} 頁未能辨識或觸發真正的頁碼控制；本次不使用固定座標，掃描已停止。`
           : result.reason === 'single-page-data-timeout'
             ? `單頁遊戲資料尚未收完整：目前 ${result.count ?? roomBandCount(page)} / ${result.target ?? target}。請停留在選擇機台畫面數秒後再掃描。`
             : `第 ${page} 頁資料收取失敗：目前 ${result.count ?? roomBandCount(page)} / ${result.target ?? target}。掃描已停在此頁，不會跳過。`;
