@@ -3021,10 +3021,36 @@
             </article>
           `;
         }).join("");
+        bindPublicWinImagePreviews();
       } catch (error) {
         publicWinList.innerHTML =
           '<div class="public-win-empty">會員紀錄暫時讀取不到，稍後重新整理即可。</div>';
       }
+    }
+
+    function bindPublicWinImagePreviews() {
+      if (!publicWinList) return;
+      publicWinList.querySelectorAll('.public-win-card img').forEach((image) => {
+        if (image.dataset.previewBound === '1') return;
+        image.dataset.previewBound = '1';
+        image.setAttribute('role', 'button');
+        image.setAttribute('tabindex', '0');
+        image.setAttribute('aria-label', '點擊放大會員喜報圖片');
+
+        const open = (event) => {
+          event?.preventDefault?.();
+          event?.stopPropagation?.();
+          openPublicWinPreview(
+            image.currentSrc || image.src,
+            image.alt || '會員喜報照片'
+          );
+        };
+
+        image.addEventListener('click', open);
+        image.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') open(event);
+        });
+      });
     }
 
     function setupPublicWinScroller() {
@@ -3037,6 +3063,7 @@
       let moved = false;
 
       publicWinList.addEventListener('pointerdown', (event) => {
+        if (event.target.closest?.('.public-win-card img')) return;
         if (event.pointerType && event.pointerType !== 'mouse') return;
         if (event.button !== 0) return;
         dragging = true;
