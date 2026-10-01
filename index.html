@@ -2395,19 +2395,6 @@
   font-size:11px;
   font-weight:900;
 }
-.public-win-focus-btn{
-  width:100%;
-  margin:0 0 12px;
-  padding:13px 14px;
-  border:1px solid #f4b6cf;
-  border-radius:15px;
-  background:linear-gradient(90deg,#ffe7f1,#ffd7e7);
-  color:#d83f7f;
-  font-size:15px;
-  font-weight:1000;
-  cursor:pointer;
-  box-shadow:0 8px 18px rgba(229,92,148,.13);
-}
 .public-win-list{
   display:flex;
   gap:10px;
@@ -2538,15 +2525,7 @@
           <div class="public-win-badge">免登入查看</div>
         </div>
 
-        <button
-          id="publicWinFocusBtn"
-          class="public-win-focus-btn"
-          type="button"
-        >
-          🏆 立即查看會員喜報
-        </button>
-
-        <div id="publicWinWrap" style="display:none">
+        <div id="publicWinWrap">
           <div id="publicWinList" class="public-win-list">
             <div class="public-win-empty">正在讀取最新紀錄…</div>
           </div>
@@ -2896,8 +2875,6 @@
     const logoutButton = $("logoutButton");
     const appLineFloat = $("appLineFloat");
     const publicWinList = $("publicWinList");
-    const publicWinWrap = $("publicWinWrap");
-    const publicWinFocusBtn = $("publicWinFocusBtn");
 
     let loggedInMember = sessionStorage.getItem("memberAccount") || "";
 
@@ -3533,28 +3510,8 @@
 
 
 
-    if (publicWinFocusBtn && publicWinWrap) {
-      publicWinFocusBtn.addEventListener("click", async () => {
-        const isHidden =
-          publicWinWrap.style.display === "none" ||
-          getComputedStyle(publicWinWrap).display === "none";
-
-        if (isHidden) {
-          publicWinWrap.style.display = "block";
-          publicWinFocusBtn.textContent = "收起會員喜報";
-          await loadPublicWins();
-          setTimeout(() => {
-            publicWinWrap.scrollIntoView({
-              behavior: "smooth",
-              block: "nearest"
-            });
-          }, 50);
-        } else {
-          publicWinWrap.style.display = "none";
-          publicWinFocusBtn.textContent = "🏆 立即查看會員喜報";
-        }
-      });
-    }
+    // 登入頁開啟時直接顯示並載入公開會員喜報。
+    loadPublicWins();
 
     loginButton.addEventListener("click", verifyMember);
 
