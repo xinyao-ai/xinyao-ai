@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.24
+// @version      3.1.25
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；支援後台一鍵維護模式。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -523,22 +523,26 @@ setInterval(xinyaoCheckMaintenance, 10000);
       );
       const hasButtonsGroup = lower.some(name => name === 'buttons' || name.endsWith('buttons'));
       const hasControlBar = lower.some(name => /(?:spin|control|bottom).*bar/.test(name));
+      const hasAnyButton = lower.some(name => /(?:btn|button)/.test(name));
       const roomishNode = /^(?:num|roomnum|roomnumber|tablenum|tablenumber|machinenum|machinenumber)$/.test(nodeName);
       const hasNonRoomUi = lower.some(name =>
-        /(?:balance|credit|wallet|amount|stake|bet|payout|jackpot|prize|score|autoplay|linecount)/.test(name)
+        /(?:balance|credit|wallet|amount|stake|bet|payout|jackpot|grand|major|minor|mini|prize|score|autoplay|autospin|buyfree|freegame|freespin|linecount|menu|sound|speed)/.test(name)
       );
 
       if (hasExactCurrentButton) score += 100;
       else if (hasCurrentRoomButton) score += 90;
       else if (hasSlotTableButton) score += 80;
-      // 直式版實機會把目前房號按鈕換成一般包裝名稱；畫面上的房號仍是
-      // 純數字 Label，位於底部 buttons / control bar。這裡只接受 3～4 位
-      // 顯示值（例如 060、2545），避免把押注 8、線數等短數字誤認成房號。
-      else if (!hasNonRoomUi && roomishNode && text.length >= 3 && text.length <= 4 && (hasButtonsGroup || hasControlBar)) {
-        score += hasButtonsGroup ? 65 : 55;
+      // 部分直式 ATG 版本會把目前房號 Label 改成一般 value/text 名稱，
+      // 不再叫 num。只要它仍位於底部控制按鈕群，且不是餘額/押注/彩金等 UI，
+      // 就把 3～4 位純數字當成房號候選。這能涵蓋 0863、1058 等實機版型，
+      // 又不會把押注 4、線數 8 這類短數字抓進來。
+      else if (!hasNonRoomUi && text.length >= 3 && text.length <= 4 && (hasAnyButton || hasButtonsGroup || hasControlBar)) {
+        score += hasButtonsGroup ? 62 : (hasControlBar ? 56 : 50);
+        if (hasAnyButton) score += 12;
+        if (text.length === 3) score += 4;
       } else continue;
 
-      if (nodeName === 'num') score += 10;
+      if (roomishNode) score += 10;
       if (hasButtonsGroup) score += 5;
       if (hasControlBar) score += 3;
       // 越接近 label 的按鈕節點優先，避免畫面其他資訊區剛好有相似名稱。
@@ -661,7 +665,94 @@ setInterval(xinyaoCheckMaintenance, 10000);
     }
   }
 
+  function findLiveZlibOffset(input) {
+    let bytes;
+    try {
+      if (input instanceof Uint8Array) bytes = input;
+      else if (input instanceof ArrayBuffer) bytes = new Uint8Array(input);
+      else if (ArrayBuffer.isView(input)) bytes = new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+      else return -1;
+    } catch (_) {
+      return -1;
+    }
+    const limit = Math.min(Math.max(0, bytes.length - 1), 32);
+    for (let i = 0; i < limit; i++) {
+      const cmf = bytes[i];
+      const flg = bytes[i + 1];
+      if ((cmf & 0x0f) !== 8) continue;
+      if (((cmf << 8) + flg) % 31 !== 0) continue;
+      return i;
+    }
+    return -1;
+  }
+
+  async function decodeLiveBinaryRoomFrame(input) {
+    let bytes;
+    try {
+      if (input instanceof Uint8Array) bytes = input;
+      else if (input instanceof ArrayBuffer) bytes = new Uint8Array(input);
+      else if (ArrayBuffer.isView(input)) bytes = new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+      else if (typeof Blob !== 'undefined' && input instanceof Blob) bytes = new Uint8Array(await input.arrayBuffer());
+      else return '';
+    } catch (_) {
+      return '';
+    }
+    if (!bytes.length) return '';
+
+    const zlibOffset = findLiveZlibOffset(bytes);
+    if (zlibOffset >= 0) {
+      const chunk = bytes.subarray(zlibOffset);
+      try {
+        if (typeof DecompressionStream === 'function') {
+          const stream = new Blob([chunk]).stream().pipeThrough(new DecompressionStream('deflate'));
+          const text = await new Response(stream).text();
+          if (text && text.trim()) return text;
+        }
+      } catch (_) {}
+      try {
+        const pako = globalThis?.pako;
+        if (pako && typeof pako.inflate === 'function') {
+          const out = pako.inflate(chunk);
+          const text = new TextDecoder().decode(out);
+          if (text && text.trim()) return text;
+        }
+      } catch (_) {}
+    }
+
+    try {
+      const direct = new TextDecoder().decode(bytes).replace(/^\u0004+/, '');
+      return direct && direct.trim() ? direct : '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  async function inspectOutboundRoomDataAsync(data, eventHint = '') {
+    try {
+      if (
+        data instanceof ArrayBuffer ||
+        ArrayBuffer.isView(data) ||
+        (typeof Blob !== 'undefined' && data instanceof Blob)
+      ) {
+        const text = await decodeLiveBinaryRoomFrame(data);
+        if (!text) return false;
+        return inspectOutboundRoomData(text, eventHint);
+      }
+      return inspectOutboundRoomData(data, eventHint);
+    } catch (_) {
+      return false;
+    }
+  }
+
   function applyOutboundRoomFromTransport(data, eventHint = '') {
+    if (
+      data instanceof ArrayBuffer ||
+      ArrayBuffer.isView(data) ||
+      (typeof Blob !== 'undefined' && data instanceof Blob)
+    ) {
+      inspectOutboundRoomDataAsync(data, eventHint).catch(() => {});
+      return false;
+    }
     return inspectOutboundRoomData(data, eventHint);
   }
 
@@ -1944,7 +2035,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
           ws.send = function(data) {
             // 先從進房/遊戲送出訊息抓 roomId/tableId，再處理 spin。
             // 這條路徑是 3.1.10 的房號來源；不使用右側排行榜猜房號。
-            applyOutboundRoomFromTransport(data);
+            applyOutboundRoomFromTransport(data, 'ws:send');
             startNewRound(data);
             return nativeSend.call(this, data);
           };
@@ -2102,6 +2193,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
       resolveRoomIdentityFromOutboundText,
       resolveRoomIdentityFromOutboundObject,
       inspectOutboundRoomData,
+      inspectOutboundRoomDataAsync,
+      decodeLiveBinaryRoomFrame,
       nearestAllowedStake,
       buildStageRecommendation,
       advanceResetResilientCounter
