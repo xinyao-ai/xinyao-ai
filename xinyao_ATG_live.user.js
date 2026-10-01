@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.26
+// @version      3.1.27
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；支援後台一鍵維護模式。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -771,9 +771,14 @@ setInterval(xinyaoCheckMaintenance, 10000);
   function applyRoomIdentity(identity) {
     if (!identity?.key) return false;
 
-    // 選擇機台視窗開啟時，只保留已存在的同房 identity；
-    // 不允許清單中的候選房號或換房請求提前污染目前房號。
-    if (isMachineSelectionOpenFromCocos()) {
+    // getSlotTableDetail 是 ATG 在會員實際選定機台時送出的明確事件。
+    // 事件送出當下「選擇機台」視窗可能還沒關閉，因此不能像一般候選房號一樣擋掉，
+    // 否則第一次進房與換房都會永遠停在「目前房號：—」。
+    const trustedCurrentRoomSource = identity?.source === 'cocos' || identity?.source === 'socketio:getSlotTableDetail';
+
+    // 選擇機台視窗開啟時，只阻擋非明確選房來源；
+    // getSlotTableDetail 代表已經真的選中房間，必須允許通過。
+    if (!trustedCurrentRoomSource && isMachineSelectionOpenFromCocos()) {
       const currentKey = String(state.currentRoomKey || '');
       if (!currentKey || currentKey.startsWith('runtime:') || String(identity.key) !== currentKey) return false;
     }
@@ -789,7 +794,6 @@ setInterval(xinyaoCheckMaintenance, 10000);
     const genuineRoomChange = Boolean(
       state.currentRoomKey && state.currentRoomKey !== nextKey && !upgradingRuntimeIdentity
     );
-    const trustedCurrentRoomSource = identity?.source === 'cocos' || identity?.source === 'socketio:getSlotTableDetail';
     const roomMoney = evolveRoomPlaySession({
       roomKey: state.currentRoomKey,
       roomNumber: state.currentRoomNumber,
