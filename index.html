@@ -2366,18 +2366,101 @@
   @media(max-width:560px){#loginPage.login-page-539{padding:56px 16px 45px}.login-brand-539{padding-bottom:24px}.login-logo-wrap-539{width:112px;height:112px;margin-bottom:17px}.login-logo-539{width:94px!important;height:94px!important;border-radius:24px!important}.login-deco-ball{width:36px;height:36px}.login-main-title-539{font-size:30px}.login-subtitle-539{font-size:15px}.login-form-card-539{padding:24px 22px 26px;border-radius:25px!important}.login-form-card-539 h3{font-size:21px;margin-bottom:22px}.login-input-wrap-539 input,#loginPage #loginButton{height:58px!important;min-height:58px!important}.login-notice-539{padding:22px 20px!important;border-radius:25px!important}#loginPage .login-notice-line{font-size:13px}#loginPage .contact-text{white-space:nowrap!important;font-size:12.5px!important;letter-spacing:-.25px}#loginPage .login-line-button{min-width:88px!important;height:36px!important;padding:0 9px!important;font-size:11px!important}.register-now-button{min-height:55px!important}}
   @media(max-width:390px){#loginPage .line-contact-row{gap:6px!important}#loginPage .contact-text{font-size:11.5px!important}#loginPage .login-line-button{min-width:80px!important;padding:0 7px!important;font-size:10px!important}}
   </style>
-
-<style id="xinyao-live-data-style">
-  .atg-live-card{margin:16px 0;padding:18px;border:1px solid #f2cede;border-radius:24px;background:linear-gradient(135deg,#fff,#fff3f8);box-shadow:0 12px 32px rgba(226,86,145,.12)}
-  .atg-live-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
-  .atg-live-title{font-size:18px;font-weight:900;color:#4f4149}.atg-live-badge{padding:6px 11px;border-radius:999px;background:#fff0f6;color:#cf3776;font-size:12px;font-weight:900}
-  .atg-live-badge.ok{background:#eafff0;color:#168a46}.atg-live-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.atg-live-item{padding:13px 14px;border:1px solid #f4dce7;border-radius:17px;background:rgba(255,255,255,.9)}
-  .atg-live-label{font-size:12px;color:#9a7d89;font-weight:800}.atg-live-value{margin-top:5px;font-size:17px;color:#473a41;font-weight:900;word-break:break-word}.atg-live-help{margin-top:5px;color:#88727c;font-size:11px;line-height:1.55}
-  .atg-live-confirmed{margin-top:11px;padding:12px 14px;border-radius:16px;background:#f9fff9;border:1px solid #d8f2df;display:none}.atg-live-confirmed.show{display:block}.atg-live-confirmed-title{font-size:12px;font-weight:900;color:#23894b;margin-bottom:6px}.atg-live-confirmed-row{font-size:13px;line-height:1.75;color:#4e5d52}
-  .atg-live-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.atg-live-actions button{border:0;border-radius:12px;padding:9px 13px;font-weight:900;cursor:pointer}.atg-live-refresh{background:#ef4d91;color:#fff}.atg-live-debug{display:none;background:#fff0f6;color:#d13a79}.atg-live-debug.show{display:inline-block}
-  @media(max-width:560px){.atg-live-grid{grid-template-columns:1fr}.atg-live-card{padding:15px;border-radius:20px}}
+<style id="public-win-login-style">
+.public-win-login{
+  margin:0 0 20px;
+  padding:16px;
+  border:1px solid #f2bfd2;
+  border-radius:20px;
+  background:linear-gradient(145deg,#fffafd,#fff1f7);
+  box-shadow:0 10px 26px rgba(229,92,148,.10);
+}
+.public-win-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:10px;
+}
+.public-win-title{
+  color:#583f4b;
+  font-size:16px;
+  font-weight:1000;
+}
+.public-win-badge{
+  padding:5px 9px;
+  border-radius:999px;
+  background:#ffe4ef;
+  color:#df3f7e;
+  font-size:11px;
+  font-weight:900;
+}
+.public-win-focus-btn{
+  width:100%;
+  margin:0 0 12px;
+  padding:13px 14px;
+  border:1px solid #f4b6cf;
+  border-radius:15px;
+  background:linear-gradient(90deg,#ffe7f1,#ffd7e7);
+  color:#d83f7f;
+  font-size:15px;
+  font-weight:1000;
+  cursor:pointer;
+  box-shadow:0 8px 18px rgba(229,92,148,.13);
+}
+.public-win-list{
+  display:flex;
+  gap:10px;
+  overflow-x:auto;
+  scroll-snap-type:x mandatory;
+  padding-bottom:3px;
+  scrollbar-width:none;
+}
+.public-win-list::-webkit-scrollbar{display:none}
+.public-win-card{
+  flex:0 0 88%;
+  scroll-snap-align:start;
+  padding:12px;
+  border:1px solid #f2d9e4;
+  border-radius:16px;
+  background:#fff;
+}
+.public-win-text{
+  color:#402f37;
+  font-size:14px;
+  font-weight:800;
+  line-height:1.6;
+}
+.public-win-amount{
+  color:#ef3f85;
+  font-size:18px;
+  font-weight:1000;
+}
+.public-win-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px}
+.public-win-card img{
+  display:block;
+  width:100%;
+  max-height:210px;
+  object-fit:cover;
+  margin-top:10px;
+  border-radius:12px;
+  background:#fff8fb;
+}
+.public-win-empty{
+  color:#9b8590;
+  font-size:13px;
+}
+.public-win-hint{
+  margin-top:9px;
+  color:#9e8791;
+  font-size:11px;
+  text-align:center;
+}
+@media(max-width:480px){
+  .public-win-login{padding:13px}
+  .public-win-card{flex-basis:94%}
+}
 </style>
-
 </head>
 
 <body>
@@ -2447,6 +2530,33 @@
         <div id="loginMessage" class="login-message-539"></div>
       </section>
 
+
+
+      <section class="public-win-login" aria-label="恭喜會員紀錄">
+        <div class="public-win-head">
+          <div class="public-win-title">🎉 恭喜會員紀錄</div>
+          <div class="public-win-badge">免登入查看</div>
+        </div>
+
+        <button
+          id="publicWinFocusBtn"
+          class="public-win-focus-btn"
+          type="button"
+        >
+          🏆 立即查看會員喜報
+        </button>
+
+        <div id="publicWinWrap" style="display:none">
+          <div id="publicWinList" class="public-win-list">
+            <div class="public-win-empty">正在讀取最新紀錄…</div>
+          </div>
+
+          <div class="public-win-hint">
+            左右滑動可查看更多會員紀錄
+          </div>
+        </div>
+      </section>
+
       <section class="login-notice-card login-notice-539">
         <div class="login-notice-title">📣 登入須知</div>
         <div class="login-notice-line">需完成 <strong>皇鼎平台註冊</strong> 才可登入分析系統</div>
@@ -2487,65 +2597,6 @@
         </div>
       </div>
     </section>
-
-
-    <section id="xinyaoLiveDataPanel" class="atg-live-card">
-      <div class="atg-live-head">
-        <div class="atg-live-title">📡 ATG 即時遊戲資料</div>
-        <span id="xinyaoLiveStatus" class="atg-live-badge">等待資料</span>
-      </div>
-      <div class="atg-live-grid">
-        <div class="atg-live-item">
-          <div class="atg-live-label">目前遊戲</div>
-          <div id="xinyaoLiveGame" class="atg-live-value">尚未收到</div>
-          <div class="atg-live-help">依 ATG 遊戲代碼自動辨識。</div>
-        </div>
-        <div class="atg-live-item">
-          <div class="atg-live-label">目前點數</div>
-          <div id="xinyaoLiveBalance" class="atg-live-value">—</div>
-          <div class="atg-live-help">ATG 回傳的玩家目前點數，不是自行估算。</div>
-        </div>
-        <div class="atg-live-item">
-          <div class="atg-live-label">目前押注</div>
-          <div id="xinyaoLiveBet" class="atg-live-value">—</div>
-          <div class="atg-live-help">本回合 ATG 回傳的實際總押注。</div>
-        </div>
-        <div class="atg-live-item">
-          <div class="atg-live-label">最新一局派彩</div>
-          <div id="xinyaoLivePayout" class="atg-live-value">—</div>
-          <div class="atg-live-help">最新一個回合最後結算的派彩金額。</div>
-        </div>
-        <div class="atg-live-item">
-          <div class="atg-live-label">本次最高派彩</div>
-          <div id="xinyaoLiveMaxPayout" class="atg-live-value">—</div>
-          <div class="atg-live-help">從本次捕捉到的回合中，取最高結算派彩。</div>
-        </div>
-        <div class="atg-live-item">
-          <div class="atg-live-label">免費遊戲狀態</div>
-          <div id="xinyaoLiveFreeGame" class="atg-live-value">—</div>
-          <div class="atg-live-help">顯示目前是否進入免費遊戲，以及剩餘次數。</div>
-        </div>
-        <div class="atg-live-item">
-          <div class="atg-live-label">本次完成轉數</div>
-          <div id="xinyaoLiveRoundCount" class="atg-live-value">0 轉</div>
-          <div class="atg-live-help">依手機 ATG 即時資料的 spinId 去除重複後計算；同一轉重複資料不會重複計入。</div>
-        </div>
-        <div class="atg-live-item">
-          <div class="atg-live-label">最後同步時間</div>
-          <div id="xinyaoLiveTime" class="atg-live-value">—</div>
-          <div class="atg-live-help">代表網站最後一次從手機雲端同步到 ATG 點數、押注、派彩等資料的時間。</div>
-        </div>
-      </div>
-      <div id="xinyaoLiveConfirmed" class="atg-live-confirmed show">
-        <div class="atg-live-confirmed-title">✅ 已驗證可讀取的真實欄位</div>
-        <div id="xinyaoLiveConfirmedRows" class="atg-live-confirmed-row">目前點數、實際押注、回合派彩、免費遊戲狀態。</div>
-      </div>
-      <div class="atg-live-actions">
-        <button id="xinyaoLiveRefresh" class="atg-live-refresh" type="button">重新讀取即時資料</button>
-        <button id="xinyaoLiveDebug" class="atg-live-debug" type="button">複製欄位驗證資料</button>
-      </div>
-    </section>
-
 
     <section class="card" style="padding:14px;">
       <div class="mode-grid" style="margin-top:0;">
@@ -2813,6 +2864,9 @@
     const WORKER_URL =
       "https://holy-violet-41e1.love06130430.workers.dev";
 
+    const ADMIN_PUBLIC_API =
+      "https://xinyao-atg-admin-api.love06130430.workers.dev";
+
     const $ = (id) => document.getElementById(id);
     const loginPage = $("loginPage");
     const appPage = $("appPage");
@@ -2841,6 +2895,9 @@
     const memberDisplay = $("memberDisplay");
     const logoutButton = $("logoutButton");
     const appLineFloat = $("appLineFloat");
+    const publicWinList = $("publicWinList");
+    const publicWinWrap = $("publicWinWrap");
+    const publicWinFocusBtn = $("publicWinFocusBtn");
 
     let loggedInMember = sessionStorage.getItem("memberAccount") || "";
 
@@ -2864,6 +2921,81 @@
       playLoginTransition();
       renderHistory();
       window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+
+
+    function escapeWinText(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function parsePublicWinImages(value) {
+      if (!value) return [];
+
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed.filter(Boolean) : [value];
+      } catch {
+        return [value];
+      }
+    }
+
+    async function loadPublicWins() {
+      if (!publicWinList) return;
+
+      try {
+        const response = await fetch(
+          ADMIN_PUBLIC_API + "/public/wins",
+          { method: "GET", cache: "no-store" }
+        );
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+          throw new Error(data.message || data.error || "讀取失敗");
+        }
+
+        const wins = Array.isArray(data.wins) ? data.wins : [];
+        if (!wins.length) {
+          publicWinList.innerHTML =
+            '<div class="public-win-empty">目前尚無公開會員紀錄。</div>';
+          return;
+        }
+
+        publicWinList.innerHTML = wins.map((win) => {
+          const member = escapeWinText(win.member_display || "會員");
+          const amount = Number(win.amount || 0).toLocaleString("zh-TW");
+          const images = parsePublicWinImages(win.image_url);
+          const imageHtml = images.length
+            ? `<div class="public-win-gallery">
+                ${images.map((src) => `
+                  <img
+                    src="${escapeWinText(src)}"
+                    alt="會員喜報照片"
+                    loading="lazy"
+                  >
+                `).join("")}
+              </div>`
+            : "";
+
+          return `
+            <article class="public-win-card">
+              <div class="public-win-text">
+                恭喜${member}使用此程式贏得
+                <span class="public-win-amount">${amount}</span>
+              </div>
+              ${imageHtml}
+            </article>
+          `;
+        }).join("");
+      } catch (error) {
+        publicWinList.innerHTML =
+          '<div class="public-win-empty">會員紀錄暫時讀取不到，稍後重新整理即可。</div>';
+      }
     }
 
     async function verifyMember() {
@@ -3399,6 +3531,31 @@
       pointerGlow.style.top = `${event.clientY}px`;
     });
 
+
+
+    if (publicWinFocusBtn && publicWinWrap) {
+      publicWinFocusBtn.addEventListener("click", async () => {
+        const isHidden =
+          publicWinWrap.style.display === "none" ||
+          getComputedStyle(publicWinWrap).display === "none";
+
+        if (isHidden) {
+          publicWinWrap.style.display = "block";
+          publicWinFocusBtn.textContent = "收起會員喜報";
+          await loadPublicWins();
+          setTimeout(() => {
+            publicWinWrap.scrollIntoView({
+              behavior: "smooth",
+              block: "nearest"
+            });
+          }, 50);
+        } else {
+          publicWinWrap.style.display = "none";
+          publicWinFocusBtn.textContent = "🏆 立即查看會員喜報";
+        }
+      });
+    }
+
     loginButton.addEventListener("click", verifyMember);
 
     memberAccountInput.addEventListener("keydown", (event) => {
@@ -3416,8 +3573,5 @@
 
 
   </script>
-
-  <script src="./xinyao_site_live_v2.js?v=328"></script>
-
 </body>
 </html>
