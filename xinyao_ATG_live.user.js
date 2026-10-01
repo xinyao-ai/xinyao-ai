@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.23
+// @version      3.1.24
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；支援後台一鍵維護模式。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -468,20 +468,22 @@ setInterval(xinyaoCheckMaintenance, 10000);
   // ATG 的「選擇機台」彈窗本身也包含大量 slotTableBtn > num。
   // 彈窗開啟期間不可把清單中的任一機台誤認為會員已經進入的房號。
   function isMachineSelectionOpenFromCocos() {
-    try {
-      const cocos = window.cc;
-      const scene = cocos?.director?.getScene?.();
-      const Label = cocos?.Label;
-      if (!scene || !Label || typeof scene.getComponentsInChildren !== 'function') return false;
+    for (const gameWindow of collectSameOriginLiveWindows()) {
+      try {
+        const cocos = gameWindow.cc;
+        const scene = cocos?.director?.getScene?.();
+        const Label = cocos?.Label;
+        if (!scene || !Label || typeof scene.getComponentsInChildren !== 'function') continue;
 
-      const labels = scene.getComponentsInChildren(Label) || [];
-      return labels.some((label) => {
-        const node = label?.node;
-        if (!node || node.activeInHierarchy === false) return false;
-        const text = String(label?.string ?? '').replace(/\s+/g, '');
-        return text.includes('選擇機台');
-      });
-    } catch (_) {}
+        const labels = scene.getComponentsInChildren(Label) || [];
+        if (labels.some((label) => {
+          const node = label?.node;
+          if (!node || node.activeInHierarchy === false) return false;
+          const text = String(label?.string ?? '').replace(/\s+/g, '');
+          return text.includes('選擇機台');
+        })) return true;
+      } catch (_) {}
+    }
     return false;
   }
 
@@ -552,15 +554,40 @@ setInterval(xinyaoCheckMaintenance, 10000);
     return { key: `room:${best.roomNumber}`, roomNumber: best.roomNumber, source: 'cocos' };
   }
 
+  function collectSameOriginLiveWindows(rootWindow = window) {
+    const windows = [];
+    const seen = new Set();
+    const visit = (win) => {
+      if (!win || seen.has(win)) return;
+      seen.add(win);
+      windows.push(win);
+      let frames = [];
+      try { frames = [...win.document.querySelectorAll('iframe')]; } catch (_) {}
+      for (const frame of frames) {
+        try {
+          const child = frame.contentWindow;
+          if (!child) continue;
+          void child.document;
+          visit(child);
+        } catch (_) {}
+      }
+    };
+    visit(rootWindow);
+    return windows;
+  }
+
   function resolveRoomIdentityFromCocos() {
     if (isMachineSelectionOpenFromCocos()) return null;
-    try {
-      const cocos = window.cc;
-      const scene = cocos?.director?.getScene?.();
-      const Label = cocos?.Label;
-      if (!scene || !Label || typeof scene.getComponentsInChildren !== 'function') return null;
-      return resolveRoomIdentityFromCocosLabels(scene.getComponentsInChildren(Label) || []);
-    } catch (_) {}
+    for (const gameWindow of collectSameOriginLiveWindows()) {
+      try {
+        const cocos = gameWindow.cc;
+        const scene = cocos?.director?.getScene?.();
+        const Label = cocos?.Label;
+        if (!scene || !Label || typeof scene.getComponentsInChildren !== 'function') continue;
+        const identity = resolveRoomIdentityFromCocosLabels(scene.getComponentsInChildren(Label) || []);
+        if (identity) return identity;
+      } catch (_) {}
+    }
     return null;
   }
 
