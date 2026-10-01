@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.28
+// @version      3.1.29
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；支援後台一鍵維護模式。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -613,17 +613,18 @@ setInterval(xinyaoCheckMaintenance, 10000);
   function applyResolvedOutboundRoomIdentity(identity) {
     if (!identity) return false;
 
-    // Cocos 有有效房號時，封包不得覆蓋目前畫面上的真實機台。
-    // 換房瞬間可能仍收到上一房延遲的 WebSocket / XHR / Socket.IO 訊息；
-    // 若任由舊封包改回房號，網站會誤開一筆 0 轉 / 0 免遊 / 0 派彩的假紀錄。
-    const cocosIdentity = resolveRoomIdentityFromCocos();
-    if (cocosIdentity?.key) {
-      if (String(cocosIdentity.key) !== String(identity.key || '')) {
-        const changed = applyRoomIdentity(cocosIdentity);
-        if (changed) sync();
-        return false;
+    // Cocos 只是畫面 heuristic；真正的 getSlotTableDetail 是伺服器確認過的目前房。
+    // 權威來源不得被 Cocos 的誤判（例如直式版把其他 3~4 位數字當房號）覆蓋。
+    if (!isAuthoritativeCurrentRoomIdentity(identity)) {
+      const cocosIdentity = resolveRoomIdentityFromCocos();
+      if (cocosIdentity?.key) {
+        if (String(cocosIdentity.key) !== String(identity.key || '')) {
+          const changed = applyRoomIdentity(cocosIdentity);
+          if (changed) sync();
+          return false;
+        }
+        identity = cocosIdentity;
       }
-      identity = cocosIdentity;
     }
 
     const changed = applyRoomIdentity(identity);
@@ -763,8 +764,18 @@ setInterval(xinyaoCheckMaintenance, 10000);
     return inspectOutboundRoomData(data, eventHint);
   }
 
+  function isAuthoritativeCurrentRoomIdentity(identity) {
+    const source = String(identity?.source || '');
+    return source === 'socketio:getSlotTableDetail' ||
+      source === 'scanner:getSlotTableDetail' ||
+      source === 'scan-remap';
+  }
+
   function shouldIgnoreIdentityAgainstCocos(identity, cocosIdentity = resolveRoomIdentityFromCocos()) {
     if (!identity?.key || identity?.source === 'cocos') return false;
+    // getSlotTableDetail / scanner bridge 是伺服器確認過的目前房號來源，
+    // Cocos 只是一層畫面 heuristic，不能反過來否決權威房號。
+    if (isAuthoritativeCurrentRoomIdentity(identity)) return false;
     if (!cocosIdentity?.key) return false;
     return String(identity.key) !== String(cocosIdentity.key);
   }
