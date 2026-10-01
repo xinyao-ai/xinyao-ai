@@ -2499,6 +2499,17 @@
   .public-win-card{flex-basis:94%}
 }
 </style>
+<style id="xinyao-live-data-style">
+  .atg-live-card{margin:16px 0;padding:18px;border:1px solid #f2cede;border-radius:24px;background:linear-gradient(135deg,#fff,#fff3f8);box-shadow:0 12px 32px rgba(226,86,145,.12)}
+  .atg-live-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .atg-live-title{font-size:18px;font-weight:900;color:#4f4149}.atg-live-badge{padding:6px 11px;border-radius:999px;background:#fff0f6;color:#cf3776;font-size:12px;font-weight:900}
+  .atg-live-badge.ok{background:#eafff0;color:#168a46}.atg-live-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.atg-live-item{padding:13px 14px;border:1px solid #f4dce7;border-radius:17px;background:rgba(255,255,255,.9)}
+  .atg-live-label{font-size:12px;color:#9a7d89;font-weight:800}.atg-live-value{margin-top:5px;font-size:17px;color:#473a41;font-weight:900;word-break:break-word}.atg-live-help{margin-top:5px;color:#88727c;font-size:11px;line-height:1.55}
+  .atg-live-confirmed{margin-top:11px;padding:12px 14px;border-radius:16px;background:#f9fff9;border:1px solid #d8f2df;display:none}.atg-live-confirmed.show{display:block}.atg-live-confirmed-title{font-size:12px;font-weight:900;color:#23894b;margin-bottom:6px}.atg-live-confirmed-row{font-size:13px;line-height:1.75;color:#4e5d52}
+  .atg-live-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.atg-live-actions button{border:0;border-radius:12px;padding:9px 13px;font-weight:900;cursor:pointer}.atg-live-refresh{background:#ef4d91;color:#fff}.atg-live-debug{display:none;background:#fff0f6;color:#d13a79}.atg-live-debug.show{display:inline-block}
+  @media(max-width:560px){.atg-live-grid{grid-template-columns:1fr}.atg-live-card{padding:15px;border-radius:20px}}
+</style>
+
 </head>
 
 <body>
@@ -2627,6 +2638,64 @@
         </div>
       </div>
     </section>
+
+<section id="xinyaoLiveDataPanel" class="atg-live-card">
+      <div class="atg-live-head">
+        <div class="atg-live-title">📡 ATG 即時遊戲資料</div>
+        <span id="xinyaoLiveStatus" class="atg-live-badge">等待資料</span>
+      </div>
+      <div class="atg-live-grid">
+        <div class="atg-live-item">
+          <div class="atg-live-label">目前遊戲</div>
+          <div id="xinyaoLiveGame" class="atg-live-value">尚未收到</div>
+          <div class="atg-live-help">依 ATG 遊戲代碼自動辨識。</div>
+        </div>
+        <div class="atg-live-item">
+          <div class="atg-live-label">目前點數</div>
+          <div id="xinyaoLiveBalance" class="atg-live-value">—</div>
+          <div class="atg-live-help">ATG 回傳的玩家目前點數，不是自行估算。</div>
+        </div>
+        <div class="atg-live-item">
+          <div class="atg-live-label">目前押注</div>
+          <div id="xinyaoLiveBet" class="atg-live-value">—</div>
+          <div class="atg-live-help">本回合 ATG 回傳的實際總押注。</div>
+        </div>
+        <div class="atg-live-item">
+          <div class="atg-live-label">最新一局派彩</div>
+          <div id="xinyaoLivePayout" class="atg-live-value">—</div>
+          <div class="atg-live-help">最新一個回合最後結算的派彩金額。</div>
+        </div>
+        <div class="atg-live-item">
+          <div class="atg-live-label">目前捕捉最高派彩</div>
+          <div id="xinyaoLiveMaxPayout" class="atg-live-value">—</div>
+          <div class="atg-live-help">從本次捕捉到的回合中，取最高結算派彩。</div>
+        </div>
+        <div class="atg-live-item">
+          <div class="atg-live-label">免費遊戲狀態</div>
+          <div id="xinyaoLiveFreeGame" class="atg-live-value">—</div>
+          <div class="atg-live-help">顯示目前是否進入免費遊戲，以及剩餘次數。</div>
+        </div>
+        <div class="atg-live-item">
+          <div class="atg-live-label">本次完成轉數</div>
+          <div id="xinyaoLiveRoundCount" class="atg-live-value">0 局</div>
+          <div class="atg-live-help">依手機 ATG 即時資料的 spinId 去除重複後計算；同一轉重複資料不會重複計入。</div>
+        </div>
+        <div class="atg-live-item">
+          <div class="atg-live-label">最後同步手機 ATG 資料</div>
+          <div id="xinyaoLiveTime" class="atg-live-value">—</div>
+          <div class="atg-live-help">代表網站最後一次從手機雲端同步到 ATG 點數、押注、派彩等資料的時間。</div>
+        </div>
+      </div>
+      <div id="xinyaoLiveConfirmed" class="atg-live-confirmed show">
+        <div class="atg-live-confirmed-title">✅ 已驗證可讀取的真實欄位</div>
+        <div id="xinyaoLiveConfirmedRows" class="atg-live-confirmed-row">目前點數、實際押注、回合派彩、免費遊戲狀態。</div>
+      </div>
+      <div class="atg-live-actions">
+        <button id="xinyaoLiveRefresh" class="atg-live-refresh" type="button">重新讀取即時資料</button>
+        <button id="xinyaoLiveDebug" class="atg-live-debug" type="button">複製欄位驗證資料</button>
+      </div>
+    </section>
+
 
     <section class="card" style="padding:14px;">
       <div class="mode-grid" style="margin-top:0;">
