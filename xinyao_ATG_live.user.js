@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.25
+// @version      3.1.26
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；支援後台一鍵維護模式。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -368,13 +368,20 @@ setInterval(xinyaoCheckMaintenance, 10000);
   function resolveRoomIdentityFromOutboundObject(value, eventHint = '') {
     if (!value || typeof value !== 'object') return null;
 
+    const hint = String(eventHint || (Array.isArray(value) && typeof value[0] === 'string' ? value[0] : ''));
+    // 實機 Network 已確認：切換目前機台時 Socket.IO 會送
+    // 42x["getSlotTableDetail",{"roomId":...}]。這個事件代表「會員真正選中的房」，
+    // 可安全拿來建立新房的進房金額，而不是排行榜裡任意 slotTableUpdated 房號。
+    const trustedCurrentRoomEvent = /(?:^|:)getSlotTableDetail$/i.test(hint) || /^getSlotTableDetail$/i.test(hint);
+    const transportSource = trustedCurrentRoomEvent ? 'socketio:getSlotTableDetail' : 'transport';
+
     const numberNames = new Set([
       'room','roomnumber','roomno','roomnum','tablenumber','tableno','tablenum',
       'machinenumber','machineno','machinenum'
     ]);
     const directNumber = findNamedNumber(value, numberNames);
     if (directNumber !== null && directNumber >= 1 && directNumber <= 4100) {
-      return { key: `room:${directNumber}`, roomNumber: directNumber };
+      return { key: `room:${directNumber}`, roomNumber: directNumber, source: transportSource };
     }
 
     const idNames = new Set(['roomid','tableid','slottableid','machineid']);
@@ -382,14 +389,13 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
     // Socket.IO 有些進房事件是 emit('enterRoom', 1003) 或 emit('joinTable', { id: ... })。
     // 只有事件名稱明確像「進/換房」時，才接受裸數字或 generic id，避免把頁碼/下注額誤認成房號。
-    const hint = String(eventHint || (Array.isArray(value) && typeof value[0] === 'string' ? value[0] : ''));
     const roomActionHint = /(?:(?:enter|join|select|switch|change|open|play).*(?:room|table|slot|machine)|(?:room|table|slot|machine).*(?:enter|join|select|switch|change|open|play))/i.test(hint);
 
     if (roomActionHint && Array.isArray(value)) {
       for (const item of value.slice(1)) {
         const n = toNumber(item);
         if (n !== null) {
-          if (n >= 1 && n <= 4100) return { key: `room:${n}`, roomNumber: n };
+          if (n >= 1 && n <= 4100) return { key: `room:${n}`, roomNumber: n, source: transportSource };
           if (roomId === null) roomId = n;
         }
       }
@@ -403,8 +409,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
     if (roomId !== null) {
       const mapped = fullScanRoomNumberByRoomId(roomId);
       return mapped !== null
-        ? { key: `room:${mapped}`, roomNumber: mapped }
-        : { key: `roomId:${roomId}`, roomNumber: null };
+        ? { key: `room:${mapped}`, roomNumber: mapped, source: transportSource }
+        : { key: `roomId:${roomId}`, roomNumber: null, source: transportSource };
     }
 
     // room/table 物件常見 { room: { number: 1003 } } / { table: { id: ... } }
@@ -413,14 +419,14 @@ setInterval(xinyaoCheckMaintenance, 10000);
       if (!['room','table','slottable','machine'].includes(key) || !child || typeof child !== 'object') continue;
       const nestedNumber = findNamedNumber(child, new Set(['number','no','num','roomnumber','tablenumber','machinenumber']));
       if (nestedNumber !== null && nestedNumber >= 1 && nestedNumber <= 4100) {
-        return { key: `room:${nestedNumber}`, roomNumber: nestedNumber };
+        return { key: `room:${nestedNumber}`, roomNumber: nestedNumber, source: transportSource };
       }
       const nestedId = findNamedNumber(child, new Set(['id','roomid','tableid','slottableid','machineid']));
       if (nestedId !== null) {
         const mapped = fullScanRoomNumberByRoomId(nestedId);
         return mapped !== null
-          ? { key: `room:${mapped}`, roomNumber: mapped }
-          : { key: `roomId:${nestedId}`, roomNumber: null };
+          ? { key: `room:${mapped}`, roomNumber: mapped, source: transportSource }
+          : { key: `roomId:${nestedId}`, roomNumber: null, source: transportSource };
       }
     }
 
@@ -783,6 +789,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     const genuineRoomChange = Boolean(
       state.currentRoomKey && state.currentRoomKey !== nextKey && !upgradingRuntimeIdentity
     );
+    const trustedCurrentRoomSource = identity?.source === 'cocos' || identity?.source === 'socketio:getSlotTableDetail';
     const roomMoney = evolveRoomPlaySession({
       roomKey: state.currentRoomKey,
       roomNumber: state.currentRoomNumber,
@@ -792,7 +799,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
       roomNumber: nextRoomNumber,
       // Cocos 節點是在目前機台畫面已建立後才讀到；此時目前 wallet 點數就是新房進房點數。
       // 其他較早到達的封包型 roomId 仍維持原本延後抓餘額的策略。
-      balance: genuineRoomChange ? (identity?.source === 'cocos' ? state.balance : null) : state.balance
+      balance: genuineRoomChange ? (trustedCurrentRoomSource ? state.balance : null) : state.balance
     });
 
     if (state.currentRoomKey === nextKey) {
@@ -2014,7 +2021,37 @@ setInterval(xinyaoCheckMaintenance, 10000);
     render();
   }
 
+  function patchWebSocketPrototypeSendForWindow(targetWindow) {
+    try {
+      const WS = targetWindow?.WebSocket;
+      const proto = WS?.prototype;
+      if (!proto || typeof proto.send !== 'function' || proto.send.__xinyaoRoomOutboundWrapped) return false;
+
+      const nativeSend = proto.send;
+      const wrappedSend = function(data) {
+        try {
+          // 直接包 prototype.send，連「程式啟動前已經建立」的 Socket.IO WebSocket 也抓得到。
+          // 實機已確認換房會送 42x["getSlotTableDetail",{"roomId":...}]。
+          applyOutboundRoomFromTransport(data, 'ws:send');
+          startNewRound(data);
+        } catch (_) {}
+        return nativeSend.call(this, data);
+      };
+      try { Object.defineProperty(wrappedSend, '__xinyaoRoomOutboundWrapped', { value: true }); } catch (_) {}
+      proto.send = wrappedSend;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   function patchWebSocket() {
+    // 遊戲可能在同源 iframe 裡，而且 Socket.IO 常比面板更早建立連線。
+    // 每次巡檢都先補 prototype.send；這不依賴重新建立 WebSocket，所以換房也能抓。
+    for (const gameWindow of collectSameOriginLiveWindows()) {
+      patchWebSocketPrototypeSendForWindow(gameWindow);
+    }
+
     const NativeWS = window.WebSocket;
     if (!NativeWS || NativeWS.__xinyaoLiveV200Wrapped) return;
 
@@ -2030,17 +2067,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
           }, true);
         } catch (_) {}
 
-        try {
-          const nativeSend = ws.send;
-          ws.send = function(data) {
-            // 先從進房/遊戲送出訊息抓 roomId/tableId，再處理 spin。
-            // 這條路徑是 3.1.10 的房號來源；不使用右側排行榜猜房號。
-            applyOutboundRoomFromTransport(data, 'ws:send');
-            startNewRound(data);
-            return nativeSend.call(this, data);
-          };
-        } catch (_) {}
-
+        // send 已統一由 WebSocket.prototype.send 攔截；不要再包 instance send，避免同一換房訊息處理兩次。
         return ws;
       }
     });
@@ -2096,33 +2123,35 @@ setInterval(xinyaoCheckMaintenance, 10000);
   }
 
   function patchSocketIO() {
-    try {
-      const proto = window.io?.Socket?.prototype;
-      if (!proto) return;
+    for (const gameWindow of collectSameOriginLiveWindows()) {
+      try {
+        const proto = gameWindow.io?.Socket?.prototype;
+        if (!proto) continue;
 
-      if (typeof proto.onevent === 'function' && !proto.onevent.__xinyaoLiveV200Wrapped) {
-        const nativeOnevent = proto.onevent;
-        const wrappedOnevent = function(packet) {
-          try { if (packet?.data) inspectObject(packet.data); } catch (_) {}
-          return nativeOnevent.call(this, packet);
-        };
-        try { Object.defineProperty(wrappedOnevent, '__xinyaoLiveV200Wrapped', { value: true }); } catch (_) {}
-        proto.onevent = wrappedOnevent;
-      }
+        if (typeof proto.onevent === 'function' && !proto.onevent.__xinyaoLiveV200Wrapped) {
+          const nativeOnevent = proto.onevent;
+          const wrappedOnevent = function(packet) {
+            try { if (packet?.data) inspectObject(packet.data); } catch (_) {}
+            return nativeOnevent.call(this, packet);
+          };
+          try { Object.defineProperty(wrappedOnevent, '__xinyaoLiveV200Wrapped', { value: true }); } catch (_) {}
+          proto.onevent = wrappedOnevent;
+        }
 
-      if (typeof proto.emit === 'function' && !proto.emit.__xinyaoRoomOutboundWrapped) {
-        const nativeEmit = proto.emit;
-        const wrappedEmit = function(...args) {
-          try {
-            const eventHint = typeof args[0] === 'string' ? args[0] : '';
-            applyOutboundRoomFromTransport(args, eventHint);
-          } catch (_) {}
-          return nativeEmit.apply(this, args);
-        };
-        try { Object.defineProperty(wrappedEmit, '__xinyaoRoomOutboundWrapped', { value: true }); } catch (_) {}
-        proto.emit = wrappedEmit;
-      }
-    } catch (_) {}
+        if (typeof proto.emit === 'function' && !proto.emit.__xinyaoRoomOutboundWrapped) {
+          const nativeEmit = proto.emit;
+          const wrappedEmit = function(...args) {
+            try {
+              const eventHint = typeof args[0] === 'string' ? args[0] : '';
+              applyOutboundRoomFromTransport(args, eventHint);
+            } catch (_) {}
+            return nativeEmit.apply(this, args);
+          };
+          try { Object.defineProperty(wrappedEmit, '__xinyaoRoomOutboundWrapped', { value: true }); } catch (_) {}
+          proto.emit = wrappedEmit;
+        }
+      } catch (_) {}
+    }
   }
 
   function patchFetchOutboundRoom() {
