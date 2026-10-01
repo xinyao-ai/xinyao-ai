@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.27
+// @version      3.1.28
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；支援後台一鍵維護模式。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -128,6 +128,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     freeGameLastPositiveSpinId: '',
     freeGameZeroSpinId: '',
     currentRoomKey: RUNTIME_ROOM_KEY,
+    currentRoomId: null,
     currentRoomNumber: null,
     roomEntryBalance: null,
     roomProfit: null,
@@ -409,8 +410,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
     if (roomId !== null) {
       const mapped = fullScanRoomNumberByRoomId(roomId);
       return mapped !== null
-        ? { key: `room:${mapped}`, roomNumber: mapped, source: transportSource }
-        : { key: `roomId:${roomId}`, roomNumber: null, source: transportSource };
+        ? { key: `room:${mapped}`, roomNumber: mapped, roomId, source: transportSource }
+        : { key: `roomId:${roomId}`, roomNumber: null, roomId, source: transportSource };
     }
 
     // room/table 物件常見 { room: { number: 1003 } } / { table: { id: ... } }
@@ -425,8 +426,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
       if (nestedId !== null) {
         const mapped = fullScanRoomNumberByRoomId(nestedId);
         return mapped !== null
-          ? { key: `room:${mapped}`, roomNumber: mapped, source: transportSource }
-          : { key: `roomId:${nestedId}`, roomNumber: null, source: transportSource };
+          ? { key: `room:${mapped}`, roomNumber: mapped, roomId: nestedId, source: transportSource }
+          : { key: `roomId:${nestedId}`, roomNumber: null, roomId: nestedId, source: transportSource };
       }
     }
 
@@ -768,13 +769,48 @@ setInterval(xinyaoCheckMaintenance, 10000);
     return String(identity.key) !== String(cocosIdentity.key);
   }
 
+  function currentRoomIdFromState() {
+    const direct = toNumber(state.currentRoomId);
+    if (direct !== null) return direct;
+    const match = String(state.currentRoomKey || '').match(/^roomId:(\d+)$/i);
+    return match ? toNumber(match[1]) : null;
+  }
+
+  function refreshCurrentRoomMappingFromScan() {
+    const roomId = currentRoomIdFromState();
+    if (roomId === null) return false;
+    const mapped = fullScanRoomNumberByRoomId(roomId);
+    if (mapped === null || mapped === state.currentRoomNumber) return false;
+    const changed = applyRoomIdentity({
+      key: `room:${mapped}`,
+      roomNumber: mapped,
+      roomId,
+      source: 'scan-remap'
+    });
+    if (changed) sync();
+    return changed;
+  }
+
+  function applyCurrentRoomSelectionBridge(detail) {
+    const roomId = toNumber(detail?.roomId);
+    const roomNumber = toNumber(detail?.roomNumber);
+    if (roomId === null && roomNumber === null) return false;
+    const mapped = roomNumber !== null ? roomNumber : (roomId !== null ? fullScanRoomNumberByRoomId(roomId) : null);
+    const identity = mapped !== null
+      ? { key: `room:${mapped}`, roomNumber: mapped, roomId, source: 'scanner:getSlotTableDetail' }
+      : { key: `roomId:${roomId}`, roomNumber: null, roomId, source: 'scanner:getSlotTableDetail' };
+    const changed = applyRoomIdentity(identity);
+    if (changed) sync();
+    return changed;
+  }
+
   function applyRoomIdentity(identity) {
     if (!identity?.key) return false;
 
     // getSlotTableDetail 是 ATG 在會員實際選定機台時送出的明確事件。
     // 事件送出當下「選擇機台」視窗可能還沒關閉，因此不能像一般候選房號一樣擋掉，
     // 否則第一次進房與換房都會永遠停在「目前房號：—」。
-    const trustedCurrentRoomSource = identity?.source === 'cocos' || identity?.source === 'socketio:getSlotTableDetail';
+    const trustedCurrentRoomSource = identity?.source === 'cocos' || identity?.source === 'socketio:getSlotTableDetail' || identity?.source === 'scanner:getSlotTableDetail';
 
     // 選擇機台視窗開啟時，只阻擋非明確選房來源；
     // getSlotTableDetail 代表已經真的選中房間，必須允許通過。
@@ -786,10 +822,15 @@ setInterval(xinyaoCheckMaintenance, 10000);
     if (shouldIgnoreIdentityAgainstCocos(identity)) return false;
     const nextKey = String(identity.key);
     const nextRoomNumber = identity.roomNumber ?? null;
+    const nextRoomId = toNumber(identity.roomId) ?? (() => {
+      const match = nextKey.match(/^roomId:(\d+)$/i);
+      return match ? toNumber(match[1]) : null;
+    })();
+    const previousRoomId = currentRoomIdFromState();
 
     const upgradingRuntimeIdentity = Boolean(
-      String(state.currentRoomKey || '').startsWith('runtime:') &&
-      state.currentRoomKey !== nextKey
+      (String(state.currentRoomKey || '').startsWith('runtime:') && state.currentRoomKey !== nextKey) ||
+      (state.currentRoomNumber === null && previousRoomId !== null && nextRoomId !== null && previousRoomId === nextRoomId && state.currentRoomKey !== nextKey)
     );
     const genuineRoomChange = Boolean(
       state.currentRoomKey && state.currentRoomKey !== nextKey && !upgradingRuntimeIdentity
@@ -808,6 +849,10 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
     if (state.currentRoomKey === nextKey) {
       let changed = false;
+      if (nextRoomId !== null && state.currentRoomId !== nextRoomId) {
+        state.currentRoomId = nextRoomId;
+        changed = true;
+      }
       if (identity.roomNumber !== null && identity.roomNumber !== undefined && state.currentRoomNumber !== identity.roomNumber) {
         state.currentRoomNumber = identity.roomNumber;
         changed = true;
@@ -826,6 +871,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
     // runtime fallback 升級成真實房號時，保留已記錄的進房金額與免遊次數；真正換房才重設。
     state.currentRoomKey = nextKey;
+    state.currentRoomId = nextRoomId;
     state.currentRoomNumber = nextRoomNumber;
     state.roomEntryBalance = roomMoney.entryBalance;
     state.roomProfit = roomMoney.profit;
@@ -2228,15 +2274,24 @@ setInterval(xinyaoCheckMaintenance, 10000);
       inspectOutboundRoomData,
       inspectOutboundRoomDataAsync,
       decodeLiveBinaryRoomFrame,
+      refreshCurrentRoomMappingFromScan,
+      applyCurrentRoomSelectionBridge,
       nearestAllowedStake,
       buildStageRecommendation,
       advanceResetResilientCounter
     };
   }
 
+  try {
+    window.addEventListener('xinyao:current-room-selected', event => {
+      try { applyCurrentRoomSelectionBridge(event?.detail || {}); } catch (_) {}
+    });
+  } catch (_) {}
+
   mountPanel();
   syncCocosRoomIdentity();
   setInterval(syncCocosRoomIdentity, 200);
+  setInterval(refreshCurrentRoomMappingFromScan, 250);
   patchWebSocket();
   patchJSON();
   patchTextDecoder();
@@ -3213,6 +3268,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     rankingSnapshotAt: '',
     latestTableNumbers: [],
     latestInferredPage: null,
+    currentSelectedRoomId: null,
     autoPagerProfile: null,
     learningPageNav: false,
     learningStartPage: null,
@@ -3521,6 +3577,30 @@ setInterval(xinyaoCheckMaintenance, 10000);
     scheduleRender();
   }
 
+  function roomNumberByRoomIdFromScanner(roomId) {
+    const id = finiteNumber(roomId);
+    if (id === null) return null;
+    for (const room of state.roomMap.values()) {
+      if (finiteNumber(room?.roomId) !== id) continue;
+      const number = finiteNumber(room?.number);
+      if (number !== null) return number;
+    }
+    return null;
+  }
+
+  function publishCurrentRoomSelection(roomId, source = 'scanner') {
+    const id = finiteNumber(roomId);
+    if (id === null) return false;
+    state.currentSelectedRoomId = id;
+    const roomNumber = roomNumberByRoomIdFromScanner(id);
+    try {
+      window.dispatchEvent(new CustomEvent('xinyao:current-room-selected', {
+        detail: { roomId: id, roomNumber, source }
+      }));
+    } catch (_) {}
+    return roomNumber !== null;
+  }
+
   function upsertRoom(obj, source = 'unknown') {
     const room = normalizeRoom(obj);
     if (!room) return false;
@@ -3547,6 +3627,9 @@ setInterval(xinyaoCheckMaintenance, 10000);
     if (idFallbackKey && idFallbackKey !== key) state.roomMap.delete(idFallbackKey);
     state.roomMap.set(key, merged);
     state.lastSource = source;
+    if (finiteNumber(state.currentSelectedRoomId) !== null && finiteNumber(merged.roomId) === finiteNumber(state.currentSelectedRoomId) && finiteNumber(merged.number) !== null) {
+      publishCurrentRoomSelection(state.currentSelectedRoomId, `${source}:room-map`);
+    }
     return finiteNumber(merged.number) !== null;
   }
 
@@ -3721,30 +3804,45 @@ setInterval(xinyaoCheckMaintenance, 10000);
     }
   }
 
-  function processSocketIoText(text, source) {
+  function parseSocketIoEventPacket(text) {
     const s = String(text || '').trim();
-    if (!s.startsWith('42[')) return false;
-
+    if (!s.startsWith('42')) return null;
+    const arrayStart = s.indexOf('[');
+    if (arrayStart < 2) return null;
     try {
-      const packet = nativeJSONParse(s.slice(2));
-      if (!Array.isArray(packet) || packet.length < 2) return false;
-      const [eventName, payload] = packet;
-
-      if (eventName === 'slotTableUpdated') {
-        const changed = applyStatusUpdates(payload, source);
-        recordEvent('slotTableUpdated', { changed });
-      } else if (INTERESTING_TEXT.test(String(eventName))) {
-        recordEvent('socketEvent', {
-          eventName: String(eventName),
-          preview: sanitizeText(JSON.stringify(payload)).slice(0, 1800)
-        });
-      }
-
-      ingestObject(payload, `${source}:${eventName}`);
-      return true;
-    } catch {
-      return false;
+      const packet = JSON.parse(s.slice(arrayStart));
+      if (!Array.isArray(packet) || packet.length < 2 || typeof packet[0] !== 'string') return null;
+      return { eventName: packet[0], payload: packet[1], packet };
+    } catch (_) {
+      return null;
     }
+  }
+
+  function processSocketIoText(text, source) {
+    const parsed = parseSocketIoEventPacket(text);
+    if (!parsed) return false;
+    const { eventName, payload } = parsed;
+
+    if (eventName === 'getSlotTableDetail') {
+      const roomId = finiteNumber(payload?.roomId ?? payload?.tableId ?? payload?.slotTableId);
+      if (roomId !== null) {
+        publishCurrentRoomSelection(roomId, `${source}:getSlotTableDetail`);
+        recordEvent('currentRoom', { roomId, roomNumber: roomNumberByRoomIdFromScanner(roomId) });
+      }
+    }
+
+    if (eventName === 'slotTableUpdated') {
+      const changed = applyStatusUpdates(payload, source);
+      recordEvent('slotTableUpdated', { changed });
+    } else if (INTERESTING_TEXT.test(String(eventName))) {
+      recordEvent('socketEvent', {
+        eventName: String(eventName),
+        preview: sanitizeText(JSON.stringify(payload)).slice(0, 1800)
+      });
+    }
+
+    ingestObject(payload, `${source}:${eventName}`);
+    return true;
   }
 
   function processText(text, source) {
@@ -3899,8 +3997,13 @@ setInterval(xinyaoCheckMaintenance, 10000);
       const nativeSend = ws.send.bind(ws);
 
       ws.send = function (data) {
-        if (typeof data === 'string' && (state.learningPageNav || INTERESTING_TEXT.test(data))) {
-          recordEvent('WS→', { url: safeUrl, preview: sanitizeText(data).slice(0, 1800) });
+        if (typeof data === 'string') {
+          if (state.learningPageNav || INTERESTING_TEXT.test(data) || data.startsWith('42')) {
+            recordEvent('WS→', { url: safeUrl, preview: sanitizeText(data).slice(0, 1800) });
+          }
+          // 重要：目前房 getSlotTableDetail 是送往伺服器的 Socket.IO event，
+          // 不能只記錄 WS→；要直接解析並橋接給左側即時助手。
+          processText(data, `WebSocket→:${safeUrl}`);
         }
         return nativeSend(data);
       };
