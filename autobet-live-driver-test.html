@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>芯瑤 AutoBet Live Driver 測試</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  padding:30px 16px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei",sans-serif;
+  background:#fff6fa;
+  color:#59434d;
+}
+
+.wrap{
+  width:min(860px,100%);
+  margin:auto;
+}
+
+.card{
+  background:#fff;
+  border:1px solid #ffd3e3;
+  border-radius:20px;
+  padding:20px;
+  margin-bottom:16px;
+}
+
+h1{
+  margin-top:0;
+  color:#ef377e;
+}
+
+.notice{
+  padding:12px;
+  border-radius:12px;
+  background:#fff0f6;
+  line-height:1.7;
+}
+
+.ok{
+  color:#16865b;
+  font-weight:900;
+  line-height:1.9;
+}
+
+.fail{
+  color:#d83d58;
+  font-weight:900;
+  line-height:1.9;
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <div class="card">
+    <h1>🌸 芯瑤 AutoBet Live Driver 測試</h1>
+
+    <div class="notice">
+      ⚠️ 這一步測試假資料是否能「自動逐局執行」。<br>
+      不會按真正 ATG Spin、不會改下注金額。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🧪 Live Driver 測試</h3>
+    <div id="result">測試中…</div>
+  </div>
+
+  <div class="card">
+    <h3>🎮 即時面板</h3>
+    <div id="xinyao-autobet-panel"></div>
+  </div>
+
+</div>
+
+<script src="./xinyao_ATG_autobet_engine.js"></script>
+<script src="./xinyao_ATG_autobet_strategy.js"></script>
+<script src="./xinyao_ATG_autobet_controller.js"></script>
+<script src="./xinyao_ATG_autobet_runner.js"></script>
+<script src="./xinyao_ATG_autobet_console.js"></script>
+<script src="./xinyao_ATG_autobet_session.js"></script>
+<script src="./xinyao_ATG_autobet_simulator.js"></script>
+<script src="./xinyao_ATG_autobet_live_sim.js"></script>
+<script src="./xinyao_ATG_autobet_panel.js?v=0201"></script>
+<script src="./xinyao_ATG_autobet_live_panel.js"></script>
+
+<script src="./xinyao_ATG_autobet_live_driver.js"></script>
+
+<script>
+(async () => {
+
+  const box =
+    document.getElementById('result');
+
+  if (!window.XinyaoAutoBetLiveDriver) {
+
+    box.innerHTML =
+      '<div class="fail">❌ Live Driver 尚未建立｜這次失敗是正常的</div>';
+
+    return;
+  }
+
+  const S =
+    window.XinyaoAutoBetSession;
+
+  const L =
+    window.XinyaoAutoBetLiveSim;
+
+  const LP =
+    window.XinyaoAutoBetLivePanel;
+
+  const D =
+    window.XinyaoAutoBetLiveDriver;
+
+  const wait = ms =>
+    new Promise(resolve =>
+      setTimeout(resolve, ms)
+    );
+
+  const tests = [];
+
+  function add(name, expected, actual) {
+
+    tests.push({
+      name,
+      expected:String(expected),
+      actual:String(actual),
+      ok:String(expected) === String(actual)
+    });
+
+  }
+
+  S.reset({
+    startBalance:2000,
+    balance:2000,
+    takeProfit:1000,
+    stopLoss:800,
+    maxSpins:100
+  });
+
+  L.reset();
+
+  L.configure({
+    balances:[
+      1996,
+      2004,
+      1992
+    ]
+  });
+
+  LP.mount(
+    '#xinyao-autobet-panel'
+  );
+
+  D.reset();
+
+  add(
+    '初始狀態',
+    'STOPPED',
+    D.getState().status
+  );
+
+  D.start({
+    intervalMs:80
+  });
+
+  add(
+    '開始自動模擬',
+    'RUNNING',
+    D.getState().status
+  );
+
+  /*
+    等第一局自動跑完
+  */
+  await wait(110);
+
+  add(
+    '自動完成第 1 局',
+    1,
+    S.getState().totalSpins
+  );
+
+  add(
+    '第 1 局點數',
+    1996,
+    S.getState().balance
+  );
+
+  /*
+    暫停後不應再增加轉數
+  */
+  D.pause();
+
+  const beforePause =
+    S.getState().totalSpins;
+
+  await wait(180);
+
+  add(
+    '暫停時不執行',
+    beforePause,
+    S.getState().totalSpins
+  );
+
+  add(
+    '暫停狀態',
+    'PAUSED',
+    D.getState().status
+  );
+
+  /*
+    繼續後把剩下資料跑完
+  */
+  D.resume();
+
+  await wait(290);
+
+  add(
+    '三局全部完成',
+    3,
+    S.getState().totalSpins
+  );
+
+  add(
+    '最後點數',
+    1992,
+    S.getState().balance
+  );
+
+  add(
+    '資料跑完自動停止',
+    'STOPPED',
+    D.getState().status
+  );
+
+  let passed = 0;
+
+  const html =
+    tests.map(test => {
+
+      if (test.ok) {
+        passed++;
+      }
+
+      return `
+        <div class="${test.ok ? 'ok' : 'fail'}">
+
+          ${test.ok ? '✅' : '❌'}
+
+          ${test.name}
+
+          ｜預期：
+          ${test.expected}
+
+          ｜實際：
+          ${test.actual}
+
+        </div>
+      `;
+
+    }).join('');
+
+  box.innerHTML =
+    html +
+    `<hr><b>結果：${passed} / ${tests.length} 通過</b>`;
+
+})();
+</script>
+
+</body>
+</html>
