@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>芯瑤 AutoBet Panel 測試</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  padding:30px 16px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei",sans-serif;
+  background:#fff6fa;
+  color:#59434d;
+}
+
+.wrap{
+  width:min(820px,100%);
+  margin:auto;
+}
+
+.card{
+  background:#fff;
+  border:1px solid #ffd3e3;
+  border-radius:20px;
+  padding:20px;
+  margin-bottom:16px;
+}
+
+h1{
+  margin-top:0;
+  color:#ef377e;
+}
+
+.notice{
+  padding:12px;
+  border-radius:12px;
+  background:#fff0f6;
+  line-height:1.7;
+}
+
+.ok{
+  color:#16865b;
+  font-weight:900;
+  line-height:1.9;
+}
+
+.fail{
+  color:#d83d58;
+  font-weight:900;
+  line-height:1.9;
+}
+
+#xinyao-autobet-panel{
+  margin-top:18px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <div class="card">
+    <h1>🌸 芯瑤 AutoBet Panel 測試</h1>
+
+    <div class="notice">
+      ⚠️ 目前只測試控制面板。<br>
+      不會按 ATG Spin、不會修改下注金額。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🧪 Panel 自動測試</h3>
+    <div id="result">測試中…</div>
+  </div>
+
+  <div class="card">
+    <h3>🎮 面板預覽</h3>
+    <div id="xinyao-autobet-panel"></div>
+  </div>
+
+</div>
+
+<script src="./xinyao_ATG_autobet_engine.js"></script>
+<script src="./xinyao_ATG_autobet_strategy.js"></script>
+<script src="./xinyao_ATG_autobet_controller.js"></script>
+<script src="./xinyao_ATG_autobet_runner.js"></script>
+<script src="./xinyao_ATG_autobet_console.js"></script>
+
+<script src="./xinyao_ATG_autobet_panel.js"></script>
+
+<script>
+(() => {
+
+  const box =
+    document.getElementById('result');
+
+  if (!window.XinyaoAutoBetPanel) {
+
+    box.innerHTML =
+      '<div class="fail">❌ Panel 尚未建立｜這次失敗是正常的</div>';
+
+    return;
+  }
+
+  window.XinyaoAutoBetPanel.mount(
+    '#xinyao-autobet-panel'
+  );
+
+  const tests = [];
+
+  function add(
+    name,
+    expected,
+    actual
+  ) {
+
+    tests.push({
+      name,
+      expected,
+      actual,
+      ok: expected === actual
+    });
+
+  }
+
+  const Console =
+    window.XinyaoAutoBetConsole;
+
+  add(
+    '初始狀態',
+    'STOPPED',
+    Console.getState().status
+  );
+
+  document
+    .getElementById('xab-start')
+    .click();
+
+  add(
+    '開始按鈕',
+    'RUNNING',
+    Console.getState().status
+  );
+
+  document
+    .getElementById('xab-pause')
+    .click();
+
+  add(
+    '暫停按鈕',
+    'PAUSED',
+    Console.getState().status
+  );
+
+  document
+    .getElementById('xab-resume')
+    .click();
+
+  add(
+    '繼續按鈕',
+    'RUNNING',
+    Console.getState().status
+  );
+
+  document
+    .getElementById('xab-emergency')
+    .click();
+
+  add(
+    '緊急停止',
+    'EMERGENCY_STOP',
+    Console.getState().reason
+  );
+
+  let passed = 0;
+
+  const html =
+    tests.map(test => {
+
+      if (test.ok) {
+        passed++;
+      }
+
+      return `
+        <div class="${test.ok ? 'ok' : 'fail'}">
+          ${test.ok ? '✅' : '❌'}
+          ${test.name}
+          ｜預期：${test.expected}
+          ｜實際：${test.actual}
+        </div>
+      `;
+
+    }).join('');
+
+  box.innerHTML =
+    html +
+    `<hr><b>結果：${passed} / ${tests.length} 通過</b>`;
+
+})();
+</script>
+
+</body>
+</html>
