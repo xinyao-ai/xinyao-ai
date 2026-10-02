@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>芯瑤 AutoBet 測試台</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 30px 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+        "Microsoft JhengHei", sans-serif;
+      background: #fff6fa;
+      color: #59434d;
+    }
+
+    .wrap {
+      width: min(720px, 100%);
+      margin: auto;
+    }
+
+    .card {
+      background: white;
+      border: 1px solid #ffd3e3;
+      border-radius: 20px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin-top: 0;
+      color: #ef377e;
+    }
+
+    .notice {
+      padding: 12px;
+      border-radius: 12px;
+      background: #fff0f6;
+      line-height: 1.7;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    input {
+      width: 100%;
+      margin-top: 6px;
+      padding: 12px;
+      border: 1px solid #f2c8d8;
+      border-radius: 12px;
+      font-size: 16px;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 16px;
+      padding: 14px;
+      border: 0;
+      border-radius: 14px;
+      background: #f03c82;
+      color: white;
+      font-size: 16px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .result {
+      margin-top: 16px;
+      padding: 16px;
+      border-radius: 14px;
+      background: #fff7fb;
+      border: 1px solid #ffd7e6;
+      line-height: 1.8;
+    }
+
+    .pass {
+      color: #16865b;
+      font-weight: 900;
+    }
+
+    .fail {
+      color: #d83d58;
+      font-weight: 900;
+    }
+
+    @media (max-width: 600px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <div class="card">
+    <h1>🌸 芯瑤 AutoBet 測試台</h1>
+
+    <div class="notice">
+      ⚠️ 目前是純測試模式。<br>
+      不會按 Spin、不會調整下注、不會操作 ATG。
+    </div>
+  </div>
+
+  <div class="card">
+
+    <div class="grid">
+
+      <label>
+        進房本金
+        <input id="startBalance" type="number" value="2000">
+      </label>
+
+      <label>
+        目前點數
+        <input id="balance" type="number" value="2000">
+      </label>
+
+      <label>
+        已完成轉數
+        <input id="spins" type="number" value="0">
+      </label>
+
+      <label>
+        最大轉數
+        <input id="maxSpins" type="number" value="100">
+      </label>
+
+      <label>
+        止盈金額
+        <input id="takeProfit" type="number" value="1000">
+      </label>
+
+      <label>
+        止損金額
+        <input id="stopLoss" type="number" value="800">
+      </label>
+
+    </div>
+
+    <label style="margin-top:14px;">
+      <input
+        id="freeGameActive"
+        type="checkbox"
+        style="width:auto;margin-right:8px;"
+      >
+      現在正在免費遊戲／免遊
+    </label>
+
+    <button id="evaluateButton">
+      🧪 執行模擬判斷
+    </button>
+
+    <div class="result" id="result">
+      等待測試
+    </div>
+
+  </div>
+
+  <div class="card">
+
+    <strong>🔬 引擎自動測試</strong>
+
+    <div
+      id="selfTest"
+      style="margin-top:12px;line-height:1.8;"
+    >
+      測試中…
+    </div>
+
+  </div>
+
+</div>
+
+<script src="./xinyao_ATG_autobet_engine.js"></script>
+
+<script>
+(() => {
+
+  const $ = id =>
+    document.getElementById(id);
+
+  function runEvaluation() {
+
+    if (!window.XinyaoAutoBetEngine) {
+      $('result').innerHTML =
+        '<span class="fail">❌ AutoBet Engine 沒有載入</span>';
+      return;
+    }
+
+    const state = {
+      startBalance:
+        Number($('startBalance').value),
+
+      balance:
+        Number($('balance').value),
+
+      spins:
+        Number($('spins').value),
+
+      freeGameActive:
+        $('freeGameActive').checked
+    };
+
+    const settings = {
+      takeProfit:
+        Number($('takeProfit').value),
+
+      stopLoss:
+        Number($('stopLoss').value),
+
+      maxSpins:
+        Number($('maxSpins').value)
+    };
+
+    const result =
+      window.XinyaoAutoBetEngine.evaluate(
+        state,
+        settings
+      );
+
+    const actionName = {
+      CONTINUE: '✅ 繼續',
+      STOP: '🛑 停止',
+      PAUSE: '⏸️ 暫停'
+    };
+
+    const reasonName = {
+      NORMAL: '正常',
+      TAKE_PROFIT: '達到止盈',
+      STOP_LOSS: '達到止損',
+      MAX_SPINS: '達到最大轉數',
+      FREE_GAME: '正在免費遊戲'
+    };
+
+    $('result').innerHTML = `
+      <b>判斷：</b>
+      ${actionName[result.action] || result.action}
+      <br>
+
+      <b>原因：</b>
+      ${reasonName[result.reason] || result.reason}
+      <br>
+
+      <b>目前盈虧：</b>
+      ${Number(result.profit).toFixed(2)}
+    `;
+  }
+
+  function runSelfTests() {
+
+    if (!window.XinyaoAutoBetEngine) {
+
+      $('selfTest').innerHTML =
+        '<span class="fail">❌ Engine 載入失敗</span>';
+
+      return;
+    }
+
+    const tests = [
+
+      {
+        name: '正常狀態',
+        state: {
+          startBalance: 2000,
+          balance: 2100,
+          spins: 20
+        },
+        settings: {
+          takeProfit: 1000,
+          stopLoss: 800,
+          maxSpins: 100
+        },
+        expected: 'CONTINUE'
+      },
+
+      {
+        name: '止盈',
+        state: {
+          startBalance: 2000,
+          balance: 3000,
+          spins: 20
+        },
+        settings: {
+          takeProfit: 1000,
+          stopLoss: 800,
+          maxSpins: 100
+        },
+        expected: 'STOP'
+      },
+
+      {
+        name: '止損',
+        state: {
+          startBalance: 2000,
+          balance: 1200,
+          spins: 20
+        },
+        settings: {
+          takeProfit: 1000,
+          stopLoss: 800,
+          maxSpins: 100
+        },
+        expected: 'STOP'
+      },
+
+      {
+        name: '最大轉數',
+        state: {
+          startBalance: 2000,
+          balance: 1950,
+          spins: 100
+        },
+        settings: {
+          takeProfit: 1000,
+          stopLoss: 800,
+          maxSpins: 100
+        },
+        expected: 'STOP'
+      },
+
+      {
+        name: '免遊暫停',
+        state: {
+          startBalance: 2000,
+          balance: 2100,
+          spins: 30,
+          freeGameActive: true
+        },
+        settings: {
+          takeProfit: 1000,
+          stopLoss: 800,
+          maxSpins: 100
+        },
+        expected: 'PAUSE'
+      }
+
+    ];
+
+    let passed = 0;
+
+    const html =
+      tests.map(test => {
+
+        const actual =
+          window.XinyaoAutoBetEngine.evaluate(
+            test.state,
+            test.settings
+          );
+
+        const ok =
+          actual.action === test.expected;
+
+        if (ok) {
+          passed++;
+        }
+
+        return `
+          <div class="${ok ? 'pass' : 'fail'}">
+            ${ok ? '✅' : '❌'}
+            ${test.name}
+            →
+            ${actual.action}
+          </div>
+        `;
+
+      }).join('');
+
+    $('selfTest').innerHTML =
+      html +
+      `<hr>
+       <b>結果：${passed} / ${tests.length} 通過</b>`;
+  }
+
+  $('evaluateButton')
+    .addEventListener(
+      'click',
+      runEvaluation
+    );
+
+  runSelfTests();
+
+})();
+</script>
+
+</body>
+</html>
