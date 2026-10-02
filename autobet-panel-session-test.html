@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>芯瑤 AutoBet Panel Session 測試</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  padding:30px 16px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei",sans-serif;
+  background:#fff6fa;
+  color:#59434d;
+}
+
+.wrap{
+  width:min(820px,100%);
+  margin:auto;
+}
+
+.card{
+  background:#fff;
+  border:1px solid #ffd3e3;
+  border-radius:20px;
+  padding:20px;
+  margin-bottom:16px;
+}
+
+h1{
+  margin-top:0;
+  color:#ef377e;
+}
+
+.notice{
+  padding:12px;
+  border-radius:12px;
+  background:#fff0f6;
+  line-height:1.7;
+}
+
+.ok{
+  color:#16865b;
+  font-weight:900;
+  line-height:1.9;
+}
+
+.fail{
+  color:#d83d58;
+  font-weight:900;
+  line-height:1.9;
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <div class="card">
+
+    <h1>🌸 芯瑤 AutoBet Panel＋Session 測試</h1>
+
+    <div class="notice">
+      ⚠️ 目前只測試資料是否正確顯示在面板。<br>
+      不會按 Spin、不會改注、不會操作 ATG。
+    </div>
+
+  </div>
+
+  <div class="card">
+
+    <h3>🧪 整合測試</h3>
+
+    <div id="result">
+      測試中…
+    </div>
+
+  </div>
+
+  <div class="card">
+
+    <h3>🎮 面板預覽</h3>
+
+    <div id="xinyao-autobet-panel"></div>
+
+  </div>
+
+</div>
+
+<script src="./xinyao_ATG_autobet_engine.js"></script>
+<script src="./xinyao_ATG_autobet_strategy.js"></script>
+<script src="./xinyao_ATG_autobet_controller.js"></script>
+<script src="./xinyao_ATG_autobet_runner.js"></script>
+<script src="./xinyao_ATG_autobet_console.js"></script>
+<script src="./xinyao_ATG_autobet_session.js"></script>
+<script src="./xinyao_ATG_autobet_panel.js"></script>
+
+<script>
+(() => {
+
+  const box =
+    document.getElementById('result');
+
+  const S =
+    window.XinyaoAutoBetSession;
+
+  const P =
+    window.XinyaoAutoBetPanel;
+
+  if (!S || !P) {
+
+    box.innerHTML =
+      '<div class="fail">❌ Session 或 Panel 沒有載入</div>';
+
+    return;
+  }
+
+  S.reset({
+    startBalance: 2000,
+    balance: 1846,
+    takeProfit: 1000,
+    stopLoss: 800,
+    maxSpins: 100
+  });
+
+  S.recordSpin({
+    balance: 1846,
+    freeGameActive: false
+  });
+
+  P.mount(
+    '#xinyao-autobet-panel'
+  );
+
+  /*
+    如果新版 Panel 有 refreshSession，
+    就要求它重新讀取 Session。
+  */
+  if (
+    typeof P.refreshSession === 'function'
+  ) {
+    P.refreshSession();
+  }
+
+  const decision =
+    S.getDecision();
+
+  const tests = [];
+
+  function text(id) {
+
+    const el =
+      document.getElementById(id);
+
+    return el
+      ? el.textContent.trim()
+      : 'MISSING';
+  }
+
+  function add(
+    name,
+    expected,
+    actual
+  ) {
+
+    tests.push({
+      name,
+      expected: String(expected),
+      actual: String(actual),
+      ok:
+        String(expected) ===
+        String(actual)
+    });
+
+  }
+
+  add(
+    '進房本金',
+    '2000.00',
+    text('xab-start-balance')
+  );
+
+  add(
+    '目前點數',
+    '1846.00',
+    text('xab-balance')
+  );
+
+  add(
+    '目前盈虧',
+    '-154.00',
+    text('xab-profit')
+  );
+
+  add(
+    '目前階段',
+    '1',
+    text('xab-stage')
+  );
+
+  add(
+    '建議下注',
+    '4',
+    text('xab-bet')
+  );
+
+  add(
+    '剩餘轉數',
+    '49',
+    text('xab-remaining')
+  );
+
+  add(
+    '止盈',
+    '1000.00',
+    text('xab-take-profit')
+  );
+
+  add(
+    '止損',
+    '800.00',
+    text('xab-stop-loss')
+  );
+
+  let passed = 0;
+
+  const html =
+    tests.map(test => {
+
+      if (test.ok) {
+        passed++;
+      }
+
+      return `
+        <div class="${test.ok ? 'ok' : 'fail'}">
+
+          ${test.ok ? '✅' : '❌'}
+
+          ${test.name}
+
+          ｜預期：
+          ${test.expected}
+
+          ｜實際：
+          ${test.actual}
+
+        </div>
+      `;
+
+    }).join('');
+
+  box.innerHTML =
+    html +
+    `<hr><b>結果：${passed} / ${tests.length} 通過</b>`;
+
+})();
+</script>
+
+</body>
+</html>
