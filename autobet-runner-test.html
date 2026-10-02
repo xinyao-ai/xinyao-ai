@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>芯瑤 AutoBet Runner 測試</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  padding:30px 16px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei",sans-serif;
+  background:#fff6fa;
+  color:#59434d;
+}
+
+.wrap{
+  width:min(780px,100%);
+  margin:auto;
+}
+
+.card{
+  background:#fff;
+  border:1px solid #ffd3e3;
+  border-radius:20px;
+  padding:20px;
+  margin-bottom:16px;
+}
+
+h1{
+  margin-top:0;
+  color:#ef377e;
+}
+
+.notice{
+  padding:12px;
+  border-radius:12px;
+  background:#fff0f6;
+  line-height:1.7;
+}
+
+.ok{
+  color:#16865b;
+  font-weight:900;
+  line-height:1.9;
+}
+
+.fail{
+  color:#d83d58;
+  font-weight:900;
+  line-height:1.9;
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <div class="card">
+    <h1>🌸 芯瑤 AutoBet Runner 測試</h1>
+
+    <div class="notice">
+      ⚠️ 目前只模擬自動執行流程。<br>
+      不會按 Spin、不會修改 ATG 金額、不會操作正式程式。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🧪 Runner 測試</h3>
+    <div id="result">測試中…</div>
+  </div>
+
+</div>
+
+<script src="./xinyao_ATG_autobet_engine.js"></script>
+<script src="./xinyao_ATG_autobet_strategy.js"></script>
+<script src="./xinyao_ATG_autobet_controller.js"></script>
+<script src="./xinyao_ATG_autobet_runner.js"></script>
+
+<script>
+(() => {
+
+  const box =
+    document.getElementById('result');
+
+  if (!window.XinyaoAutoBetRunner) {
+
+    box.innerHTML =
+      '<div class="fail">❌ Runner 尚未建立｜這次失敗是正常的</div>';
+
+    return;
+  }
+
+  const settings = {
+    takeProfit: 1000,
+    stopLoss: 800,
+    maxSpins: 100
+  };
+
+  const tests = [
+
+    {
+      name: '開始第一階段',
+      state: {
+        startBalance: 2000,
+        balance: 2000,
+        totalSpins: 0,
+        stage: 1,
+        stageCompletedSpins: 0
+      },
+      expected: {
+        action: 'CONTINUE',
+        bet: 4,
+        stage: 1,
+        remaining: 50
+      }
+    },
+
+    {
+      name: '第一階段已跑 20 轉',
+      state: {
+        startBalance: 2000,
+        balance: 1950,
+        totalSpins: 20,
+        stage: 1,
+        stageCompletedSpins: 20
+      },
+      expected: {
+        action: 'CONTINUE',
+        bet: 4,
+        stage: 1,
+        remaining: 30
+      }
+    },
+
+    {
+      name: '第一階段完成後進第二階段',
+      state: {
+        startBalance: 2000,
+        balance: 2300,
+        totalSpins: 50,
+        stage: 1,
+        stageCompletedSpins: 50
+      },
+      expected: {
+        action: 'CONTINUE',
+        bet: 6,
+        stage: 2,
+        remaining: 40
+      }
+    },
+
+    {
+      name: '達止盈停止',
+      state: {
+        startBalance: 2000,
+        balance: 3000,
+        totalSpins: 35,
+        stage: 1,
+        stageCompletedSpins: 35
+      },
+      expected: {
+        action: 'STOP',
+        reason: 'TAKE_PROFIT'
+      }
+    },
+
+    {
+      name: '緊急停止',
+      state: {
+        startBalance: 2000,
+        balance: 2100,
+        totalSpins: 10,
+        stage: 1,
+        stageCompletedSpins: 10,
+        emergencyStop: true
+      },
+      expected: {
+        action: 'STOP',
+        reason: 'EMERGENCY_STOP'
+      }
+    }
+
+  ];
+
+  let passed = 0;
+
+  const html =
+    tests.map(test => {
+
+      const actual =
+        window.XinyaoAutoBetRunner.next(
+          test.state,
+          settings
+        );
+
+      let ok =
+        actual.action === test.expected.action;
+
+      if (
+        test.expected.action === 'CONTINUE'
+      ) {
+        ok =
+          ok &&
+          Number(actual.bet) === test.expected.bet &&
+          Number(actual.stage) === test.expected.stage &&
+          Number(actual.remainingStageSpins) === test.expected.remaining;
+      } else {
+        ok =
+          ok &&
+          actual.reason === test.expected.reason;
+      }
+
+      if (ok) {
+        passed++;
+      }
+
+      return `
+        <div class="${ok ? 'ok' : 'fail'}">
+          ${ok ? '✅' : '❌'}
+          ${test.name}
+          ｜${actual.action}
+          ${
+            actual.action === 'CONTINUE'
+              ? `｜${actual.bet} 元｜第 ${actual.stage} 階段｜剩 ${actual.remainingStageSpins} 轉`
+              : `｜${actual.reason}`
+          }
+        </div>
+      `;
+
+    }).join('');
+
+  box.innerHTML =
+    html +
+    `<hr><b>結果：${passed} / ${tests.length} 通過</b>`;
+
+})();
+</script>
+
+</body>
+</html>
