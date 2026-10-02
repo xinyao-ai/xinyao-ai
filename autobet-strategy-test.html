@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>芯瑤 AutoBet 配注測試</title>
+
+<style>
+  *{box-sizing:border-box}
+
+  body{
+    margin:0;
+    padding:30px 16px;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei",sans-serif;
+    background:#fff6fa;
+    color:#59434d;
+  }
+
+  .wrap{
+    width:min(720px,100%);
+    margin:auto;
+  }
+
+  .card{
+    background:#fff;
+    border:1px solid #ffd3e3;
+    border-radius:20px;
+    padding:20px;
+    margin-bottom:16px;
+  }
+
+  h1{
+    margin-top:0;
+    color:#ef377e;
+  }
+
+  .ok{
+    color:#16865b;
+    font-weight:900;
+    line-height:1.9;
+  }
+
+  .fail{
+    color:#d83d58;
+    font-weight:900;
+    line-height:1.9;
+  }
+
+  .notice{
+    padding:12px;
+    background:#fff0f6;
+    border-radius:12px;
+    line-height:1.7;
+  }
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <div class="card">
+    <h1>🌸 芯瑤 AutoBet 分階段配注測試</h1>
+
+    <div class="notice">
+      ⚠️ 這頁只測試「建議下注金額＋建議轉數」。<br>
+      不會按 Spin、不會改 ATG 下注金額。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🧪 策略測試</h3>
+    <div id="result">測試中…</div>
+  </div>
+
+</div>
+
+<script src="./xinyao_ATG_autobet_strategy.js"></script>
+
+<script>
+(() => {
+
+  const resultBox =
+    document.getElementById('result');
+
+  if (!window.XinyaoAutoBetStrategy) {
+    resultBox.innerHTML =
+      '<div class="fail">❌ Strategy 尚未建立｜這次顯示失敗是正常的</div>';
+    return;
+  }
+
+  const tests = [
+    {
+      name: '本金 2000｜第一階段',
+      input: {
+        startBalance: 2000,
+        balance: 2000,
+        stage: 1
+      },
+      expectedBet: 4,
+      expectedSpins: 50
+    },
+
+    {
+      name: '第一階段小虧｜保守下一階段',
+      input: {
+        startBalance: 2000,
+        balance: 1800,
+        stage: 2
+      },
+      expectedBet: 4,
+      expectedSpins: 40
+    },
+
+    {
+      name: '第一階段小贏｜小幅提高',
+      input: {
+        startBalance: 2000,
+        balance: 2300,
+        stage: 2
+      },
+      expectedBet: 6,
+      expectedSpins: 40
+    },
+
+    {
+      name: '本金剩不到 50%｜降注',
+      input: {
+        startBalance: 2000,
+        balance: 900,
+        stage: 3
+      },
+      expectedBet: 2,
+      expectedSpins: 30
+    },
+
+    {
+      name: '獲利超過 30%｜鎖利保守',
+      input: {
+        startBalance: 2000,
+        balance: 2700,
+        stage: 3
+      },
+      expectedBet: 4,
+      expectedSpins: 30
+    }
+  ];
+
+  let passed = 0;
+
+  const html = tests.map(test => {
+
+    const actual =
+      window.XinyaoAutoBetStrategy.nextStage(
+        test.input
+      );
+
+    const ok =
+      Number(actual.bet) === test.expectedBet &&
+      Number(actual.spins) === test.expectedSpins;
+
+    if (ok) passed++;
+
+    return `
+      <div class="${ok ? 'ok' : 'fail'}">
+        ${ok ? '✅' : '❌'}
+        ${test.name}
+        ｜預期 ${test.expectedBet} 元 × ${test.expectedSpins} 轉
+        ｜實際 ${actual.bet} 元 × ${actual.spins} 轉
+      </div>
+    `;
+
+  }).join('');
+
+  resultBox.innerHTML =
+    html +
+    `<hr><b>結果：${passed} / ${tests.length} 通過</b>`;
+
+})();
+</script>
+
+</body>
+</html>
