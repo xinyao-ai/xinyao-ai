@@ -1,15 +1,25 @@
 /* =========================================================
    芯瑤 ATG AutoBet Panel
-   模擬控制面板 v0.1
+   Session 整合版 v0.2
 
-   功能：
+   顯示：
+   - 進房本金
+   - 目前點數
+   - 盈虧
+   - 目前階段
+   - 建議下注
+   - 剩餘轉數
+   - 止盈
+   - 止損
+
+   控制：
    ▶ 開始
    ⏸ 暫停
    ▶ 繼續
    🛑 緊急停止
 
    注意：
-   目前只控制模擬狀態
+   目前仍是模擬模式
    不會按 ATG Spin
    不會修改下注金額
 ========================================================= */
@@ -17,12 +27,36 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.1.0';
+  const VERSION = '0.2.0';
 
   let root = null;
 
   function getConsole() {
     return window.XinyaoAutoBetConsole || null;
+  }
+
+  function getSession() {
+    return window.XinyaoAutoBetSession || null;
+  }
+
+  function money(value) {
+    const n = Number(value);
+
+    return Number.isFinite(n)
+      ? n.toFixed(2)
+      : '—';
+  }
+
+  function value(value) {
+    if (
+      value === null ||
+      value === undefined ||
+      value === ''
+    ) {
+      return '—';
+    }
+
+    return String(value);
   }
 
   function stateText(status) {
@@ -35,29 +69,37 @@
     return map[status] || status;
   }
 
+  function setText(id, text) {
+
+    if (!root) return;
+
+    const el =
+      root.querySelector(
+        `#${id}`
+      );
+
+    if (el) {
+      el.textContent = text;
+    }
+  }
+
   function renderStatus() {
 
     if (!root) return;
 
     const C = getConsole();
 
-    const statusEl =
-      root.querySelector('#xab-status');
-
-    const reasonEl =
-      root.querySelector('#xab-reason');
-
     if (!C) {
 
-      if (statusEl) {
-        statusEl.textContent =
-          '核心未載入';
-      }
+      setText(
+        'xab-status',
+        '核心未載入'
+      );
 
-      if (reasonEl) {
-        reasonEl.textContent =
-          'CONSOLE_NOT_READY';
-      }
+      setText(
+        'xab-reason',
+        'CONSOLE_NOT_READY'
+      );
 
       return;
     }
@@ -65,15 +107,153 @@
     const state =
       C.getState();
 
-    if (statusEl) {
-      statusEl.textContent =
-        stateText(state.status);
+    setText(
+      'xab-status',
+      stateText(
+        state.status
+      )
+    );
+
+    setText(
+      'xab-reason',
+      state.reason || '—'
+    );
+  }
+
+  function refreshSession() {
+
+    if (!root) return false;
+
+    const S = getSession();
+
+    if (!S) {
+
+      setText(
+        'xab-start-balance',
+        '—'
+      );
+
+      setText(
+        'xab-balance',
+        '—'
+      );
+
+      setText(
+        'xab-profit',
+        '—'
+      );
+
+      setText(
+        'xab-stage',
+        '—'
+      );
+
+      setText(
+        'xab-bet',
+        '—'
+      );
+
+      setText(
+        'xab-remaining',
+        '—'
+      );
+
+      setText(
+        'xab-take-profit',
+        '—'
+      );
+
+      setText(
+        'xab-stop-loss',
+        '—'
+      );
+
+      return false;
     }
 
-    if (reasonEl) {
-      reasonEl.textContent =
-        state.reason || '—';
-    }
+    const state =
+      S.getState();
+
+    const decision =
+      S.getDecision();
+
+    setText(
+      'xab-start-balance',
+      money(
+        state.startBalance
+      )
+    );
+
+    setText(
+      'xab-balance',
+      money(
+        state.balance
+      )
+    );
+
+    setText(
+      'xab-profit',
+      money(
+        state.profit
+      )
+    );
+
+    setText(
+      'xab-stage',
+      value(
+        state.stage
+      )
+    );
+
+    setText(
+      'xab-bet',
+      decision.action === 'CONTINUE'
+        ? value(decision.bet)
+        : '—'
+    );
+
+    setText(
+      'xab-remaining',
+      decision.action === 'CONTINUE'
+        ? value(
+            decision.remainingStageSpins
+          )
+        : '0'
+    );
+
+    setText(
+      'xab-take-profit',
+      money(
+        state.settings?.takeProfit
+      )
+    );
+
+    setText(
+      'xab-stop-loss',
+      money(
+        state.settings?.stopLoss
+      )
+    );
+
+    /*
+      額外顯示目前 AutoBet 決策
+    */
+    setText(
+      'xab-decision',
+      decision.action || '—'
+    );
+
+    setText(
+      'xab-decision-reason',
+      decision.reason || '—'
+    );
+
+    return true;
+  }
+
+  function renderAll() {
+    renderStatus();
+    refreshSession();
   }
 
   function bind() {
@@ -87,8 +267,21 @@
       ?.addEventListener(
         'click',
         () => {
+
+          /*
+            如果有 Session，
+            開始時清除緊急停止。
+          */
+          const S =
+            getSession();
+
+          S?.setEmergencyStop?.(
+            false
+          );
+
           C.start();
-          renderStatus();
+
+          renderAll();
         }
       );
 
@@ -97,8 +290,10 @@
       ?.addEventListener(
         'click',
         () => {
+
           C.pause();
-          renderStatus();
+
+          renderAll();
         }
       );
 
@@ -107,8 +302,10 @@
       ?.addEventListener(
         'click',
         () => {
+
           C.resume();
-          renderStatus();
+
+          renderAll();
         }
       );
 
@@ -117,17 +314,67 @@
       ?.addEventListener(
         'click',
         () => {
+
+          const S =
+            getSession();
+
+          S?.setEmergencyStop?.(
+            true
+          );
+
           C.emergencyStop();
-          renderStatus();
+
+          renderAll();
         }
       );
+  }
+
+  function dataBox(
+    label,
+    id,
+    initial = '—'
+  ) {
+
+    return `
+      <div style="
+        padding:12px;
+        border-radius:14px;
+        background:#fff7fb;
+        border:1px solid #f7d8e4;
+        min-width:0;
+      ">
+
+        <div style="
+          font-size:11px;
+          color:#9b7d89;
+        ">
+          ${label}
+        </div>
+
+        <div
+          id="${id}"
+          style="
+            margin-top:5px;
+            font-size:16px;
+            font-weight:900;
+            color:#59434d;
+            word-break:break-word;
+          "
+        >
+          ${initial}
+        </div>
+
+      </div>
+    `;
   }
 
   function mount(target) {
 
     const element =
       typeof target === 'string'
-        ? document.querySelector(target)
+        ? document.querySelector(
+            target
+          )
         : target;
 
     if (!element) {
@@ -136,7 +383,8 @@
 
     root = element;
 
-    const C = getConsole();
+    const C =
+      getConsole();
 
     if (!C) {
 
@@ -157,8 +405,11 @@
     }
 
     /*
-      每次重新 mount，
-      先回到安全停止狀態。
+      每次掛載 Panel，
+      Console 回安全停止狀態。
+
+      注意：
+      不重設 Session。
     */
     C.reset();
 
@@ -168,7 +419,9 @@
         border-radius:20px;
         background:#fff;
         padding:18px;
-        box-shadow:0 10px 30px rgba(239,55,126,.08);
+        box-shadow:
+          0 10px 30px
+          rgba(239,55,126,.08);
       ">
 
         <div style="
@@ -181,6 +434,7 @@
         ">
 
           <div>
+
             <div style="
               font-size:18px;
               font-weight:900;
@@ -196,6 +450,7 @@
             ">
               模擬模式｜目前不會操作 ATG
             </div>
+
           </div>
 
           <div style="
@@ -205,72 +460,170 @@
             color:#e33878;
             font-weight:900;
           ">
+
             <span id="xab-status">
               已停止
             </span>
+
           </div>
 
         </div>
 
+        <!-- ===== 資金狀態 ===== -->
+
+        <div style="
+          font-size:13px;
+          font-weight:900;
+          color:#7f6570;
+          margin:4px 0 9px;
+        ">
+          💰 資金狀態
+        </div>
+
         <div style="
           display:grid;
-          grid-template-columns:repeat(2,minmax(0,1fr));
-          gap:10px;
+          grid-template-columns:
+            repeat(3,minmax(0,1fr));
+          gap:9px;
           margin-bottom:14px;
         ">
 
-          <div style="
-            padding:12px;
-            border-radius:14px;
-            background:#fff7fb;
-            border:1px solid #f7d8e4;
-          ">
-            <div style="
-              font-size:11px;
-              color:#9b7d89;
-            ">
-              控制狀態
-            </div>
+          ${dataBox(
+            '進房本金',
+            'xab-start-balance'
+          )}
 
-            <div style="
-              margin-top:4px;
-              font-weight:900;
-            ">
-              <span id="xab-state-label">
-                模擬控制
-              </span>
-            </div>
-          </div>
+          ${dataBox(
+            '目前點數',
+            'xab-balance'
+          )}
 
-          <div style="
-            padding:12px;
-            border-radius:14px;
-            background:#fff7fb;
-            border:1px solid #f7d8e4;
-          ">
-            <div style="
-              font-size:11px;
-              color:#9b7d89;
-            ">
-              最後原因
-            </div>
+          ${dataBox(
+            '本房盈虧',
+            'xab-profit'
+          )}
 
-            <div
-              id="xab-reason"
-              style="
-                margin-top:4px;
-                font-weight:900;
-              "
-            >
-              RESET
-            </div>
-          </div>
+        </div>
 
+        <!-- ===== 自動配注 ===== -->
+
+        <div style="
+          font-size:13px;
+          font-weight:900;
+          color:#7f6570;
+          margin:4px 0 9px;
+        ">
+          🎯 自動配注
         </div>
 
         <div style="
           display:grid;
-          grid-template-columns:repeat(2,minmax(0,1fr));
+          grid-template-columns:
+            repeat(3,minmax(0,1fr));
+          gap:9px;
+          margin-bottom:14px;
+        ">
+
+          ${dataBox(
+            '目前階段',
+            'xab-stage'
+          )}
+
+          ${dataBox(
+            '建議下注',
+            'xab-bet'
+          )}
+
+          ${dataBox(
+            '剩餘轉數',
+            'xab-remaining'
+          )}
+
+        </div>
+
+        <!-- ===== 安全條件 ===== -->
+
+        <div style="
+          font-size:13px;
+          font-weight:900;
+          color:#7f6570;
+          margin:4px 0 9px;
+        ">
+          🛡️ 安全條件
+        </div>
+
+        <div style="
+          display:grid;
+          grid-template-columns:
+            repeat(2,minmax(0,1fr));
+          gap:9px;
+          margin-bottom:14px;
+        ">
+
+          ${dataBox(
+            '止盈',
+            'xab-take-profit'
+          )}
+
+          ${dataBox(
+            '止損',
+            'xab-stop-loss'
+          )}
+
+        </div>
+
+        <!-- ===== 決策狀態 ===== -->
+
+        <div style="
+          display:grid;
+          grid-template-columns:
+            repeat(2,minmax(0,1fr));
+          gap:9px;
+          margin-bottom:14px;
+        ">
+
+          ${dataBox(
+            '目前決策',
+            'xab-decision'
+          )}
+
+          ${dataBox(
+            '決策原因',
+            'xab-decision-reason'
+          )}
+
+        </div>
+
+        <!-- ===== Console 狀態 ===== -->
+
+        <div style="
+          display:grid;
+          grid-template-columns:
+            repeat(2,minmax(0,1fr));
+          gap:9px;
+          margin-bottom:14px;
+        ">
+
+          ${dataBox(
+            '控制狀態',
+            'xab-state-label',
+            '模擬控制'
+          )}
+
+          ${dataBox(
+            '最後原因',
+            'xab-reason',
+            'RESET'
+          )}
+
+        </div>
+
+        <!-- ===== 控制按鈕 ===== -->
+
+        <div style="
+          display:grid;
+          grid-template-columns:
+            repeat(2,minmax(0,1fr));
           gap:10px;
         ">
 
@@ -349,27 +702,36 @@
           font-size:11px;
           line-height:1.7;
         ">
-          ⚠️ 此面板目前只控制模擬狀態，
-          不會按 Spin、不會調注、不會送出下注。
+
+          ⚠️ 此面板目前仍是模擬模式，
+          不會按 Spin、不會調整 ATG 注額、
+          不會送出下注。
+
         </div>
 
       </div>
     `;
 
     bind();
-    renderStatus();
+    renderAll();
 
     return true;
   }
 
   window.XinyaoAutoBetPanel = {
     version: VERSION,
+
     mount,
-    renderStatus
+
+    renderStatus,
+
+    refreshSession,
+
+    renderAll
   };
 
   console.log(
-    `[芯瑤 AutoBet Panel] v${VERSION} 已載入｜模擬模式`
+    `[芯瑤 AutoBet Panel] v${VERSION} 已載入｜Session 整合模擬版`
   );
 
 })();
