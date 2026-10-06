@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>芯瑤 ATG Universal Device Resolver 測試</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  padding:30px 16px;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    "Microsoft JhengHei",
+    sans-serif;
+
+  background:#fff6fa;
+  color:#59434d;
+}
+
+.wrap{
+  width:min(900px,100%);
+  margin:auto;
+}
+
+.card{
+  background:#fff;
+  border:1px solid #ffd3e3;
+  border-radius:20px;
+  padding:20px;
+  margin-bottom:16px;
+}
+
+h1{
+  margin-top:0;
+  color:#ef377e;
+}
+
+.notice{
+  padding:12px;
+  border-radius:12px;
+  background:#fff0f6;
+  line-height:1.7;
+}
+
+.ok{
+  color:#16865b;
+  font-weight:900;
+  line-height:1.9;
+}
+
+.fail{
+  color:#d83d58;
+  font-weight:900;
+  line-height:1.9;
+}
+
+.fixture{
+  display:none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <div class="card">
+
+    <h1>
+      🌸 芯瑤 ATG Universal Device Resolver 測試
+    </h1>
+
+    <div class="notice">
+      ⚠️ 測試同一套資料解析是否能跨裝置、跨直橫式使用。<br>
+      不依賴固定位置、不依賴螢幕尺寸、不按 Spin、不改注、不操作真正 ATG。
+    </div>
+
+  </div>
+
+  <div class="card">
+
+    <h3>
+      🧪 Universal Resolver 測試
+    </h3>
+
+    <div id="result">
+      測試中…
+    </div>
+
+  </div>
+
+</div>
+
+
+<!-- ======================================================
+     測試資料
+====================================================== -->
+
+<div id="fixtures" class="fixture">
+
+  <!--
+    ① 電腦橫式
+    左側即時助手直接有目前房號
+  -->
+  <div id="desktop-landscape">
+
+    <div class="live-assistant">
+      <div>目前房號：3032</div>
+      <div>進房金額：1072.68</div>
+      <div>目前點數：1072.68</div>
+      <div>本房盈虧：0.00</div>
+      <div>目前下注：4.00</div>
+    </div>
+
+    <div class="full-analysis">
+      已抓房號：4100 / 4100
+      頁數：9 / 9
+    </div>
+
+  </div>
+
+
+  <!--
+    ② iPhone 直式
+    左側目前房號消失
+    但右側排行仍知道目前房間
+  -->
+  <div id="iphone-portrait">
+
+    <div class="live-assistant">
+      <div>目前房號：—</div>
+      <div>進房金額：1072.68</div>
+      <div>目前點數：1072.68</div>
+      <div>本房盈虧：0.00</div>
+      <div>目前下注：4.00</div>
+    </div>
+
+    <div class="full-analysis">
+      <div>
+        已抓房號：4100 / 4100
+      </div>
+
+      <div>
+        目前資料排行：3032 房｜總分數 91.2
+      </div>
+    </div>
+
+  </div>
+
+
+  <!--
+    ③ iPhone 橫式
+    房號存在於「目前遊玩中」
+  -->
+  <div id="iphone-landscape">
+
+    <div>
+      目前遊玩中：3032 房
+    </div>
+
+    <div>
+      目前點數：1072.68
+    </div>
+
+    <div>
+      目前下注：4
+    </div>
+
+  </div>
+
+
+  <!--
+    ④ Android 直式
+    使用 data-room-id
+  -->
+  <div id="android-portrait">
+
+    <div
+      class="machine active"
+      data-room-id="3032"
+    >
+      已選擇機台
+    </div>
+
+    <div>
+      目前點數：
+      <span>1072.68</span>
+    </div>
+
+    <div>
+      目前下注：
+      <span>4</span>
+    </div>
+
+  </div>
+
+
+  <!--
+    ⑤ Android 橫式
+    使用 data-machine-id
+  -->
+  <div id="android-landscape">
+
+    <div
+      class="selected-machine"
+      data-machine-id="3032"
+    >
+      Selected
+    </div>
+
+    <div>
+      目前餘額：1072.68
+    </div>
+
+    <div>
+      目前押注：4
+    </div>
+
+  </div>
+
+
+  <!--
+    ⑥ 平板 / Shadow DOM
+  -->
+  <div id="tablet">
+
+    <div id="tablet-shadow-host"></div>
+
+    <div>
+      全房掃描完成：
+      4100 / 4100
+    </div>
+
+  </div>
+
+
+  <!--
+    ⑦ 動態切換版面
+  -->
+  <div id="dynamic-layout">
+
+    <div id="dynamic-content">
+      <div>目前房號：3032</div>
+      <div>目前點數：1072.68</div>
+      <div>目前下注：4</div>
+    </div>
+
+  </div>
+
+</div>
+
+
+<script src="./xinyao_ATG_universal_device_resolver.js"></script>
+
+<script>
+(() => {
+
+  /*
+    建立 Tablet 的 open Shadow DOM
+  */
+  const tabletHost =
+    document.getElementById(
+      'tablet-shadow-host'
+    );
+
+  const tabletShadow =
+    tabletHost.attachShadow({
+      mode:'open'
+    });
+
+  tabletShadow.innerHTML = `
+    <div>
+      <div>目前房號：3032</div>
+      <div>目前點數：1072.68</div>
+      <div>目前下注：4.00</div>
+    </div>
+  `;
+
+
+  const box =
+    document.getElementById(
+      'result'
+    );
+
+  /*
+    RED：
+    Resolver 還沒建立時，
+    這裡就必須失敗。
+  */
+  if (
+    !window.XinyaoATGUniversalDeviceResolver
+  ) {
+
+    box.innerHTML =
+      '<div class="fail">❌ Universal Device Resolver 尚未建立｜這次失敗是正常的</div>';
+
+    return;
+  }
+
+
+  const R =
+    window.XinyaoATGUniversalDeviceResolver;
+
+  const tests = [];
+
+
+  function add(
+    name,
+    expected,
+    actual
+  ) {
+
+    tests.push({
+      name,
+      expected:String(expected),
+      actual:String(actual),
+
+      ok:
+        String(expected) ===
+        String(actual)
+    });
+
+  }
+
+
+  function resolve(id) {
+
+    return R.resolve(
+      document.getElementById(id)
+    );
+
+  }
+
+
+  /* ======================================================
+     ① 電腦橫式
+  ====================================================== */
+
+  const desktop =
+    resolve(
+      'desktop-landscape'
+    );
+
+  add(
+    '電腦橫式房號',
+    '3032',
+    desktop.roomId
+  );
+
+  add(
+    '電腦橫式點數',
+    '1072.68',
+    desktop.balance
+  );
+
+  add(
+    '電腦橫式下注',
+    '4.00',
+    desktop.bet
+  );
+
+
+  /* ======================================================
+     ② iPhone 直式
+     左側沒有房號，
+     必須 fallback 到目前資料排行
+  ====================================================== */
+
+  const iphonePortrait =
+    resolve(
+      'iphone-portrait'
+    );
+
+  add(
+    'iPhone 直式房號 fallback',
+    '3032',
+    iphonePortrait.roomId
+  );
+
+  add(
+    'iPhone 直式沒有誤抓 4100',
+    false,
+    iphonePortrait.roomId === '4100'
+  );
+
+
+  /* ======================================================
+     ③ iPhone 橫式
+  ====================================================== */
+
+  const iphoneLandscape =
+    resolve(
+      'iphone-landscape'
+    );
+
+  add(
+    'iPhone 橫式房號',
+    '3032',
+    iphoneLandscape.roomId
+  );
+
+
+  /* ======================================================
+     ④ Android 直式
+  ====================================================== */
+
+  const androidPortrait =
+    resolve(
+      'android-portrait'
+    );
+
+  add(
+    'Android 直式房號',
+    '3032',
+    androidPortrait.roomId
+  );
+
+
+  /* ======================================================
+     ⑤ Android 橫式
+  ====================================================== */
+
+  const androidLandscape =
+    resolve(
+      'android-landscape'
+    );
+
+  add(
+    'Android 橫式房號',
+    '3032',
+    androidLandscape.roomId
+  );
+
+
+  /* ======================================================
+     ⑥ Tablet + Shadow DOM
+  ====================================================== */
+
+  const tablet =
+    resolve(
+      'tablet'
+    );
+
+  add(
+    '平板 Shadow DOM 房號',
+    '3032',
+    tablet.roomId
+  );
+
+  add(
+    '平板 Shadow DOM 點數',
+    '1072.68',
+    tablet.balance
+  );
+
+
+  /* ======================================================
+     ⑦ 動態版面切換
+  ====================================================== */
+
+  const dynamicRoot =
+    document.getElementById(
+      'dynamic-layout'
+    );
+
+  const before =
+    R.resolve(
+      dynamicRoot
+    );
+
+  add(
+    '切換前房號',
+    '3032',
+    before.roomId
+  );
+
+
+  /*
+    模擬：
+    橫式 → 直式
+
+    原本「目前房號」消失，
+    但排行資料仍存在。
+  */
+  document.getElementById(
+    'dynamic-content'
+  ).innerHTML = `
+
+    <div>
+      目前房號：—
+    </div>
+
+    <div>
+      目前點數：1072.68
+    </div>
+
+    <div>
+      目前下注：4
+    </div>
+
+    <div>
+      已抓房號：4100 / 4100
+    </div>
+
+    <div>
+      目前資料排行：3032 房
+    </div>
+  `;
+
+
+  const after =
+    R.resolve(
+      dynamicRoot
+    );
+
+  add(
+    '切成直式後仍找到房號',
+    '3032',
+    after.roomId
+  );
+
+  add(
+    '切換後仍排除 4100',
+    false,
+    after.roomId === '4100'
+  );
+
+
+  /* ======================================================
+     Resolver 模式
+  ====================================================== */
+
+  add(
+    'Resolver 模式',
+    'UNIVERSAL_DEVICE_RESOLVER',
+    R.getMode()
+  );
+
+
+  /* ======================================================
+     輸出
+  ====================================================== */
+
+  let passed = 0;
+
+  const html =
+    tests.map(test => {
+
+      if (test.ok) {
+        passed++;
+      }
+
+      return `
+        <div class="${
+          test.ok
+            ? 'ok'
+            : 'fail'
+        }">
+
+          ${
+            test.ok
+              ? '✅'
+              : '❌'
+          }
+
+          ${test.name}
+
+          ｜預期：
+          ${test.expected}
+
+          ｜實際：
+          ${test.actual}
+
+        </div>
+      `;
+
+    }).join('');
+
+
+  box.innerHTML =
+    html +
+    `<hr><b>結果：${passed} / ${tests.length} 通過</b>`;
+
+})();
+</script>
+
+</body>
+</html>
