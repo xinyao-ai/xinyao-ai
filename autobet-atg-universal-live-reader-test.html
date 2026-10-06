@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>芯瑤 ATG Universal Live Reader 測試</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  padding:30px 16px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei",sans-serif;
+  background:#fff6fa;
+  color:#59434d;
+}
+
+.wrap{
+  width:min(900px,100%);
+  margin:auto;
+}
+
+.card{
+  background:#fff;
+  border:1px solid #ffd3e3;
+  border-radius:20px;
+  padding:20px;
+  margin-bottom:16px;
+}
+
+h1{
+  margin-top:0;
+  color:#ef377e;
+}
+
+.notice{
+  padding:12px;
+  border-radius:12px;
+  background:#fff0f6;
+  line-height:1.7;
+}
+
+.ok{
+  color:#16865b;
+  font-weight:900;
+  line-height:1.9;
+}
+
+.fail{
+  color:#d83d58;
+  font-weight:900;
+  line-height:1.9;
+}
+
+#fixture{
+  display:none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <div class="card">
+    <h1>🌸 芯瑤 ATG Universal Live Reader 測試</h1>
+
+    <div class="notice">
+      ⚠️ 測試自動偵測 DOM 變化、resize、orientationchange。<br>
+      不按 Spin、不改下注、不操作真正 ATG。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🧪 Universal Live Reader 測試</h3>
+    <div id="result">測試中…</div>
+  </div>
+
+</div>
+
+
+<div id="fixture">
+
+  <div id="live-data">
+    <div>目前房號：3032</div>
+    <div>進房金額：1072.68</div>
+    <div>目前點數：1072.68</div>
+    <div>本房盈虧：0.00</div>
+    <div>目前下注：4.00</div>
+    <div>本房免遊次數：0</div>
+    <div>本次完成轉數：0</div>
+  </div>
+
+</div>
+
+
+<script src="./xinyao_ATG_universal_device_resolver.js"></script>
+
+<script src="./xinyao_ATG_universal_live_reader.js"></script>
+
+<script>
+(async () => {
+
+  const box =
+    document.getElementById(
+      'result'
+    );
+
+  if (
+    !window.XinyaoATGUniversalLiveReader
+  ) {
+
+    box.innerHTML =
+      '<div class="fail">❌ Universal Live Reader 尚未建立｜這次失敗是正常的</div>';
+
+    return;
+  }
+
+
+  const Reader =
+    window.XinyaoATGUniversalLiveReader;
+
+  const root =
+    document.getElementById(
+      'fixture'
+    );
+
+  const liveData =
+    document.getElementById(
+      'live-data'
+    );
+
+  const wait = ms =>
+    new Promise(
+      resolve =>
+        setTimeout(resolve, ms)
+    );
+
+
+  const tests = [];
+
+
+  function add(
+    name,
+    expected,
+    actual
+  ) {
+
+    tests.push({
+      name,
+      expected:String(expected),
+      actual:String(actual),
+
+      ok:
+        String(expected) ===
+        String(actual)
+    });
+
+  }
+
+
+  /* ======================================================
+     初始狀態
+  ====================================================== */
+
+  Reader.reset();
+
+  add(
+    '初始狀態',
+    'STOPPED',
+    Reader.getState().status
+  );
+
+
+  /* ======================================================
+     開始監聽
+  ====================================================== */
+
+  Reader.start({
+    root,
+    debounceMs:30
+  });
+
+  await wait(80);
+
+  add(
+    '啟動狀態',
+    'RUNNING',
+    Reader.getState().status
+  );
+
+  add(
+    '初始房號',
+    '3032',
+    Reader.getData().roomId
+  );
+
+  add(
+    '初始點數',
+    '1072.68',
+    Reader.getData().balance
+  );
+
+  add(
+    '初始下注',
+    '4.00',
+    Reader.getData().bet
+  );
+
+
+  /* ======================================================
+     模擬 DOM 即時變化
+  ====================================================== */
+
+  liveData.innerHTML = `
+    <div>目前房號：3032</div>
+    <div>進房金額：1072.68</div>
+    <div>目前點數：1068.68</div>
+    <div>本房盈虧：-4.00</div>
+    <div>目前下注：4.00</div>
+    <div>本房免遊次數：0</div>
+    <div>本次完成轉數：1</div>
+  `;
+
+  await wait(100);
+
+  add(
+    'DOM 變化後點數自動更新',
+    '1068.68',
+    Reader.getData().balance
+  );
+
+  add(
+    'DOM 變化後盈虧自動更新',
+    '-4.00',
+    Reader.getData().profit
+  );
+
+  add(
+    'DOM 變化後完成轉數更新',
+    '1',
+    Reader.getData().completedSpins
+  );
+
+
+  /* ======================================================
+     模擬切成直式
+     左側目前房號消失
+     改用 fallback
+  ====================================================== */
+
+  liveData.innerHTML = `
+    <div>目前房號：—</div>
+    <div>進房金額：1072.68</div>
+    <div>目前點數：1068.68</div>
+    <div>本房盈虧：-4.00</div>
+    <div>目前下注：4.00</div>
+
+    <div>已抓房號：4100 / 4100</div>
+
+    <div>
+      目前資料排行：3032 房
+    </div>
+  `;
+
+  window.dispatchEvent(
+    new Event(
+      'orientationchange'
+    )
+  );
+
+  await wait(100);
+
+  add(
+    '直式切換後房號仍正確',
+    '3032',
+    Reader.getData().roomId
+  );
+
+  add(
+    '直式沒有誤抓 4100',
+    false,
+    Reader.getData().roomId === '4100'
+  );
+
+
+  /* ======================================================
+     resize
+  ====================================================== */
+
+  const beforeResize =
+    Reader.getState().refreshCount;
+
+  window.dispatchEvent(
+    new Event(
+      'resize'
+    )
+  );
+
+  await wait(100);
+
+  add(
+    'resize 會重新解析',
+    true,
+    Reader.getState().refreshCount >
+      beforeResize
+  );
+
+
+  /* ======================================================
+     停止後不能再更新
+  ====================================================== */
+
+  Reader.stop();
+
+  add(
+    '停止狀態',
+    'STOPPED',
+    Reader.getState().status
+  );
+
+
+  liveData.innerHTML = `
+    <div>目前房號：9999</div>
+    <div>目前點數：500.00</div>
+    <div>目前下注：20</div>
+  `;
+
+  window.dispatchEvent(
+    new Event(
+      'resize'
+    )
+  );
+
+  await wait(120);
+
+  add(
+    '停止後房號不再更新',
+    '3032',
+    Reader.getData().roomId
+  );
+
+
+  /* ======================================================
+     模式
+  ====================================================== */
+
+  add(
+    'Live Reader 模式',
+    'UNIVERSAL_LIVE_READ_ONLY',
+    Reader.getMode()
+  );
+
+
+  /* ======================================================
+     輸出
+  ====================================================== */
+
+  let passed = 0;
+
+  const html =
+    tests.map(test => {
+
+      if (test.ok) {
+        passed++;
+      }
+
+      return `
+        <div class="${
+          test.ok
+            ? 'ok'
+            : 'fail'
+        }">
+
+          ${
+            test.ok
+              ? '✅'
+              : '❌'
+          }
+
+          ${test.name}
+
+          ｜預期：
+          ${test.expected}
+
+          ｜實際：
+          ${test.actual}
+
+        </div>
+      `;
+
+    }).join('');
+
+
+  box.innerHTML =
+    html +
+    `<hr><b>結果：${passed} / ${tests.length} 通過</b>`;
+
+})();
+</script>
+
+</body>
+</html>
