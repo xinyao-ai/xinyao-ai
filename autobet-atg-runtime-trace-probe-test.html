@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>芯瑤 ATG Runtime Trace Probe 測試</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  padding:30px 16px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei",sans-serif;
+  background:#fff6fa;
+  color:#59434d;
+}
+
+.wrap{
+  width:min(900px,100%);
+  margin:auto;
+}
+
+.card{
+  background:#fff;
+  border:1px solid #ffd3e3;
+  border-radius:20px;
+  padding:20px;
+  margin-bottom:16px;
+}
+
+h1{
+  margin-top:0;
+  color:#ef377e;
+}
+
+.notice{
+  padding:12px;
+  border-radius:12px;
+  background:#fff0f6;
+  line-height:1.7;
+}
+
+.ok{
+  color:#16865b;
+  font-weight:900;
+  line-height:1.9;
+}
+
+.fail{
+  color:#d83d58;
+  font-weight:900;
+  line-height:1.9;
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <div class="card">
+
+    <h1>
+      🌸 芯瑤 ATG Runtime Trace Probe 測試
+    </h1>
+
+    <div class="notice">
+      ⚠️ 測試 Runtime Trace 是否只記錄、不改變原函式行為。<br>
+      不加速、不按 Spin、不改下注、不操作真正 ATG。
+    </div>
+
+  </div>
+
+  <div class="card">
+
+    <h3>🧪 Runtime Trace Probe 測試</h3>
+
+    <div id="result">
+      測試中…
+    </div>
+
+  </div>
+
+</div>
+
+
+<script src="./xinyao_ATG_runtime_trace_probe.js"></script>
+
+<script>
+(() => {
+
+  const box =
+    document.getElementById(
+      'result'
+    );
+
+
+  /*
+    RED：
+    Probe 還沒建立時，
+    這裡應該失敗。
+  */
+  if (
+    !window.XinyaoATGRuntimeTraceProbe
+  ) {
+
+    box.innerHTML =
+      '<div class="fail">❌ Runtime Trace Probe 尚未建立｜這次失敗是正常的</div>';
+
+    return;
+  }
+
+
+  const Probe =
+    window.XinyaoATGRuntimeTraceProbe;
+
+
+  /* ======================================================
+     建立假的 Browser API
+     不碰真正瀏覽器 API
+  ====================================================== */
+
+  const originalRAF =
+    function(callback) {
+      if (callback) {
+        callback(100);
+      }
+
+      return 101;
+    };
+
+
+  const originalTimeout =
+    function(callback, delay) {
+      if (callback) {
+        callback();
+      }
+
+      return 202;
+    };
+
+
+  const originalInterval =
+    function(callback, delay) {
+      return 303;
+    };
+
+
+  const fakeGlobals = {
+
+    requestAnimationFrame:
+      originalRAF,
+
+    setTimeout:
+      originalTimeout,
+
+    setInterval:
+      originalInterval
+
+  };
+
+
+  const originalGetContext =
+    function(type) {
+
+      return {
+        fakeContext:true,
+        type
+      };
+    };
+
+
+  const fakeCanvasPrototype = {
+
+    getContext:
+      originalGetContext
+
+  };
+
+
+  /* ======================================================
+     開始安裝 Trace
+  ====================================================== */
+
+  Probe.reset();
+
+
+  Probe.install({
+
+    globals:
+      fakeGlobals,
+
+    canvasPrototype:
+      fakeCanvasPrototype
+
+  });
+
+
+  const tests = [];
+
+
+  function add(
+    name,
+    expected,
+    actual
+  ) {
+
+    tests.push({
+
+      name,
+
+      expected:
+        String(expected),
+
+      actual:
+        String(actual),
+
+      ok:
+        String(expected) ===
+        String(actual)
+
+    });
+
+  }
+
+
+  add(
+    '安裝狀態',
+    true,
+    Probe.getState().installed
+  );
+
+
+  /* ======================================================
+     Canvas Context
+  ====================================================== */
+
+  const ctx2d =
+    fakeCanvasPrototype
+      .getContext(
+        '2d'
+      );
+
+
+  const ctxWebGL =
+    fakeCanvasPrototype
+      .getContext(
+        'webgl'
+      );
+
+
+  const ctxWebGL2 =
+    fakeCanvasPrototype
+      .getContext(
+        'webgl2'
+      );
+
+
+  add(
+    '2D Context 被記錄',
+    1,
+    Probe.snapshot()
+      .contexts
+      .canvas2d
+  );
+
+
+  add(
+    'WebGL Context 被記錄',
+    1,
+    Probe.snapshot()
+      .contexts
+      .webgl
+  );
+
+
+  add(
+    'WebGL2 Context 被記錄',
+    1,
+    Probe.snapshot()
+      .contexts
+      .webgl2
+  );
+
+
+  add(
+    'getContext 原結果沒有被破壞',
+    'webgl2',
+    ctxWebGL2.type
+  );
+
+
+  /* ======================================================
+     RAF
+  ====================================================== */
+
+  const rafReturn1 =
+    fakeGlobals
+      .requestAnimationFrame(
+        () => {}
+      );
+
+
+  fakeGlobals
+    .requestAnimationFrame(
+      () => {}
+    );
+
+
+  fakeGlobals
+    .requestAnimationFrame(
+      () => {}
+    );
+
+
+  add(
+    'RAF 呼叫次數',
+    3,
+    Probe.snapshot()
+      .raf
+      .scheduled
+  );
+
+
+  add(
+    'RAF 回傳值沒有被破壞',
+    101,
+    rafReturn1
+  );
+
+
+  /* ======================================================
+     setTimeout
+  ====================================================== */
+
+  const timeoutReturn =
+    fakeGlobals
+      .setTimeout(
+        () => {},
+        250
+      );
+
+
+  fakeGlobals
+    .setTimeout(
+      () => {},
+      1200
+    );
+
+
+  add(
+    'setTimeout 呼叫次數',
+    2,
+    Probe.snapshot()
+      .timers
+      .timeouts
+  );
+
+
+  add(
+    'setTimeout 回傳值沒有被破壞',
+    202,
+    timeoutReturn
+  );
+
+
+  /* ======================================================
+     setInterval
+  ====================================================== */
+
+  const intervalReturn =
+    fakeGlobals
+      .setInterval(
+        () => {},
+        500
+      );
+
+
+  add(
+    'setInterval 呼叫次數',
+    1,
+    Probe.snapshot()
+      .timers
+      .intervals
+  );
+
+
+  add(
+    'setInterval 回傳值沒有被破壞',
+    303,
+    intervalReturn
+  );
+
+
+  /* ======================================================
+     模式
+  ====================================================== */
+
+  add(
+    'Probe 模式',
+    'PASSIVE_RUNTIME_TRACE',
+    Probe.getMode()
+  );
+
+
+  /* ======================================================
+     卸載
+  ====================================================== */
+
+  Probe.uninstall();
+
+
+  add(
+    '卸載後狀態',
+    false,
+    Probe.getState().installed
+  );
+
+
+  add(
+    'RAF 已恢復原函式',
+    true,
+    fakeGlobals.requestAnimationFrame ===
+      originalRAF
+  );
+
+
+  add(
+    'setTimeout 已恢復原函式',
+    true,
+    fakeGlobals.setTimeout ===
+      originalTimeout
+  );
+
+
+  add(
+    'setInterval 已恢復原函式',
+    true,
+    fakeGlobals.setInterval ===
+      originalInterval
+  );
+
+
+  add(
+    'getContext 已恢復原函式',
+    true,
+    fakeCanvasPrototype.getContext ===
+      originalGetContext
+  );
+
+
+  /* ======================================================
+     輸出
+  ====================================================== */
+
+  let passed = 0;
+
+
+  const html =
+    tests.map(test => {
+
+      if (test.ok) {
+        passed++;
+      }
+
+      return `
+        <div class="${
+          test.ok
+            ? 'ok'
+            : 'fail'
+        }">
+
+          ${
+            test.ok
+              ? '✅'
+              : '❌'
+          }
+
+          ${test.name}
+
+          ｜預期：
+          ${test.expected}
+
+          ｜實際：
+          ${test.actual}
+
+        </div>
+      `;
+
+    }).join('');
+
+
+  box.innerHTML =
+    html +
+    `<hr><b>結果：${passed} / ${tests.length} 通過</b>`;
+
+})();
+</script>
+
+</body>
+</html>
