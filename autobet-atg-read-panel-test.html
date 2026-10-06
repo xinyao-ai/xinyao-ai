@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>芯瑤 ATG Read Panel 測試</title>
+
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  padding:30px 16px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei",sans-serif;
+  background:#fff6fa;
+  color:#59434d;
+}
+.wrap{width:min(860px,100%);margin:auto}
+.card{
+  background:#fff;
+  border:1px solid #ffd3e3;
+  border-radius:20px;
+  padding:20px;
+  margin-bottom:16px;
+}
+h1{margin-top:0;color:#ef377e}
+.notice{
+  padding:12px;
+  border-radius:12px;
+  background:#fff0f6;
+  line-height:1.7;
+}
+.ok{color:#16865b;font-weight:900;line-height:1.9}
+.fail{color:#d83d58;font-weight:900;line-height:1.9}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <div class="card">
+    <h1>🌸 芯瑤 ATG Read Panel 測試</h1>
+
+    <div class="notice">
+      ⚠️ 測試唯讀資料同步後，Panel 是否一起更新。<br>
+      不按 Spin、不改注、不操作真正 ATG。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🧪 Read Panel 整合測試</h3>
+    <div id="result">測試中…</div>
+  </div>
+
+  <div class="card">
+    <h3>🎮 面板預覽</h3>
+    <div id="xinyao-autobet-panel"></div>
+  </div>
+
+</div>
+
+<script src="./xinyao_ATG_autobet_engine.js"></script>
+<script src="./xinyao_ATG_autobet_strategy.js"></script>
+<script src="./xinyao_ATG_autobet_controller.js"></script>
+<script src="./xinyao_ATG_autobet_runner.js"></script>
+<script src="./xinyao_ATG_autobet_console.js"></script>
+<script src="./xinyao_ATG_autobet_session.js"></script>
+
+<script src="./xinyao_ATG_autobet_atg_source_bridge.js"></script>
+<script src="./xinyao_ATG_autobet_atg_adapter.js"></script>
+<script src="./xinyao_ATG_autobet_atg_read_pipeline.js"></script>
+<script src="./xinyao_ATG_autobet_atg_session_sync.js"></script>
+
+<script src="./xinyao_ATG_autobet_panel.js?v=0201"></script>
+
+<script src="./xinyao_ATG_autobet_atg_read_panel.js"></script>
+
+<script>
+(() => {
+
+  const box =
+    document.getElementById('result');
+
+  if (!window.XinyaoATGReadPanel) {
+
+    box.innerHTML =
+      '<div class="fail">❌ Read Panel 尚未建立｜這次失敗是正常的</div>';
+
+    return;
+  }
+
+  const B =
+    window.XinyaoATGSourceBridge;
+
+  const P =
+    window.XinyaoATGReadPipeline;
+
+  const S =
+    window.XinyaoAutoBetSession;
+
+  const Y =
+    window.XinyaoATGReadSessionSync;
+
+  const RP =
+    window.XinyaoATGReadPanel;
+
+  let source = {
+    balance:'1000.90',
+    bet:'4',
+    roomId:'0863',
+    freeGameActive:false,
+    spinCompleted:false
+  };
+
+  B.configure({
+    sourceReader:() => source
+  });
+
+  P.connect();
+
+  S.reset({
+    startBalance:1000.90,
+    balance:1000.90,
+    takeProfit:500,
+    stopLoss:400,
+    maxSpins:100
+  });
+
+  Y.reset();
+  Y.connect();
+
+  RP.mount(
+    '#xinyao-autobet-panel'
+  );
+
+  const tests = [];
+
+  function text(id) {
+    const el =
+      document.getElementById(id);
+
+    return el
+      ? el.textContent.trim()
+      : 'MISSING';
+  }
+
+  function add(name,expected,actual) {
+    tests.push({
+      name,
+      expected:String(expected),
+      actual:String(actual),
+      ok:String(expected) === String(actual)
+    });
+  }
+
+  RP.syncOnce();
+
+  add(
+    '初始點數顯示',
+    '1000.90',
+    text('xab-balance')
+  );
+
+  source = {
+    balance:'996.90',
+    bet:'4',
+    roomId:'0863',
+    freeGameActive:false,
+    spinCompleted:true
+  };
+
+  RP.syncOnce();
+
+  add(
+    '第一局點數更新',
+    '996.90',
+    text('xab-balance')
+  );
+
+  add(
+    '第一局盈虧更新',
+    '-4.00',
+    text('xab-profit')
+  );
+
+  add(
+    '完成轉數更新',
+    1,
+    S.getState().totalSpins
+  );
+
+  add(
+    '唯讀下注資料',
+    4,
+    RP.getLastRead().bet
+  );
+
+  add(
+    '唯讀房號資料',
+    '0863',
+    RP.getLastRead().roomId
+  );
+
+  let passed = 0;
+
+  const html =
+    tests.map(test => {
+
+      if (test.ok) passed++;
+
+      return `
+        <div class="${test.ok ? 'ok' : 'fail'}">
+          ${test.ok ? '✅' : '❌'}
+          ${test.name}
+          ｜預期：${test.expected}
+          ｜實際：${test.actual}
+        </div>
+      `;
+
+    }).join('');
+
+  box.innerHTML =
+    html +
+    `<hr><b>結果：${passed} / ${tests.length} 通過</b>`;
+
+})();
+</script>
+
+</body>
+</html>
