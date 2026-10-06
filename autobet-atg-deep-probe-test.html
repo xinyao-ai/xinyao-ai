@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>芯瑤 ATG Deep Probe 測試</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  padding:30px 16px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei",sans-serif;
+  background:#fff6fa;
+  color:#59434d;
+}
+
+.wrap{
+  width:min(860px,100%);
+  margin:auto;
+}
+
+.card{
+  background:#fff;
+  border:1px solid #ffd3e3;
+  border-radius:20px;
+  padding:20px;
+  margin-bottom:16px;
+}
+
+h1{
+  margin-top:0;
+  color:#ef377e;
+}
+
+.notice{
+  padding:12px;
+  border-radius:12px;
+  background:#fff0f6;
+  line-height:1.7;
+}
+
+.ok{
+  color:#16865b;
+  font-weight:900;
+  line-height:1.9;
+}
+
+.fail{
+  color:#d83d58;
+  font-weight:900;
+  line-height:1.9;
+}
+
+#fixture{
+  display:none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <div class="card">
+    <h1>🌸 芯瑤 ATG Deep Probe 測試</h1>
+
+    <div class="notice">
+      ⚠️ 測試一般 DOM + open Shadow DOM 深層唯讀掃描。<br>
+      不按 Spin、不改注、不操作真正 ATG。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🧪 Deep Probe 測試</h3>
+    <div id="result">測試中…</div>
+  </div>
+
+</div>
+
+<div id="fixture">
+
+  <!-- 模擬右側全房分析 -->
+  <div id="analysis">
+    已抓房號：4100 / 4100
+  </div>
+
+  <!-- 模擬左側即時助手 Shadow DOM -->
+  <div id="assistant-host"></div>
+
+</div>
+
+<script src="./xinyao_ATG_deep_read_probe.js"></script>
+
+<script>
+(() => {
+
+  const host =
+    document.getElementById(
+      'assistant-host'
+    );
+
+  const shadow =
+    host.attachShadow({
+      mode:'open'
+    });
+
+  shadow.innerHTML = `
+    <div id="live-panel">
+      <div>目前房號：0863</div>
+      <div>進房金額：1000.90</div>
+      <div>目前點數：996.90</div>
+      <div>本房盈虧：-4.00</div>
+      <div>目前下注：4</div>
+      <div>本房免遊次數：0 次</div>
+      <div>本次完成轉數：1</div>
+    </div>
+  `;
+
+  const box =
+    document.getElementById(
+      'result'
+    );
+
+  if (
+    !window.XinyaoATGDeepReadProbe
+  ) {
+
+    box.innerHTML =
+      '<div class="fail">❌ Deep Read Probe 尚未建立｜這次失敗是正常的</div>';
+
+    return;
+  }
+
+  const P =
+    window.XinyaoATGDeepReadProbe;
+
+  const data =
+    P.scan(
+      document.getElementById(
+        'fixture'
+      )
+    );
+
+  const tests = [];
+
+  function add(
+    name,
+    expected,
+    actual
+  ) {
+
+    tests.push({
+      name,
+      expected:String(expected),
+      actual:String(actual),
+      ok:
+        String(expected) ===
+        String(actual)
+    });
+  }
+
+  add(
+    '有進入 Shadow DOM',
+    true,
+    data.shadowRoots > 0
+  );
+
+  add(
+    '讀到目前房號',
+    '0863',
+    data.live.roomId
+  );
+
+  add(
+    '讀到進房金額',
+    '1000.90',
+    data.live.entryBalance
+  );
+
+  add(
+    '讀到目前點數',
+    '996.90',
+    data.live.balance
+  );
+
+  add(
+    '讀到本房盈虧',
+    '-4.00',
+    data.live.profit
+  );
+
+  add(
+    '讀到目前下注',
+    '4',
+    data.live.bet
+  );
+
+  add(
+    '讀到免遊次數',
+    '0',
+    data.live.freeGameCount
+  );
+
+  add(
+    '讀到完成轉數',
+    '1',
+    data.live.completedSpins
+  );
+
+  add(
+    '沒有把 4100 當房號',
+    false,
+    data.live.roomId === '4100'
+  );
+
+  add(
+    '診斷模式',
+    'DEEP_PASSIVE_READ_ONLY',
+    data.mode
+  );
+
+  let passed = 0;
+
+  const html =
+    tests.map(test => {
+
+      if (test.ok) {
+        passed++;
+      }
+
+      return `
+        <div class="${test.ok ? 'ok' : 'fail'}">
+
+          ${test.ok ? '✅' : '❌'}
+
+          ${test.name}
+
+          ｜預期：
+          ${test.expected}
+
+          ｜實際：
+          ${test.actual}
+
+        </div>
+      `;
+
+    }).join('');
+
+  box.innerHTML =
+    html +
+    `<hr><b>結果：${passed} / ${tests.length} 通過</b>`;
+
+})();
+</script>
+
+</body>
+</html>
