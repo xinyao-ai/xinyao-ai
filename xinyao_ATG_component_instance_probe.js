@@ -1,23 +1,32 @@
 /* =========================================================
-   芯瑤 ATG Component Instance Probe v0.1.0
+   芯瑤 ATG Component Instance Probe v0.2.0
 
    PASSIVE / READ ONLY
 
+   支援：
+
+   舊版結構：
+   - _updating
+   - _lateUpdating
+
+   ATG 真機結構：
+   - startInvoker
+   - updateInvoker
+   - lateUpdateInvoker
+
    功能：
-   - 掃描 ComponentScheduler 內正在排程的 Component
-   - 分別記錄各 Component：
-       update()
-       lateUpdate()
-   - 統計呼叫次數
-   - 保留 Node 名稱
-   - 產生呼叫排行榜
+   - 找出實際被排程的 Component
+   - 個別記錄 update()
+   - 個別記錄 lateUpdate()
+   - 支援中途建立的新 Component
+   - 產生活躍排行榜
 
    不會：
    - 修改 dt
-   - 修改 Component 行為
    - 加速
    - Spin
    - 改下注
+   - 掃描 Component 內部的 uv / renderData 陣列
 ========================================================= */
 
 (() => {
@@ -25,7 +34,7 @@
 
 
   const VERSION =
-    '0.1.0';
+    '0.2.0';
 
 
   const MODE =
@@ -49,15 +58,6 @@
   };
 
 
-  /*
-    每一個 Component 對應一筆紀錄。
-
-    key：
-      Component instance
-
-    value：
-      統計與原函式資訊
-  */
   let records =
     new Map();
 
@@ -75,7 +75,7 @@
 
 
   /* ======================================================
-     安全讀取
+     Safe Read
   ====================================================== */
 
   function safeGet(
@@ -87,7 +87,6 @@
 
       const value =
         getter();
-
 
       return value === undefined
         ? fallback
@@ -101,7 +100,7 @@
 
 
   /* ======================================================
-     找 Cocos
+     Find Cocos
   ====================================================== */
 
   function findCC(
@@ -130,7 +129,7 @@
 
 
   /* ======================================================
-     找 Director
+     Find Director
   ====================================================== */
 
   function findDirector(
@@ -162,7 +161,7 @@
 
 
   /* ======================================================
-     找 ComponentScheduler
+     Find ComponentScheduler
   ====================================================== */
 
   function findComponentScheduler(
@@ -171,9 +170,6 @@
     globals
   ) {
 
-    /*
-      Cocos Creator 2.x
-    */
     const fromDirector =
       safeGet(
         () =>
@@ -188,9 +184,6 @@
     }
 
 
-    /*
-      Getter fallback
-    */
     const fromGetter =
       safeGet(
         () => {
@@ -217,14 +210,12 @@
     }
 
 
-    /*
-      Global fallback
-    */
     const fromGlobal =
       safeGet(
         () =>
-          globals?.componentScheduler ||
-          globals?.compScheduler,
+          globals?._compScheduler ||
+          globals?.compScheduler ||
+          globals?.componentScheduler,
         null
       );
 
@@ -234,15 +225,13 @@
     }
 
 
-    /*
-      cc fallback
-    */
     return (
 
       safeGet(
         () =>
           cc?._compScheduler ||
-          cc?.compScheduler,
+          cc?.compScheduler ||
+          cc?.componentScheduler,
         null
       ) ||
 
@@ -253,7 +242,7 @@
 
 
   /* ======================================================
-     Component 名稱
+     Component Name
   ====================================================== */
 
   function getComponentName(
@@ -285,21 +274,26 @@
       safeGet(
         () => component.name,
         null
+      ),
+
+      safeGet(
+        () => component.node?.name,
+        null
       )
 
     ];
 
 
     for (
-      const name of candidates
+      const value of candidates
     ) {
 
       if (
-        typeof name === 'string' &&
-        name.trim()
+        typeof value === 'string' &&
+        value.trim()
       ) {
 
-        return name.trim();
+        return value.trim();
       }
     }
 
@@ -309,7 +303,7 @@
 
 
   /* ======================================================
-     Node 名稱
+     Node Name
   ====================================================== */
 
   function getNodeName(
@@ -330,7 +324,62 @@
 
 
   /* ======================================================
-     建立 Component 紀錄
+     判斷是不是 Component 候選
+
+     重點：
+     只接受 invoker bucket 直接放的物件。
+
+     不會遞迴跑進：
+     _renderData
+     uvSliced
+     vertices
+     sprite frame...
+  ====================================================== */
+
+  function isComponentCandidate(
+    value
+  ) {
+
+    if (
+      !value ||
+      (
+        typeof value !== 'object' &&
+        typeof value !== 'function'
+      )
+    ) {
+
+      return false;
+    }
+
+
+    /*
+      一般 Component 至少會有其中一些特徵。
+    */
+    if (
+      typeof value.update ===
+        'function' ||
+
+      typeof value.lateUpdate ===
+        'function' ||
+
+      typeof value.start ===
+        'function' ||
+
+      value.node ||
+
+      value.__classname__
+    ) {
+
+      return true;
+    }
+
+
+    return false;
+  }
+
+
+  /* ======================================================
+     建立 Record
   ====================================================== */
 
   function createRecord(
@@ -351,11 +400,13 @@
           component
         ),
 
+
       updateCount:
         0,
 
       lateUpdateCount:
         0,
+
 
       lastDt:
         0,
@@ -366,11 +417,13 @@
       lastLateUpdateDt:
         0,
 
+
       updateTotalDt:
         0,
 
       lateUpdateTotalDt:
         0,
+
 
       originalUpdate:
         null,
@@ -378,11 +431,13 @@
       originalLateUpdate:
         null,
 
+
       updateHadOwn:
         false,
 
       lateUpdateHadOwn:
         false,
+
 
       updateWrapped:
         false,
@@ -393,10 +448,6 @@
     };
   }
 
-
-  /* ======================================================
-     取得 / 建立紀錄
-  ====================================================== */
 
   function getRecord(
     component
@@ -431,7 +482,59 @@
 
 
   /* ======================================================
-     收集排程陣列
+     從 Array 收 Component
+
+     不做深度遞迴。
+  ====================================================== */
+
+  function collectArray(
+    array,
+    output
+  ) {
+
+    if (
+      !Array.isArray(
+        array
+      )
+    ) {
+
+      return;
+    }
+
+
+    for (
+      const item of array
+    ) {
+
+      if (
+        isComponentCandidate(
+          item
+        )
+      ) {
+
+        output.add(
+          item
+        );
+      }
+    }
+  }
+
+
+  /* ======================================================
+     掃描一個 Invoker
+
+     支援：
+
+     invoker._neg.array
+     invoker._zero.array
+     invoker._pos.array
+
+     以及少數 build 可能使用的：
+
+     invoker._neg
+     invoker._zero
+     invoker._pos
+     invoker.array
   ====================================================== */
 
   function collectFromInvoker(
@@ -444,34 +547,20 @@
     }
 
 
-    /*
-      Cocos 2.x 常見：
-      _neg.array
-      _zero.array
-      _pos.array
-    */
-    const groups = [
+    const buckets = [
 
       safeGet(
-        () => invoker._neg?.array,
+        () => invoker._neg,
         null
       ),
 
       safeGet(
-        () => invoker._zero?.array,
+        () => invoker._zero,
         null
       ),
 
       safeGet(
-        () => invoker._pos?.array,
-        null
-      ),
-
-      /*
-        其他可能結構
-      */
-      safeGet(
-        () => invoker.array,
+        () => invoker._pos,
         null
       )
 
@@ -479,39 +568,91 @@
 
 
     for (
-      const array of groups
+      const bucket of buckets
     ) {
 
-      if (
-        !Array.isArray(array)
-      ) {
+      if (!bucket) {
         continue;
       }
 
 
-      for (
-        const component of array
+      /*
+        Bucket 本身就是 Array
+      */
+      if (
+        Array.isArray(
+          bucket
+        )
       ) {
 
-        if (
-          component &&
-          (
-            typeof component === 'object' ||
-            typeof component === 'function'
-          )
-        ) {
+        collectArray(
+          bucket,
+          output
+        );
 
-          output.add(
-            component
-          );
-        }
+        continue;
       }
+
+
+      /*
+        ATG 真機：
+        _pos.array
+      */
+      collectArray(
+        safeGet(
+          () => bucket.array,
+          null
+        ),
+        output
+      );
+
+
+      /*
+        其他 Cocos build fallback
+      */
+      collectArray(
+        safeGet(
+          () => bucket._array,
+          null
+        ),
+        output
+      );
+
+
+      collectArray(
+        safeGet(
+          () => bucket.components,
+          null
+        ),
+        output
+      );
     }
+
+
+    /*
+      Invoker 本身可能直接有 array
+    */
+    collectArray(
+      safeGet(
+        () => invoker.array,
+        null
+      ),
+      output
+    );
+
+
+    collectArray(
+      safeGet(
+        () => invoker._array,
+        null
+      ),
+      output
+    );
   }
 
 
   /* ======================================================
-     掃描所有排程 Component
+     Discover Components
   ====================================================== */
 
   function discoverComponents() {
@@ -529,36 +670,14 @@
     }
 
 
-    /*
-      update components
-    */
+    /* ====================================================
+       ATG 真機結構
+    ==================================================== */
+
     collectFromInvoker(
       safeGet(
-        () => scheduler._updating,
-        null
-      ),
-      found
-    );
-
-
-    /*
-      lateUpdate components
-    */
-    collectFromInvoker(
-      safeGet(
-        () => scheduler._lateUpdating,
-        null
-      ),
-      found
-    );
-
-
-    /*
-      某些 Cocos 版本命名不同
-    */
-    collectFromInvoker(
-      safeGet(
-        () => scheduler.updating,
+        () =>
+          scheduler.startInvoker,
         null
       ),
       found
@@ -567,7 +686,96 @@
 
     collectFromInvoker(
       safeGet(
-        () => scheduler.lateUpdating,
+        () =>
+          scheduler.updateInvoker,
+        null
+      ),
+      found
+    );
+
+
+    collectFromInvoker(
+      safeGet(
+        () =>
+          scheduler.lateUpdateInvoker,
+        null
+      ),
+      found
+    );
+
+
+    /* ====================================================
+       部分 Cocos build 可能帶底線
+    ==================================================== */
+
+    collectFromInvoker(
+      safeGet(
+        () =>
+          scheduler._startInvoker,
+        null
+      ),
+      found
+    );
+
+
+    collectFromInvoker(
+      safeGet(
+        () =>
+          scheduler._updateInvoker,
+        null
+      ),
+      found
+    );
+
+
+    collectFromInvoker(
+      safeGet(
+        () =>
+          scheduler._lateUpdateInvoker,
+        null
+      ),
+      found
+    );
+
+
+    /* ====================================================
+       舊版測試 / 其他 Cocos 結構
+    ==================================================== */
+
+    collectFromInvoker(
+      safeGet(
+        () =>
+          scheduler._updating,
+        null
+      ),
+      found
+    );
+
+
+    collectFromInvoker(
+      safeGet(
+        () =>
+          scheduler._lateUpdating,
+        null
+      ),
+      found
+    );
+
+
+    collectFromInvoker(
+      safeGet(
+        () =>
+          scheduler.updating,
+        null
+      ),
+      found
+    );
+
+
+    collectFromInvoker(
+      safeGet(
+        () =>
+          scheduler.lateUpdating,
         null
       ),
       found
@@ -579,7 +787,7 @@
 
 
   /* ======================================================
-     包裝 update()
+     Wrap update()
   ====================================================== */
 
   function wrapUpdate(
@@ -622,7 +830,7 @@
         );
 
 
-    component.update =
+    const wrapped =
       function(...args) {
 
         record.updateCount++;
@@ -639,7 +847,9 @@
 
 
           if (
-            Number.isFinite(dt)
+            Number.isFinite(
+              dt
+            )
           ) {
 
             record.lastDt =
@@ -654,16 +864,35 @@
         }
 
 
-        /*
-          不改 args。
-          不改 this。
-          不改回傳值。
-        */
         return original.apply(
           this,
           args
         );
       };
+
+
+    /*
+      某些 Component 可能封印 property。
+      寫不進去就安全跳過。
+    */
+    try {
+
+      component.update =
+        wrapped;
+
+    } catch {
+
+      return false;
+    }
+
+
+    if (
+      component.update !==
+      wrapped
+    ) {
+
+      return false;
+    }
 
 
     record.updateWrapped =
@@ -678,7 +907,7 @@
 
 
   /* ======================================================
-     包裝 lateUpdate()
+     Wrap lateUpdate()
   ====================================================== */
 
   function wrapLateUpdate(
@@ -721,7 +950,7 @@
         );
 
 
-    component.lateUpdate =
+    const wrapped =
       function(...args) {
 
         record.lateUpdateCount++;
@@ -738,7 +967,9 @@
 
 
           if (
-            Number.isFinite(dt)
+            Number.isFinite(
+              dt
+            )
           ) {
 
             record.lastDt =
@@ -760,6 +991,26 @@
       };
 
 
+    try {
+
+      component.lateUpdate =
+        wrapped;
+
+    } catch {
+
+      return false;
+    }
+
+
+    if (
+      component.lateUpdate !==
+      wrapped
+    ) {
+
+      return false;
+    }
+
+
     record.lateUpdateWrapped =
       true;
 
@@ -772,17 +1023,13 @@
 
 
   /* ======================================================
-     包裝找到的 Component
+     Wrap All Discovered
   ====================================================== */
 
   function wrapDiscoveredComponents() {
 
     const found =
       discoverComponents();
-
-
-    discoveredComponents =
-      found.size;
 
 
     for (
@@ -808,12 +1055,16 @@
     }
 
 
-    return found.size;
+    discoveredComponents =
+      records.size;
+
+
+    return discoveredComponents;
   }
 
 
   /* ======================================================
-     安裝
+     Install
   ====================================================== */
 
   function install(
@@ -825,10 +1076,6 @@
     }
 
 
-    /*
-      新的一次 install
-      從乾淨紀錄開始。
-    */
     records =
       new Map();
 
@@ -883,10 +1130,10 @@
 
 
   /* ======================================================
-     重新掃描
+     Rescan
 
-     真實遊戲可能進入 Spin 後，
-     才建立新的 Component。
+     ATG 進入 Bonus / 免費遊戲後，
+     可能才建立新的 Component。
   ====================================================== */
 
   function rescan() {
@@ -904,29 +1151,22 @@
       const component of found
     ) {
 
-      if (
-        !records.has(
+      const record =
+        getRecord(
           component
-        )
-      ) {
-
-        const record =
-          getRecord(
-            component
-          );
-
-
-        wrapUpdate(
-          component,
-          record
         );
 
 
-        wrapLateUpdate(
-          component,
-          record
-        );
-      }
+      wrapUpdate(
+        component,
+        record
+      );
+
+
+      wrapLateUpdate(
+        component,
+        record
+      );
     }
 
 
@@ -939,7 +1179,7 @@
 
 
   /* ======================================================
-     清零呼叫次數
+     Reset Counts
   ====================================================== */
 
   function resetCounts() {
@@ -952,20 +1192,26 @@
       record.updateCount =
         0;
 
+
       record.lateUpdateCount =
         0;
+
 
       record.lastDt =
         0;
 
+
       record.lastUpdateDt =
         0;
+
 
       record.lastLateUpdateDt =
         0;
 
+
       record.updateTotalDt =
         0;
+
 
       record.lateUpdateTotalDt =
         0;
@@ -977,7 +1223,7 @@
 
 
   /* ======================================================
-     Snapshot Component
+     Snapshot Record
   ====================================================== */
 
   function snapshotRecord(
@@ -997,6 +1243,7 @@
       nodeName:
         record.nodeName,
 
+
       updateCount:
         record.updateCount,
 
@@ -1004,6 +1251,7 @@
         record.lateUpdateCount,
 
       totalCalls,
+
 
       lastDt:
         record.lastDt,
@@ -1014,20 +1262,28 @@
       lastLateUpdateDt:
         record.lastLateUpdateDt,
 
+
       averageUpdateDt:
+
         record.updateCount > 0
+
           ? (
               record.updateTotalDt /
               record.updateCount
             )
+
           : 0,
 
+
       averageLateUpdateDt:
+
         record.lateUpdateCount > 0
+
           ? (
               record.lateUpdateTotalDt /
               record.lateUpdateCount
             )
+
           : 0
 
     };
@@ -1049,10 +1305,35 @@
       );
 
 
+    /*
+      排名優先看 update 呼叫。
+
+      原因：
+      Reel / Spin 邏輯主要會出現在 update，
+      lateUpdate 作為第二順位。
+
+      這也避免：
+      update 2 + late 1
+      跟
+      update 3
+      都算成 total 3 時無法區分。
+    */
     const ranking =
       [...components]
         .sort(
           (a, b) => {
+
+            if (
+              b.updateCount !==
+              a.updateCount
+            ) {
+
+              return (
+                b.updateCount -
+                a.updateCount
+              );
+            }
+
 
             if (
               b.totalCalls !==
@@ -1091,6 +1372,62 @@
 
 
   /* ======================================================
+     Restore Method
+  ====================================================== */
+
+  function restoreMethod(
+    component,
+    property,
+    original,
+    hadOwn
+  ) {
+
+    if (
+      !component ||
+      !original
+    ) {
+
+      return;
+    }
+
+
+    if (hadOwn) {
+
+      try {
+
+        component[property] =
+          original;
+
+      } catch {}
+
+      return;
+    }
+
+
+    /*
+      原函式來自 prototype。
+
+      我們之前在 instance 建了一個 wrapper，
+      現在把 instance property 刪掉，
+      就會重新回到 prototype 原函式。
+    */
+    try {
+
+      delete component[property];
+
+    } catch {
+
+      try {
+
+        component[property] =
+          original;
+
+      } catch {}
+    }
+  }
+
+
+  /* ======================================================
      Uninstall
   ====================================================== */
 
@@ -1110,69 +1447,29 @@
       }
 
 
-      /* -----------------------------------------------
-         Restore update
-      ----------------------------------------------- */
-
       if (
-        record.updateWrapped &&
-        record.originalUpdate
+        record.updateWrapped
       ) {
 
-        if (
+        restoreMethod(
+          component,
+          'update',
+          record.originalUpdate,
           record.updateHadOwn
-        ) {
-
-          component.update =
-            record.originalUpdate;
-
-        } else {
-
-          /*
-            原本 update 來自 prototype，
-            移除我們建立的 instance property。
-          */
-          try {
-
-            delete component.update;
-
-          } catch {
-
-            component.update =
-              record.originalUpdate;
-          }
-        }
+        );
       }
 
 
-      /* -----------------------------------------------
-         Restore lateUpdate
-      ----------------------------------------------- */
-
       if (
-        record.lateUpdateWrapped &&
-        record.originalLateUpdate
+        record.lateUpdateWrapped
       ) {
 
-        if (
+        restoreMethod(
+          component,
+          'lateUpdate',
+          record.originalLateUpdate,
           record.lateUpdateHadOwn
-        ) {
-
-          component.lateUpdate =
-            record.originalLateUpdate;
-
-        } else {
-
-          try {
-
-            delete component.lateUpdate;
-
-          } catch {
-
-            component.lateUpdate =
-              record.originalLateUpdate;
-          }
-        }
+        );
       }
     }
 
@@ -1287,13 +1584,6 @@
 
     getMode
 
-    /*
-      刻意沒有：
-
-      setSpeed()
-      spin()
-      setBet()
-    */
   };
 
 
