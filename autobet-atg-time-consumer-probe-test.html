@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>芯瑤 ATG Time Consumer Probe 測試</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  padding:30px 16px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei",sans-serif;
+  background:#fff6fa;
+  color:#59434d;
+}
+
+.wrap{
+  width:min(900px,100%);
+  margin:auto;
+}
+
+.card{
+  background:#fff;
+  border:1px solid #ffd3e3;
+  border-radius:20px;
+  padding:20px;
+  margin-bottom:16px;
+}
+
+h1{
+  margin-top:0;
+  color:#ef377e;
+}
+
+.notice{
+  padding:12px;
+  border-radius:12px;
+  background:#fff0f6;
+  line-height:1.7;
+}
+
+.ok{
+  color:#16865b;
+  font-weight:900;
+  line-height:1.9;
+}
+
+.fail{
+  color:#d83d58;
+  font-weight:900;
+  line-height:1.9;
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <div class="card">
+
+    <h1>
+      🌸 芯瑤 ATG Time Consumer Probe 測試
+    </h1>
+
+    <div class="notice">
+      ⚠️ 目前只測試 Cocos 各時間消費層的 dt 紀錄。<br>
+      不修改 dt、不加速、不按 Spin、不改下注。
+    </div>
+
+  </div>
+
+  <div class="card">
+
+    <h3>🧪 Time Consumer Probe 測試</h3>
+
+    <div id="result">
+      測試中…
+    </div>
+
+  </div>
+
+</div>
+
+
+<script src="./xinyao_ATG_time_consumer_probe.js"></script>
+
+<script>
+(() => {
+
+  const box =
+    document.getElementById('result');
+
+
+  /*
+    RED：
+    Probe 尚未建立時，
+    這裡應該失敗。
+  */
+  if (
+    !window.XinyaoATGTimeConsumerProbe
+  ) {
+
+    box.innerHTML =
+      '<div class="fail">❌ Time Consumer Probe 尚未建立｜這次失敗是正常的</div>';
+
+    return;
+  }
+
+
+  const Probe =
+    window.XinyaoATGTimeConsumerProbe;
+
+
+  /* ======================================================
+     假 Cocos Runtime
+  ====================================================== */
+
+  const calls = [];
+
+
+  const originalSchedulerUpdate =
+    function(dt) {
+
+      calls.push(
+        ['scheduler', dt]
+      );
+
+      return 'scheduler-return';
+    };
+
+
+  const originalAnimationUpdate =
+    function(dt) {
+
+      calls.push(
+        ['animation', dt]
+      );
+
+      return 'animation-return';
+    };
+
+
+  const originalActionUpdate =
+    function(dt) {
+
+      calls.push(
+        ['action', dt]
+      );
+
+      return 'action-return';
+    };
+
+
+  const originalGetDeltaTime =
+    function() {
+
+      return 0.0167;
+    };
+
+
+  const fakeScheduler = {
+    update:
+      originalSchedulerUpdate
+  };
+
+
+  const fakeAnimationManager = {
+    update:
+      originalAnimationUpdate
+  };
+
+
+  const fakeActionManager = {
+    update:
+      originalActionUpdate
+  };
+
+
+  const fakeDirector = {
+
+    getScheduler() {
+      return fakeScheduler;
+    },
+
+    getAnimationManager() {
+      return fakeAnimationManager;
+    },
+
+    getActionManager() {
+      return fakeActionManager;
+    },
+
+    getDeltaTime:
+      originalGetDeltaTime
+  };
+
+
+  const fakeCC = {
+
+    director:
+      fakeDirector
+  };
+
+
+  const fakeGlobals = {
+    cc:
+      fakeCC
+  };
+
+
+  /* ======================================================
+     安裝
+  ====================================================== */
+
+  Probe.reset();
+
+
+  Probe.install({
+    globals:
+      fakeGlobals
+  });
+
+
+  const tests = [];
+
+
+  function add(
+    name,
+    expected,
+    actual
+  ) {
+
+    tests.push({
+
+      name,
+
+      expected:
+        String(expected),
+
+      actual:
+        String(actual),
+
+      ok:
+        String(expected) ===
+        String(actual)
+
+    });
+  }
+
+
+  add(
+    '安裝狀態',
+    true,
+    Probe.getState().installed
+  );
+
+
+  add(
+    '找到 Scheduler',
+    true,
+    Probe.getState().hasScheduler
+  );
+
+
+  add(
+    '找到 AnimationManager',
+    true,
+    Probe.getState().hasAnimationManager
+  );
+
+
+  add(
+    '找到 ActionManager',
+    true,
+    Probe.getState().hasActionManager
+  );
+
+
+  add(
+    '找到 Director getDeltaTime',
+    true,
+    Probe.getState().hasDirectorDelta
+  );
+
+
+  /* ======================================================
+     模擬幾幀
+  ====================================================== */
+
+  const schedulerReturn1 =
+    fakeScheduler.update(
+      0.0167
+    );
+
+
+  fakeScheduler.update(
+    0.0333
+  );
+
+
+  const animationReturn =
+    fakeAnimationManager.update(
+      0.0167
+    );
+
+
+  fakeAnimationManager.update(
+    0.0500
+  );
+
+
+  const actionReturn =
+    fakeActionManager.update(
+      0.0167
+    );
+
+
+  fakeActionManager.update(
+    0.1000
+  );
+
+
+  const directorDt =
+    fakeDirector.getDeltaTime();
+
+
+  const snapshot =
+    Probe.snapshot();
+
+
+  /* ======================================================
+     Scheduler
+  ====================================================== */
+
+  add(
+    'Scheduler update 次數',
+    2,
+    snapshot.scheduler.count
+  );
+
+
+  add(
+    'Scheduler 最後 dt',
+    0.0333,
+    snapshot.scheduler.lastDt
+  );
+
+
+  add(
+    'Scheduler 最大 dt',
+    0.0333,
+    snapshot.scheduler.maxDt
+  );
+
+
+  add(
+    'Scheduler 原回傳值未破壞',
+    'scheduler-return',
+    schedulerReturn1
+  );
+
+
+  /* ======================================================
+     Animation Manager
+  ====================================================== */
+
+  add(
+    'AnimationManager update 次數',
+    2,
+    snapshot.animation.count
+  );
+
+
+  add(
+    'AnimationManager 最後 dt',
+    0.05,
+    snapshot.animation.lastDt
+  );
+
+
+  add(
+    'AnimationManager 最大 dt',
+    0.05,
+    snapshot.animation.maxDt
+  );
+
+
+  add(
+    'Animation 原回傳值未破壞',
+    'animation-return',
+    animationReturn
+  );
+
+
+  /* ======================================================
+     Action Manager
+  ====================================================== */
+
+  add(
+    'ActionManager update 次數',
+    2,
+    snapshot.action.count
+  );
+
+
+  add(
+    'ActionManager 最後 dt',
+    0.1,
+    snapshot.action.lastDt
+  );
+
+
+  add(
+    'ActionManager 最大 dt',
+    0.1,
+    snapshot.action.maxDt
+  );
+
+
+  add(
+    'Action 原回傳值未破壞',
+    'action-return',
+    actionReturn
+  );
+
+
+  /* ======================================================
+     Director delta
+  ====================================================== */
+
+  add(
+    'Director getDeltaTime 次數',
+    1,
+    snapshot.directorDelta.count
+  );
+
+
+  add(
+    'Director Delta',
+    0.0167,
+    snapshot.directorDelta.lastDt
+  );
+
+
+  add(
+    'Director 原回傳值未破壞',
+    0.0167,
+    directorDt
+  );
+
+
+  /* ======================================================
+     安全條件
+  ====================================================== */
+
+  add(
+    'Probe 模式',
+    'PASSIVE_TIME_CONSUMER_PROBE',
+    Probe.getMode()
+  );
+
+
+  add(
+    '沒有 setSpeed',
+    'undefined',
+    typeof Probe.setSpeed
+  );
+
+
+  add(
+    '沒有 Spin',
+    'undefined',
+    typeof Probe.spin
+  );
+
+
+  /* ======================================================
+     卸載
+  ====================================================== */
+
+  Probe.uninstall();
+
+
+  add(
+    '卸載狀態',
+    false,
+    Probe.getState().installed
+  );
+
+
+  add(
+    'Scheduler update 已恢復',
+    true,
+    fakeScheduler.update ===
+      originalSchedulerUpdate
+  );
+
+
+  add(
+    'Animation update 已恢復',
+    true,
+    fakeAnimationManager.update ===
+      originalAnimationUpdate
+  );
+
+
+  add(
+    'Action update 已恢復',
+    true,
+    fakeActionManager.update ===
+      originalActionUpdate
+  );
+
+
+  add(
+    'Director getDeltaTime 已恢復',
+    true,
+    fakeDirector.getDeltaTime ===
+      originalGetDeltaTime
+  );
+
+
+  /* ======================================================
+     輸出
+  ====================================================== */
+
+  let passed = 0;
+
+
+  const html =
+    tests.map(test => {
+
+      if (test.ok) {
+        passed++;
+      }
+
+      return `
+        <div class="${
+          test.ok
+            ? 'ok'
+            : 'fail'
+        }">
+
+          ${
+            test.ok
+              ? '✅'
+              : '❌'
+          }
+
+          ${test.name}
+
+          ｜預期：
+          ${test.expected}
+
+          ｜實際：
+          ${test.actual}
+
+        </div>
+      `;
+
+    }).join('');
+
+
+  box.innerHTML =
+    html +
+    `<hr><b>結果：${passed} / ${tests.length} 通過</b>`;
+
+})();
+</script>
+
+</body>
+</html>
