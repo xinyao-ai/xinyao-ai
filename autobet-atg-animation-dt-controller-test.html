@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>芯瑤 ATG Animation DT Controller 測試</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  padding:30px 16px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei",sans-serif;
+  background:#fff6fa;
+  color:#59434d;
+}
+
+.wrap{
+  width:min(900px,100%);
+  margin:auto;
+}
+
+.card{
+  background:#fff;
+  border:1px solid #ffd3e3;
+  border-radius:20px;
+  padding:20px;
+  margin-bottom:16px;
+}
+
+h1{
+  margin-top:0;
+  color:#ef377e;
+}
+
+.notice{
+  padding:12px;
+  border-radius:12px;
+  background:#fff0f6;
+  line-height:1.7;
+}
+
+.ok{
+  color:#16865b;
+  font-weight:900;
+  line-height:1.9;
+}
+
+.fail{
+  color:#d83d58;
+  font-weight:900;
+  line-height:1.9;
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <div class="card">
+
+    <h1>
+      🌸 芯瑤 ATG Animation DT Controller 測試
+    </h1>
+
+    <div class="notice">
+      ⚠️ 目前只在假的 AnimationManager 測倍率。<br>
+      不按 Spin、不改下注、不碰 WebSocket、不操作真正 ATG。
+    </div>
+
+  </div>
+
+  <div class="card">
+
+    <h3>🧪 Animation DT Controller 測試</h3>
+
+    <div id="result">
+      測試中…
+    </div>
+
+  </div>
+
+</div>
+
+
+<script src="./xinyao_ATG_animation_dt_controller.js"></script>
+
+<script>
+(() => {
+
+  const box =
+    document.getElementById('result');
+
+
+  /*
+    RED：
+    Controller 尚未建立時，
+    這個失敗就是正確的。
+  */
+  if (
+    !window.XinyaoATGAnimationDtController
+  ) {
+
+    box.innerHTML =
+      '<div class="fail">❌ Animation DT Controller 尚未建立｜這次失敗是正常的</div>';
+
+    return;
+  }
+
+
+  const Controller =
+    window.XinyaoATGAnimationDtController;
+
+
+  /* ======================================================
+     Fake Cocos Runtime
+  ====================================================== */
+
+  const receivedDt = [];
+
+
+  const originalAnimationUpdate =
+    function(dt) {
+
+      receivedDt.push(
+        dt
+      );
+
+      return 'animation-return';
+    };
+
+
+  const originalSchedulerUpdate =
+    function(dt) {
+
+      return dt;
+    };
+
+
+  const fakeAnimationManager = {
+
+    update:
+      originalAnimationUpdate
+  };
+
+
+  const fakeScheduler = {
+
+    update:
+      originalSchedulerUpdate
+  };
+
+
+  const fakeDirector = {
+
+    getAnimationManager() {
+      return fakeAnimationManager;
+    },
+
+    getScheduler() {
+      return fakeScheduler;
+    }
+  };
+
+
+  const fakeCC = {
+
+    director:
+      fakeDirector
+  };
+
+
+  const fakeGlobals = {
+
+    cc:
+      fakeCC
+  };
+
+
+  /* ======================================================
+     Tests
+  ====================================================== */
+
+  const tests = [];
+
+
+  function add(
+    name,
+    expected,
+    actual
+  ) {
+
+    tests.push({
+
+      name,
+
+      expected:
+        String(expected),
+
+      actual:
+        String(actual),
+
+      ok:
+        String(expected) ===
+        String(actual)
+    });
+  }
+
+
+  /* ======================================================
+     初始化
+  ====================================================== */
+
+  Controller.init({
+    globals:
+      fakeGlobals
+  });
+
+
+  add(
+    '成功找到 AnimationManager',
+    true,
+    Controller.getState().ready
+  );
+
+
+  add(
+    '初始倍率',
+    1,
+    Controller.getState().speed
+  );
+
+
+  /* ======================================================
+     1×
+  ====================================================== */
+
+  const return1x =
+    fakeAnimationManager.update(
+      0.0167
+    );
+
+
+  add(
+    '1× dt 不變',
+    0.0167,
+    receivedDt.at(-1)
+  );
+
+
+  add(
+    '原回傳值沒有被破壞',
+    'animation-return',
+    return1x
+  );
+
+
+  /* ======================================================
+     2×
+  ====================================================== */
+
+  add(
+    '設定 2× 成功',
+    true,
+    Controller.setSpeed(2)
+  );
+
+
+  fakeAnimationManager.update(
+    0.0167
+  );
+
+
+  add(
+    '2× dt',
+    0.0334,
+    Number(
+      receivedDt.at(-1)
+        .toFixed(4)
+    )
+  );
+
+
+  /* ======================================================
+     3×
+  ====================================================== */
+
+  add(
+    '設定 3× 成功',
+    true,
+    Controller.setSpeed(3)
+  );
+
+
+  fakeAnimationManager.update(
+    0.0167
+  );
+
+
+  add(
+    '3× dt',
+    0.0501,
+    Number(
+      receivedDt.at(-1)
+        .toFixed(4)
+    )
+  );
+
+
+  /* ======================================================
+     5×
+  ====================================================== */
+
+  add(
+    '設定 5× 成功',
+    true,
+    Controller.setSpeed(5)
+  );
+
+
+  fakeAnimationManager.update(
+    0.0167
+  );
+
+
+  add(
+    '5× dt',
+    0.0835,
+    Number(
+      receivedDt.at(-1)
+        .toFixed(4)
+    )
+  );
+
+
+  /* ======================================================
+     不允許亂填倍率
+  ====================================================== */
+
+  add(
+    '拒絕 99×',
+    false,
+    Controller.setSpeed(99)
+  );
+
+
+  add(
+    '拒絕後仍維持 5×',
+    5,
+    Controller.getState().speed
+  );
+
+
+  /* ======================================================
+     Scheduler 不可以被碰
+  ====================================================== */
+
+  add(
+    'Scheduler update 沒有被替換',
+    true,
+    fakeScheduler.update ===
+      originalSchedulerUpdate
+  );
+
+
+  /* ======================================================
+     恢復 1×
+  ====================================================== */
+
+  add(
+    '恢復 1× 成功',
+    true,
+    Controller.resetSpeed()
+  );
+
+
+  fakeAnimationManager.update(
+    0.0167
+  );
+
+
+  add(
+    '恢復後 dt',
+    0.0167,
+    Number(
+      receivedDt.at(-1)
+        .toFixed(4)
+    )
+  );
+
+
+  /* ======================================================
+     模式與安全
+  ====================================================== */
+
+  add(
+    'Controller 模式',
+    'COCOS_ANIMATION_DT_CONTROLLER',
+    Controller.getMode()
+  );
+
+
+  add(
+    '沒有 Spin 功能',
+    'undefined',
+    typeof Controller.spin
+  );
+
+
+  add(
+    '沒有下注控制',
+    'undefined',
+    typeof Controller.setBet
+  );
+
+
+  /* ======================================================
+     卸載
+  ====================================================== */
+
+  Controller.uninstall();
+
+
+  add(
+    '卸載後狀態',
+    false,
+    Controller.getState().installed
+  );
+
+
+  add(
+    'Animation update 已恢復原函式',
+    true,
+    fakeAnimationManager.update ===
+      originalAnimationUpdate
+  );
+
+
+  /* ======================================================
+     輸出
+  ====================================================== */
+
+  let passed = 0;
+
+
+  const html =
+    tests.map(test => {
+
+      if (test.ok) {
+        passed++;
+      }
+
+      return `
+        <div class="${
+          test.ok
+            ? 'ok'
+            : 'fail'
+        }">
+
+          ${
+            test.ok
+              ? '✅'
+              : '❌'
+          }
+
+          ${test.name}
+
+          ｜預期：
+          ${test.expected}
+
+          ｜實際：
+          ${test.actual}
+
+        </div>
+      `;
+
+    }).join('');
+
+
+  box.innerHTML =
+    html +
+    `<hr><b>結果：${passed} / ${tests.length} 通過</b>`;
+
+})();
+</script>
+
+</body>
+</html>
