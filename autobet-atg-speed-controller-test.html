@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>芯瑤 ATG Speed Controller 測試</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  padding:30px 16px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei",sans-serif;
+  background:#fff6fa;
+  color:#59434d;
+}
+
+.wrap{
+  width:min(900px,100%);
+  margin:auto;
+}
+
+.card{
+  background:#fff;
+  border:1px solid #ffd3e3;
+  border-radius:20px;
+  padding:20px;
+  margin-bottom:16px;
+}
+
+h1{
+  margin-top:0;
+  color:#ef377e;
+}
+
+.notice{
+  padding:12px;
+  border-radius:12px;
+  background:#fff0f6;
+  line-height:1.7;
+}
+
+.ok{
+  color:#16865b;
+  font-weight:900;
+  line-height:1.9;
+}
+
+.fail{
+  color:#d83d58;
+  font-weight:900;
+  line-height:1.9;
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <div class="card">
+
+    <h1>
+      🌸 芯瑤 ATG Speed Controller 測試
+    </h1>
+
+    <div class="notice">
+      ⚠️ 目前只用假的 Cocos Scheduler 測倍率控制。<br>
+      不按 Spin、不自動下注、不操作真正 ATG。
+    </div>
+
+  </div>
+
+  <div class="card">
+
+    <h3>🧪 Speed Controller 測試</h3>
+
+    <div id="result">
+      測試中…
+    </div>
+
+  </div>
+
+</div>
+
+
+<script src="./xinyao_ATG_speed_controller.js"></script>
+
+<script>
+(() => {
+
+  const box =
+    document.getElementById('result');
+
+
+  /*
+    RED：
+    Speed Controller 尚未建立時，
+    這個失敗就是正常的。
+  */
+  if (
+    !window.XinyaoATGSpeedController
+  ) {
+
+    box.innerHTML =
+      '<div class="fail">❌ Speed Controller 尚未建立｜這次失敗是正常的</div>';
+
+    return;
+  }
+
+
+  const Controller =
+    window.XinyaoATGSpeedController;
+
+
+  /* ======================================================
+     Fake Cocos Runtime
+  ====================================================== */
+
+  let currentScale = 1;
+
+  const history = [];
+
+
+  const fakeScheduler = {
+
+    setTimeScale(value) {
+
+      currentScale =
+        Number(value);
+
+      history.push(
+        currentScale
+      );
+    },
+
+
+    getTimeScale() {
+
+      return currentScale;
+    }
+  };
+
+
+  const fakeCC = {
+
+    director: {
+
+      getScheduler() {
+
+        return fakeScheduler;
+      }
+    },
+
+    game: {
+      frameRate:60
+    }
+  };
+
+
+  const fakeGlobals = {
+    cc:fakeCC
+  };
+
+
+  const tests = [];
+
+
+  function add(
+    name,
+    expected,
+    actual
+  ) {
+
+    tests.push({
+
+      name,
+
+      expected:
+        String(expected),
+
+      actual:
+        String(actual),
+
+      ok:
+        String(expected) ===
+        String(actual)
+    });
+  }
+
+
+  /* ======================================================
+     初始化
+  ====================================================== */
+
+  Controller.init({
+    globals:fakeGlobals
+  });
+
+
+  add(
+    '成功找到 Scheduler',
+    true,
+    Controller.getState().ready
+  );
+
+
+  add(
+    '初始倍率',
+    1,
+    Controller.getState().speed
+  );
+
+
+  add(
+    '初始 Cocos timeScale',
+    1,
+    Controller.getState().timeScale
+  );
+
+
+  /* ======================================================
+     2×
+  ====================================================== */
+
+  add(
+    '設定 2× 成功',
+    true,
+    Controller.setSpeed(2)
+  );
+
+
+  add(
+    '2× timeScale',
+    2,
+    fakeScheduler.getTimeScale()
+  );
+
+
+  /* ======================================================
+     3×
+  ====================================================== */
+
+  add(
+    '設定 3× 成功',
+    true,
+    Controller.setSpeed(3)
+  );
+
+
+  add(
+    '3× timeScale',
+    3,
+    fakeScheduler.getTimeScale()
+  );
+
+
+  /* ======================================================
+     5×
+  ====================================================== */
+
+  add(
+    '設定 5× 成功',
+    true,
+    Controller.setSpeed(5)
+  );
+
+
+  add(
+    '5× timeScale',
+    5,
+    fakeScheduler.getTimeScale()
+  );
+
+
+  /* ======================================================
+     不允許任意倍率
+  ====================================================== */
+
+  add(
+    '拒絕 99×',
+    false,
+    Controller.setSpeed(99)
+  );
+
+
+  add(
+    '拒絕後仍維持 5×',
+    5,
+    fakeScheduler.getTimeScale()
+  );
+
+
+  /* ======================================================
+     恢復正常
+  ====================================================== */
+
+  add(
+    '恢復 1× 成功',
+    true,
+    Controller.resetSpeed()
+  );
+
+
+  add(
+    '恢復後 timeScale',
+    1,
+    fakeScheduler.getTimeScale()
+  );
+
+
+  /* ======================================================
+     模式與安全
+  ====================================================== */
+
+  add(
+    'Controller 模式',
+    'COCOS_TIMESCALE_CONTROLLER',
+    Controller.getMode()
+  );
+
+
+  add(
+    '沒有 Spin 功能',
+    'undefined',
+    typeof Controller.spin
+  );
+
+
+  add(
+    '沒有下注控制',
+    'undefined',
+    typeof Controller.setBet
+  );
+
+
+  /* ======================================================
+     實際 setTimeScale 紀錄
+  ====================================================== */
+
+  add(
+    '倍率呼叫順序',
+    '2,3,5,1',
+    history.join(',')
+  );
+
+
+  /* ======================================================
+     輸出
+  ====================================================== */
+
+  let passed = 0;
+
+
+  const html =
+    tests.map(test => {
+
+      if (test.ok) {
+        passed++;
+      }
+
+      return `
+        <div class="${
+          test.ok
+            ? 'ok'
+            : 'fail'
+        }">
+
+          ${
+            test.ok
+              ? '✅'
+              : '❌'
+          }
+
+          ${test.name}
+
+          ｜預期：
+          ${test.expected}
+
+          ｜實際：
+          ${test.actual}
+
+        </div>
+      `;
+
+    }).join('');
+
+
+  box.innerHTML =
+    html +
+    `<hr><b>結果：${passed} / ${tests.length} 通過</b>`;
+
+})();
+</script>
+
+</body>
+</html>
