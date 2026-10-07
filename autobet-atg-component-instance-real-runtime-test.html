@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>芯瑤 ATG Component Instance 真機結構測試</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  padding:30px 16px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei",sans-serif;
+  background:#fff6fa;
+  color:#59434d;
+}
+
+.wrap{
+  width:min(900px,100%);
+  margin:auto;
+}
+
+.card{
+  background:#fff;
+  border:1px solid #ffd3e3;
+  border-radius:20px;
+  padding:20px;
+  margin-bottom:16px;
+}
+
+h1{
+  margin-top:0;
+  color:#ef377e;
+}
+
+.notice{
+  padding:12px;
+  border-radius:12px;
+  background:#fff0f6;
+  line-height:1.7;
+}
+
+.ok{
+  color:#16865b;
+  font-weight:900;
+  line-height:1.9;
+}
+
+.fail{
+  color:#d83d58;
+  font-weight:900;
+  line-height:1.9;
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <div class="card">
+
+    <h1>
+      🌸 芯瑤 ATG Component Instance 真機結構測試
+    </h1>
+
+    <div class="notice">
+      ⚠️ 模擬真正 ATG 的 updateInvoker / lateUpdateInvoker 結構。<br>
+      不修改 dt、不加速、不按 Spin、不改下注。
+    </div>
+
+  </div>
+
+  <div class="card">
+
+    <h3>🧪 Real Runtime Structure 測試</h3>
+
+    <div id="result">
+      測試中…
+    </div>
+
+  </div>
+
+</div>
+
+
+<script src="./xinyao_ATG_component_instance_probe.js"></script>
+
+<script>
+(() => {
+
+  const box =
+    document.getElementById('result');
+
+
+  if (
+    !window.XinyaoATGComponentInstanceProbe
+  ) {
+
+    box.innerHTML =
+      '<div class="fail">❌ Component Instance Probe 尚未載入</div>';
+
+    return;
+  }
+
+
+  const Probe =
+    window.XinyaoATGComponentInstanceProbe;
+
+
+  /* ======================================================
+     Fake ATG Components
+  ====================================================== */
+
+  const originalReelUpdate =
+    function(dt) {
+
+      return `reel-${dt}`;
+    };
+
+
+  const originalReelLateUpdate =
+    function(dt) {
+
+      return `reel-late-${dt}`;
+    };
+
+
+  const originalSpinUpdate =
+    function(dt) {
+
+      return `spin-${dt}`;
+    };
+
+
+  const originalUIUpdate =
+    function(dt) {
+
+      return `ui-${dt}`;
+    };
+
+
+  const reelComponent = {
+
+    __classname__:
+      'GoldenSethReel',
+
+    node:{
+      name:'ReelRoot'
+    },
+
+    update:
+      originalReelUpdate,
+
+    lateUpdate:
+      originalReelLateUpdate
+  };
+
+
+  const spinComponent = {
+
+    __classname__:
+      'SpinController',
+
+    node:{
+      name:'SpinRoot'
+    },
+
+    update:
+      originalSpinUpdate
+  };
+
+
+  const uiComponent = {
+
+    __classname__:
+      'MachineButton',
+
+    node:{
+      name:'MachineButton'
+    },
+
+    update:
+      originalUIUpdate,
+
+    _renderData:{
+      uvSliced:
+        new Array(16).fill(0)
+    }
+  };
+
+
+  /* ======================================================
+     模擬妳真機抓到的 ComponentScheduler
+
+     真正 ATG：
+     updateInvoker._pos.array
+  ====================================================== */
+
+  const fakeCompScheduler = {
+
+    startInvoker:{
+
+      _neg:{
+        array:[]
+      },
+
+      _zero:{
+        array:[]
+      },
+
+      _pos:{
+        array:[
+          reelComponent
+        ]
+      }
+
+    },
+
+
+    updateInvoker:{
+
+      _neg:{
+        array:[]
+      },
+
+      _zero:{
+        array:[
+          spinComponent
+        ]
+      },
+
+      _pos:{
+        array:[
+          reelComponent,
+          uiComponent
+        ]
+      }
+
+    },
+
+
+    lateUpdateInvoker:{
+
+      _neg:{
+        array:[]
+      },
+
+      _zero:{
+        array:[]
+      },
+
+      _pos:{
+        array:[
+          reelComponent
+        ]
+      }
+
+    }
+
+  };
+
+
+  const fakeDirector = {
+
+    _compScheduler:
+      fakeCompScheduler
+  };
+
+
+  const fakeGlobals = {
+
+    cc:{
+
+      director:
+        fakeDirector
+
+    }
+
+  };
+
+
+  /* ======================================================
+     Install
+  ====================================================== */
+
+  Probe.reset();
+
+
+  Probe.install({
+
+    globals:
+      fakeGlobals
+
+  });
+
+
+  const tests =
+    [];
+
+
+  function add(
+    name,
+    expected,
+    actual
+  ) {
+
+    tests.push({
+
+      name,
+
+      expected:
+        String(expected),
+
+      actual:
+        String(actual),
+
+      ok:
+        String(expected) ===
+        String(actual)
+
+    });
+  }
+
+
+  function component(
+    name
+  ) {
+
+    return Probe
+      .snapshot()
+      .components
+      .find(
+        item =>
+          item.name === name
+      );
+  }
+
+
+  /* ======================================================
+     Discovery
+  ====================================================== */
+
+  let state =
+    Probe.getState();
+
+
+  add(
+    '安裝狀態',
+    true,
+    state.installed
+  );
+
+
+  add(
+    '找到 Director',
+    true,
+    state.hasDirector
+  );
+
+
+  add(
+    '找到 ComponentScheduler',
+    true,
+    state.hasComponentScheduler
+  );
+
+
+  /*
+    舊版 Probe 在這裡會是 0。
+
+    新版要能掃到：
+    Reel
+    SpinController
+    MachineButton
+  */
+  add(
+    '真機 updateInvoker 掃到 3 個 Component',
+    3,
+    state.discoveredComponents
+  );
+
+
+  add(
+    '包裝 3 個 update',
+    3,
+    state.wrappedUpdates
+  );
+
+
+  add(
+    '包裝 1 個 lateUpdate',
+    1,
+    state.wrappedLateUpdates
+  );
+
+
+  /* ======================================================
+     模擬 Runtime
+  ====================================================== */
+
+  reelComponent.update(
+    0.0167
+  );
+
+  reelComponent.update(
+    0.0167
+  );
+
+
+  spinComponent.update(
+    0.0167
+  );
+
+  spinComponent.update(
+    0.0167
+  );
+
+  spinComponent.update(
+    0.0167
+  );
+
+
+  uiComponent.update(
+    0.0167
+  );
+
+
+  reelComponent.lateUpdate(
+    0.0167
+  );
+
+
+  /* ======================================================
+     Reel
+  ====================================================== */
+
+  add(
+    'Reel 有找到',
+    true,
+    !!component(
+      'GoldenSethReel'
+    )
+  );
+
+
+  add(
+    'Reel update 次數',
+    2,
+    component(
+      'GoldenSethReel'
+    )?.updateCount
+  );
+
+
+  add(
+    'Reel lateUpdate 次數',
+    1,
+    component(
+      'GoldenSethReel'
+    )?.lateUpdateCount
+  );
+
+
+  add(
+    'Reel Node',
+    'ReelRoot',
+    component(
+      'GoldenSethReel'
+    )?.nodeName
+  );
+
+
+  /* ======================================================
+     Spin Controller
+  ====================================================== */
+
+  add(
+    'SpinController 有找到',
+    true,
+    !!component(
+      'SpinController'
+    )
+  );
+
+
+  add(
+    'SpinController update 次數',
+    3,
+    component(
+      'SpinController'
+    )?.updateCount
+  );
+
+
+  /* ======================================================
+     UI Component
+
+     _renderData 裡面的陣列不應該被當成 Component。
+  ====================================================== */
+
+  add(
+    'MachineButton 有找到',
+    true,
+    !!component(
+      'MachineButton'
+    )
+  );
+
+
+  add(
+    'MachineButton update 次數',
+    1,
+    component(
+      'MachineButton'
+    )?.updateCount
+  );
+
+
+  add(
+    '沒有把 uvSliced 當 Component',
+    false,
+    Probe
+      .snapshot()
+      .components
+      .some(
+        item =>
+          item.name ===
+          'uvSliced'
+      )
+  );
+
+
+  /* ======================================================
+     Ranking
+  ====================================================== */
+
+  const ranking =
+    Probe
+      .snapshot()
+      .ranking;
+
+
+  add(
+    '排行榜第一名',
+    'SpinController',
+    ranking[0]?.name
+  );
+
+
+  add(
+    '第一名呼叫次數',
+    3,
+    ranking[0]?.totalCalls
+  );
+
+
+  /* ======================================================
+     Rescan
+
+     模擬遊戲中途才建立 Component
+  ====================================================== */
+
+  const bonusComponent = {
+
+    __classname__:
+      'BonusReelController',
+
+    node:{
+      name:'BonusRoot'
+    },
+
+    update(dt){
+
+      return dt;
+    }
+
+  };
+
+
+  fakeCompScheduler
+    .updateInvoker
+    ._pos
+    .array
+    .push(
+      bonusComponent
+    );
+
+
+  Probe.rescan();
+
+
+  state =
+    Probe.getState();
+
+
+  add(
+    'Rescan 後抓到新 Component',
+    4,
+    state.discoveredComponents
+  );
+
+
+  bonusComponent.update(
+    0.0167
+  );
+
+
+  add(
+    'Bonus Component 可記錄',
+    1,
+    component(
+      'BonusReelController'
+    )?.updateCount
+  );
+
+
+  /* ======================================================
+     安全
+  ====================================================== */
+
+  add(
+    'Probe 模式',
+    'PASSIVE_COMPONENT_INSTANCE_PROBE',
+    Probe.getMode()
+  );
+
+
+  add(
+    '沒有 setSpeed',
+    'undefined',
+    typeof Probe.setSpeed
+  );
+
+
+  add(
+    '沒有 Spin',
+    'undefined',
+    typeof Probe.spin
+  );
+
+
+  add(
+    '沒有下注功能',
+    'undefined',
+    typeof Probe.setBet
+  );
+
+
+  /* ======================================================
+     Uninstall
+  ====================================================== */
+
+  Probe.uninstall();
+
+
+  add(
+    '卸載狀態',
+    false,
+    Probe.getState().installed
+  );
+
+
+  add(
+    'Reel update 恢復',
+    true,
+    reelComponent.update ===
+      originalReelUpdate
+  );
+
+
+  add(
+    'Reel lateUpdate 恢復',
+    true,
+    reelComponent.lateUpdate ===
+      originalReelLateUpdate
+  );
+
+
+  add(
+    'Spin update 恢復',
+    true,
+    spinComponent.update ===
+      originalSpinUpdate
+  );
+
+
+  add(
+    'UI update 恢復',
+    true,
+    uiComponent.update ===
+      originalUIUpdate
+  );
+
+
+  /* ======================================================
+     Output
+  ====================================================== */
+
+  let passed =
+    0;
+
+
+  const html =
+    tests.map(test => {
+
+      if (test.ok) {
+        passed++;
+      }
+
+
+      return `
+        <div class="${
+          test.ok
+            ? 'ok'
+            : 'fail'
+        }">
+
+          ${
+            test.ok
+              ? '✅'
+              : '❌'
+          }
+
+          ${test.name}
+
+          ｜預期：
+          ${test.expected}
+
+          ｜實際：
+          ${test.actual}
+
+        </div>
+      `;
+
+    }).join('');
+
+
+  box.innerHTML =
+    html +
+    `<hr><b>結果：${passed} / ${tests.length} 通過</b>`;
+
+})();
+</script>
+
+</body>
+</html>
