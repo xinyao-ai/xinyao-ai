@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>芯瑤 ATG Cocos Runtime Probe 測試</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  padding:30px 16px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei",sans-serif;
+  background:#fff6fa;
+  color:#59434d;
+}
+
+.wrap{
+  width:min(900px,100%);
+  margin:auto;
+}
+
+.card{
+  background:#fff;
+  border:1px solid #ffd3e3;
+  border-radius:20px;
+  padding:20px;
+  margin-bottom:16px;
+}
+
+h1{
+  margin-top:0;
+  color:#ef377e;
+}
+
+.notice{
+  padding:12px;
+  border-radius:12px;
+  background:#fff0f6;
+  line-height:1.7;
+}
+
+.ok{
+  color:#16865b;
+  font-weight:900;
+  line-height:1.9;
+}
+
+.fail{
+  color:#d83d58;
+  font-weight:900;
+  line-height:1.9;
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <div class="card">
+
+    <h1>
+      🌸 芯瑤 ATG Cocos Runtime Probe 測試
+    </h1>
+
+    <div class="notice">
+      ⚠️ 目前只偵測 Cocos Runtime 結構。<br>
+      不修改 timeScale、不加速、不按 Spin、不改下注。
+    </div>
+
+  </div>
+
+  <div class="card">
+
+    <h3>🧪 Cocos Runtime Probe 測試</h3>
+
+    <div id="result">
+      測試中…
+    </div>
+
+  </div>
+
+</div>
+
+
+<script src="./xinyao_ATG_cocos_runtime_probe.js"></script>
+
+<script>
+(() => {
+
+  const box =
+    document.getElementById('result');
+
+
+  /*
+    RED：
+    本體尚未建立時，
+    這個失敗就是正確的。
+  */
+  if (
+    !window.XinyaoATGCocosRuntimeProbe
+  ) {
+
+    box.innerHTML =
+      '<div class="fail">❌ Cocos Runtime Probe 尚未建立｜這次失敗是正常的</div>';
+
+    return;
+  }
+
+
+  const Probe =
+    window.XinyaoATGCocosRuntimeProbe;
+
+
+  /* ======================================================
+     假 Cocos Runtime
+  ====================================================== */
+
+  const fakeScheduler = {
+    setTimeScale(value) {},
+    getTimeScale() {
+      return 1;
+    }
+  };
+
+
+  const fakeDirector = {
+
+    getScheduler() {
+      return fakeScheduler;
+    },
+
+    getAnimationManager() {
+      return {
+        update() {}
+      };
+    }
+  };
+
+
+  const fakeCC = {
+
+    VERSION:
+      '2.4.10',
+
+    director:
+      fakeDirector,
+
+    game: {
+      frameRate:60
+    },
+
+    tween() {},
+
+    Tween: {
+      stopAll() {}
+    },
+
+    Animation: function() {},
+
+    AnimationManager:
+      function() {},
+
+    Scheduler:
+      function() {}
+  };
+
+
+  const fakeGlobals = {
+    cc:fakeCC
+  };
+
+
+  const result =
+    Probe.inspect({
+      globals:fakeGlobals
+    });
+
+
+  const tests = [];
+
+
+  function add(
+    name,
+    expected,
+    actual
+  ) {
+
+    tests.push({
+
+      name,
+
+      expected:String(expected),
+
+      actual:String(actual),
+
+      ok:
+        String(expected) ===
+        String(actual)
+
+    });
+  }
+
+
+  add(
+    '偵測到 Cocos',
+    true,
+    result.detected
+  );
+
+
+  add(
+    'Cocos 版本',
+    '2.4.10',
+    result.version
+  );
+
+
+  add(
+    '找到 director',
+    true,
+    result.hasDirector
+  );
+
+
+  add(
+    '找到 scheduler',
+    true,
+    result.hasScheduler
+  );
+
+
+  add(
+    'Scheduler 有 setTimeScale',
+    true,
+    result.schedulerHasSetTimeScale
+  );
+
+
+  add(
+    'Scheduler 有 getTimeScale',
+    true,
+    result.schedulerHasGetTimeScale
+  );
+
+
+  add(
+    '目前 timeScale',
+    1,
+    result.currentTimeScale
+  );
+
+
+  add(
+    '找到 game',
+    true,
+    result.hasGame
+  );
+
+
+  add(
+    'Frame Rate',
+    60,
+    result.frameRate
+  );
+
+
+  add(
+    '找到 tween',
+    true,
+    result.hasTween
+  );
+
+
+  add(
+    '找到 Animation',
+    true,
+    result.hasAnimation
+  );
+
+
+  add(
+    '找到 AnimationManager',
+    true,
+    result.hasAnimationManager
+  );
+
+
+  add(
+    '找到 Director Animation Manager',
+    true,
+    result.hasDirectorAnimationManager
+  );
+
+
+  add(
+    'Probe 模式',
+    'PASSIVE_COCOS_RUNTIME_PROBE',
+    Probe.getMode()
+  );
+
+
+  /*
+    這一階段不允許修改速度。
+  */
+  add(
+    '沒有 setSpeed 功能',
+    'undefined',
+    typeof Probe.setSpeed
+  );
+
+
+  add(
+    '沒有 Spin 功能',
+    'undefined',
+    typeof Probe.spin
+  );
+
+
+  let passed = 0;
+
+
+  const html =
+    tests.map(test => {
+
+      if (test.ok) {
+        passed++;
+      }
+
+      return `
+        <div class="${
+          test.ok
+            ? 'ok'
+            : 'fail'
+        }">
+
+          ${
+            test.ok
+              ? '✅'
+              : '❌'
+          }
+
+          ${test.name}
+
+          ｜預期：
+          ${test.expected}
+
+          ｜實際：
+          ${test.actual}
+
+        </div>
+      `;
+
+    }).join('');
+
+
+  box.innerHTML =
+    html +
+    `<hr><b>結果：${passed} / ${tests.length} 通過</b>`;
+
+})();
+</script>
+
+</body>
+</html>
