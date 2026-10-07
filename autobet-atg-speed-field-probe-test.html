@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>芯瑤 ATG Speed Field Probe 測試</title>
+
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  padding:30px 16px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei",sans-serif;
+  background:#fff6fa;
+  color:#59434d;
+}
+.wrap{width:min(900px,100%);margin:auto}
+.card{
+  background:#fff;
+  border:1px solid #ffd3e3;
+  border-radius:20px;
+  padding:20px;
+  margin-bottom:16px;
+}
+h1{margin-top:0;color:#ef377e}
+.notice{
+  padding:12px;
+  border-radius:12px;
+  background:#fff0f6;
+  line-height:1.7;
+}
+.ok{color:#16865b;font-weight:900;line-height:1.9}
+.fail{color:#d83d58;font-weight:900;line-height:1.9}
+</style>
+</head>
+
+<body>
+<div class="wrap">
+
+  <div class="card">
+    <h1>🌸 芯瑤 ATG Speed Field Probe 測試</h1>
+
+    <div class="notice">
+      ⚠️ 只讀取 Component 的 primitive 欄位變化。<br>
+      不執行 speedUp、不按 Spin、不改 speed、不執行 Getter。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🧪 Speed Field Probe 測試</h3>
+    <div id="result">測試中…</div>
+  </div>
+
+</div>
+
+<script src="./xinyao_ATG_speed_field_probe.js"></script>
+
+<script>
+(() => {
+
+  const box =
+    document.getElementById('result');
+
+  if (!window.XinyaoATGSpeedFieldProbe) {
+
+    box.innerHTML =
+      '<div class="fail">❌ Speed Field Probe 尚未建立｜這次失敗是正常的</div>';
+
+    return;
+  }
+
+  const Probe =
+    window.XinyaoATGSpeedFieldProbe;
+
+  let methodCalls = 0;
+  let getterCalls = 0;
+
+  class FakeSpinButton {
+
+    constructor() {
+
+      this.__classname__ =
+        'SpinButton';
+
+      this.node = {
+        name:'SpinButton'
+      };
+
+      this.speed =
+        1;
+
+      this.normalSpeed =
+        1;
+
+      this.fastSpeed =
+        3;
+
+      this.isSpeedUp =
+        false;
+
+      this.counter =
+        10;
+
+      this.label =
+        'READY';
+
+      this.objectValue = {
+        ignored:true
+      };
+    }
+
+    speedUp() {
+      methodCalls++;
+    }
+
+    update() {
+      methodCalls++;
+    }
+  }
+
+  const target =
+    new FakeSpinButton();
+
+  Object.defineProperty(
+    target,
+    'dangerousGetter',
+    {
+      configurable:true,
+
+      get() {
+        getterCalls++;
+        return 999;
+      }
+    }
+  );
+
+  Probe.reset();
+
+  const attached =
+    Probe.attach(target);
+
+  const baseline =
+    Probe.sample('baseline');
+
+  /*
+    模擬「遊戲自己」改欄位。
+    不是 Probe 修改。
+  */
+  target.speed =
+    3;
+
+  target.isSpeedUp =
+    true;
+
+  target.counter =
+    11;
+
+  const during =
+    Probe.sample('during-spin');
+
+  /*
+    模擬稍後恢復。
+  */
+  target.speed =
+    1;
+
+  target.isSpeedUp =
+    false;
+
+  target.counter =
+    12;
+
+  const restored =
+    Probe.sample('restored');
+
+  const state =
+    Probe.getState();
+
+  const tests = [];
+
+  function add(
+    name,
+    expected,
+    actual
+  ) {
+
+    tests.push({
+      name,
+      expected:String(expected),
+      actual:String(actual),
+      ok:String(expected) === String(actual)
+    });
+  }
+
+  function hasField(
+    sample,
+    name
+  ) {
+
+    return sample.fields.some(
+      item =>
+        item.name === name
+    );
+  }
+
+  function changed(
+    sample,
+    name,
+    from,
+    to
+  ) {
+
+    return sample.changes.some(
+      item =>
+        item.name === name &&
+        String(item.from) === String(from) &&
+        String(item.to) === String(to)
+    );
+  }
+
+  add(
+    'Attach 成功',
+    true,
+    attached
+  );
+
+  add(
+    'Probe 模式',
+    'PASSIVE_SPEED_FIELD_PROBE',
+    Probe.getMode()
+  );
+
+  add(
+    'Baseline 有 speed',
+    true,
+    hasField(
+      baseline,
+      'speed'
+    )
+  );
+
+  add(
+    'Baseline 有 normalSpeed',
+    true,
+    hasField(
+      baseline,
+      'normalSpeed'
+    )
+  );
+
+  add(
+    'Baseline 有 fastSpeed',
+    true,
+    hasField(
+      baseline,
+      'fastSpeed'
+    )
+  );
+
+  add(
+    'Baseline 有 isSpeedUp',
+    true,
+    hasField(
+      baseline,
+      'isSpeedUp'
+    )
+  );
+
+  add(
+    'Baseline 有 counter',
+    true,
+    hasField(
+      baseline,
+      'counter'
+    )
+  );
+
+  add(
+    'Baseline 有 label',
+    true,
+    hasField(
+      baseline,
+      'label'
+    )
+  );
+
+  add(
+    '不收 objectValue',
+    false,
+    hasField(
+      baseline,
+      'objectValue'
+    )
+  );
+
+  add(
+    'During speed 1→3',
+    true,
+    changed(
+      during,
+      'speed',
+      1,
+      3
+    )
+  );
+
+  add(
+    'During isSpeedUp false→true',
+    true,
+    changed(
+      during,
+      'isSpeedUp',
+      false,
+      true
+    )
+  );
+
+  add(
+    'During counter 10→11',
+    true,
+    changed(
+      during,
+      'counter',
+      10,
+      11
+    )
+  );
+
+  add(
+    'Restored speed 3→1',
+    true,
+    changed(
+      restored,
+      'speed',
+      3,
+      1
+    )
+  );
+
+  add(
+    'Restored isSpeedUp true→false',
+    true,
+    changed(
+      restored,
+      'isSpeedUp',
+      true,
+      false
+    )
+  );
+
+  add(
+    'Restored counter 11→12',
+    true,
+    changed(
+      restored,
+      'counter',
+      11,
+      12
+    )
+  );
+
+  add(
+    '總 Sample 數',
+    3,
+    state.samples.length
+  );
+
+  add(
+    '記錄 baseline 標籤',
+    'baseline',
+    state.samples[0]?.label
+  );
+
+  add(
+    '記錄 during-spin 標籤',
+    'during-spin',
+    state.samples[1]?.label
+  );
+
+  add(
+    '記錄 restored 標籤',
+    'restored',
+    state.samples[2]?.label
+  );
+
+  add(
+    '完全沒有執行方法',
+    0,
+    methodCalls
+  );
+
+  add(
+    '完全沒有執行 Getter',
+    0,
+    getterCalls
+  );
+
+  add(
+    '沒有 setSpeed',
+    'undefined',
+    typeof Probe.setSpeed
+  );
+
+  add(
+    '沒有 speedUp',
+    'undefined',
+    typeof Probe.speedUp
+  );
+
+  add(
+    '沒有 invoke',
+    'undefined',
+    typeof Probe.invoke
+  );
+
+  Probe.reset();
+
+  add(
+    'Reset 後未 Attach',
+    false,
+    Probe.getState().attached
+  );
+
+  let passed = 0;
+
+  const html =
+    tests.map(test => {
+
+      if (test.ok) {
+        passed++;
+      }
+
+      return `
+        <div class="${test.ok ? 'ok' : 'fail'}">
+          ${test.ok ? '✅' : '❌'}
+          ${test.name}
+          ｜預期：${test.expected}
+          ｜實際：${test.actual}
+        </div>
+      `;
+    }).join('');
+
+  box.innerHTML =
+    html +
+    `<hr><b>結果：${passed} / ${tests.length} 通過</b>`;
+
+})();
+</script>
+
+</body>
+</html>
