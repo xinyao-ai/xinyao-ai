@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>芯瑤 ATG Component Structure Probe 測試</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  padding:30px 16px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei",sans-serif;
+  background:#fff6fa;
+  color:#59434d;
+}
+
+.wrap{
+  width:min(900px,100%);
+  margin:auto;
+}
+
+.card{
+  background:#fff;
+  border:1px solid #ffd3e3;
+  border-radius:20px;
+  padding:20px;
+  margin-bottom:16px;
+}
+
+h1{
+  margin-top:0;
+  color:#ef377e;
+}
+
+.notice{
+  padding:12px;
+  border-radius:12px;
+  background:#fff0f6;
+  line-height:1.7;
+}
+
+.ok{
+  color:#16865b;
+  font-weight:900;
+  line-height:1.9;
+}
+
+.fail{
+  color:#d83d58;
+  font-weight:900;
+  line-height:1.9;
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <div class="card">
+
+    <h1>
+      🌸 芯瑤 ATG Component Structure Probe 測試
+    </h1>
+
+    <div class="notice">
+      ⚠️ 只讀取 ComponentScheduler 的屬性名稱、型態與陣列長度。<br>
+      不呼叫裡面的函式、不修改資料、不加速、不按 Spin。
+    </div>
+
+  </div>
+
+  <div class="card">
+
+    <h3>🧪 Structure Probe 測試</h3>
+
+    <div id="result">
+      測試中…
+    </div>
+
+  </div>
+
+</div>
+
+
+<script src="./xinyao_ATG_component_structure_probe.js"></script>
+
+<script>
+(() => {
+
+  const box =
+    document.getElementById('result');
+
+
+  /* ======================================================
+     RED
+  ====================================================== */
+
+  if (
+    !window.XinyaoATGComponentStructureProbe
+  ) {
+
+    box.innerHTML =
+      '<div class="fail">❌ Component Structure Probe 尚未建立｜這次失敗是正常的</div>';
+
+    return;
+  }
+
+
+  const Probe =
+    window.XinyaoATGComponentStructureProbe;
+
+
+  /* ======================================================
+     Fake Runtime
+  ====================================================== */
+
+  let dangerousFunctionCalled =
+    false;
+
+
+  const reelA = {
+    name:'ReelA',
+    update(){}
+  };
+
+
+  const reelB = {
+    name:'ReelB',
+    update(){}
+  };
+
+
+  const fakeCompScheduler = {
+
+    _updating: {
+
+      _neg:{
+        array:[]
+      },
+
+      _zero:{
+        array:[
+          reelA,
+          reelB
+        ]
+      },
+
+      _pos:{
+        array:[]
+      }
+
+    },
+
+
+    _lateUpdating:{
+
+      _zero:{
+        array:[
+          reelA
+        ]
+      }
+
+    },
+
+
+    customBucket:{
+
+      active:true,
+
+      components:[
+        reelA,
+        reelB
+      ]
+
+    },
+
+
+    tick(){
+
+      dangerousFunctionCalled =
+        true;
+    }
+
+  };
+
+
+  /*
+    測試 circular reference
+  */
+  fakeCompScheduler.self =
+    fakeCompScheduler;
+
+
+  const fakeDirector = {
+
+    _compScheduler:
+      fakeCompScheduler
+
+  };
+
+
+  const fakeGlobals = {
+
+    cc:{
+
+      director:
+        fakeDirector
+
+    }
+
+  };
+
+
+  /* ======================================================
+     Inspect
+  ====================================================== */
+
+  Probe.reset();
+
+
+  const output =
+    Probe.inspect({
+
+      globals:
+        fakeGlobals,
+
+      maxDepth:
+        5,
+
+      maxArrayItems:
+        10
+
+    });
+
+
+  const state =
+    Probe.getState();
+
+
+  const tests = [];
+
+
+  function add(
+    name,
+    expected,
+    actual
+  ) {
+
+    tests.push({
+
+      name,
+
+      expected:
+        String(expected),
+
+      actual:
+        String(actual),
+
+      ok:
+        String(expected) ===
+        String(actual)
+
+    });
+  }
+
+
+  function findPath(
+    path
+  ) {
+
+    return output.entries.find(
+      item =>
+        item.path === path
+    );
+  }
+
+
+  /* ======================================================
+     基本偵測
+  ====================================================== */
+
+  add(
+    '找到 Director',
+    true,
+    state.hasDirector
+  );
+
+
+  add(
+    '找到 ComponentScheduler',
+    true,
+    state.hasComponentScheduler
+  );
+
+
+  add(
+    'Probe 模式',
+    'PASSIVE_COMPONENT_STRUCTURE_PROBE',
+    Probe.getMode()
+  );
+
+
+  /* ======================================================
+     Root 結構
+  ====================================================== */
+
+  add(
+    '有產生 entries',
+    true,
+    Array.isArray(
+      output.entries
+    )
+  );
+
+
+  add(
+    'Root 路徑存在',
+    true,
+    !!findPath(
+      '$componentScheduler'
+    )
+  );
+
+
+  /* ======================================================
+     _updating
+  ====================================================== */
+
+  add(
+    '_updating 存在',
+    true,
+    !!findPath(
+      '$componentScheduler._updating'
+    )
+  );
+
+
+  add(
+    '_updating._zero 存在',
+    true,
+    !!findPath(
+      '$componentScheduler._updating._zero'
+    )
+  );
+
+
+  const updateArray =
+    findPath(
+      '$componentScheduler._updating._zero.array'
+    );
+
+
+  add(
+    'update array 型態',
+    'array',
+    updateArray?.type
+  );
+
+
+  add(
+    'update array 長度',
+    2,
+    updateArray?.length
+  );
+
+
+  /* ======================================================
+     lateUpdating
+  ====================================================== */
+
+  const lateArray =
+    findPath(
+      '$componentScheduler._lateUpdating._zero.array'
+    );
+
+
+  add(
+    'lateUpdate array 存在',
+    true,
+    !!lateArray
+  );
+
+
+  add(
+    'lateUpdate array 長度',
+    1,
+    lateArray?.length
+  );
+
+
+  /* ======================================================
+     customBucket
+  ====================================================== */
+
+  const customComponents =
+    findPath(
+      '$componentScheduler.customBucket.components'
+    );
+
+
+  add(
+    '自訂 components 陣列有找到',
+    true,
+    !!customComponents
+  );
+
+
+  add(
+    '自訂 components 長度',
+    2,
+    customComponents?.length
+  );
+
+
+  /* ======================================================
+     Function 只能看不能執行
+  ====================================================== */
+
+  const tickEntry =
+    findPath(
+      '$componentScheduler.tick'
+    );
+
+
+  add(
+    'Function 型態有辨識',
+    'function',
+    tickEntry?.type
+  );
+
+
+  add(
+    '沒有執行 Function',
+    false,
+    dangerousFunctionCalled
+  );
+
+
+  /* ======================================================
+     Circular Reference
+  ====================================================== */
+
+  const selfEntry =
+    findPath(
+      '$componentScheduler.self'
+    );
+
+
+  add(
+    'Circular 有被標記',
+    true,
+    selfEntry?.circular
+  );
+
+
+  /* ======================================================
+     安全功能限制
+  ====================================================== */
+
+  add(
+    '沒有 setSpeed',
+    'undefined',
+    typeof Probe.setSpeed
+  );
+
+
+  add(
+    '沒有 Spin',
+    'undefined',
+    typeof Probe.spin
+  );
+
+
+  add(
+    '沒有下注控制',
+    'undefined',
+    typeof Probe.setBet
+  );
+
+
+  /* ======================================================
+     Reset
+  ====================================================== */
+
+  Probe.reset();
+
+
+  add(
+    'Reset 後 entries 清空',
+    0,
+    Probe.getLastResult()
+      .entries.length
+  );
+
+
+  /* ======================================================
+     Output
+  ====================================================== */
+
+  let passed =
+    0;
+
+
+  const html =
+    tests.map(test => {
+
+      if (test.ok) {
+        passed++;
+      }
+
+
+      return `
+        <div class="${
+          test.ok
+            ? 'ok'
+            : 'fail'
+        }">
+
+          ${
+            test.ok
+              ? '✅'
+              : '❌'
+          }
+
+          ${test.name}
+
+          ｜預期：
+          ${test.expected}
+
+          ｜實際：
+          ${test.actual}
+
+        </div>
+      `;
+
+    }).join('');
+
+
+  box.innerHTML =
+    html +
+    `<hr><b>結果：${passed} / ${tests.length} 通過</b>`;
+
+})();
+</script>
+
+</body>
+</html>
