@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>芯瑤 ATG Component Instance Probe 測試</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  padding:30px 16px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei",sans-serif;
+  background:#fff6fa;
+  color:#59434d;
+}
+
+.wrap{
+  width:min(900px,100%);
+  margin:auto;
+}
+
+.card{
+  background:#fff;
+  border:1px solid #ffd3e3;
+  border-radius:20px;
+  padding:20px;
+  margin-bottom:16px;
+}
+
+h1{
+  margin-top:0;
+  color:#ef377e;
+}
+
+.notice{
+  padding:12px;
+  border-radius:12px;
+  background:#fff0f6;
+  line-height:1.7;
+}
+
+.ok{
+  color:#16865b;
+  font-weight:900;
+  line-height:1.9;
+}
+
+.fail{
+  color:#d83d58;
+  font-weight:900;
+  line-height:1.9;
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <div class="card">
+
+    <h1>
+      🌸 芯瑤 ATG Component Instance Probe 測試
+    </h1>
+
+    <div class="notice">
+      ⚠️ 測試各個 Component 的 update / lateUpdate 呼叫紀錄。<br>
+      不修改 dt、不加速、不按 Spin、不改下注。
+    </div>
+
+  </div>
+
+  <div class="card">
+
+    <h3>🧪 Component Instance Probe 測試</h3>
+
+    <div id="result">
+      測試中…
+    </div>
+
+  </div>
+
+</div>
+
+
+<script src="./xinyao_ATG_component_instance_probe.js"></script>
+
+<script>
+(() => {
+
+  const box =
+    document.getElementById('result');
+
+
+  /*
+    RED：
+    Probe 尚未建立時失敗是正常的。
+  */
+  if (
+    !window.XinyaoATGComponentInstanceProbe
+  ) {
+
+    box.innerHTML =
+      '<div class="fail">❌ Component Instance Probe 尚未建立｜這次失敗是正常的</div>';
+
+    return;
+  }
+
+
+  const Probe =
+    window.XinyaoATGComponentInstanceProbe;
+
+
+  /* ======================================================
+     Fake Components
+  ====================================================== */
+
+  const originalReelUpdate =
+    function(dt) {
+
+      return `reel-${dt}`;
+    };
+
+
+  const originalReelLateUpdate =
+    function(dt) {
+
+      return `reel-late-${dt}`;
+    };
+
+
+  const originalIdleUpdate =
+    function(dt) {
+
+      return `idle-${dt}`;
+    };
+
+
+  const originalSymbolUpdate =
+    function(dt) {
+
+      return `symbol-${dt}`;
+    };
+
+
+  const reel = {
+
+    __classname__:
+      'ReelController',
+
+    node: {
+      name:'ReelNode'
+    },
+
+    update:
+      originalReelUpdate,
+
+    lateUpdate:
+      originalReelLateUpdate
+  };
+
+
+  const idle = {
+
+    __classname__:
+      'IdleDecoration',
+
+    node: {
+      name:'IdleNode'
+    },
+
+    update:
+      originalIdleUpdate
+  };
+
+
+  const symbol = {
+
+    __classname__:
+      'SymbolController',
+
+    node: {
+      name:'SymbolNode'
+    },
+
+    update:
+      originalSymbolUpdate
+  };
+
+
+  /* ======================================================
+     模擬 Cocos ComponentScheduler 結構
+  ====================================================== */
+
+  const fakeCompScheduler = {
+
+    _updating: {
+
+      _neg: {
+        array:[]
+      },
+
+      _zero: {
+        array:[
+          reel,
+          idle,
+          symbol
+        ]
+      },
+
+      _pos: {
+        array:[]
+      }
+    },
+
+
+    _lateUpdating: {
+
+      _neg: {
+        array:[]
+      },
+
+      _zero: {
+        array:[
+          reel
+        ]
+      },
+
+      _pos: {
+        array:[]
+      }
+    }
+  };
+
+
+  const fakeDirector = {
+
+    _compScheduler:
+      fakeCompScheduler
+  };
+
+
+  const fakeCC = {
+
+    director:
+      fakeDirector
+  };
+
+
+  const fakeGlobals = {
+
+    cc:
+      fakeCC
+  };
+
+
+  /* ======================================================
+     Install
+  ====================================================== */
+
+  Probe.reset();
+
+
+  Probe.install({
+    globals:
+      fakeGlobals
+  });
+
+
+  const tests = [];
+
+
+  function add(
+    name,
+    expected,
+    actual
+  ) {
+
+    tests.push({
+
+      name,
+
+      expected:
+        String(expected),
+
+      actual:
+        String(actual),
+
+      ok:
+        String(expected) ===
+        String(actual)
+
+    });
+  }
+
+
+  function component(
+    name
+  ) {
+
+    return Probe
+      .snapshot()
+      .components
+      .find(
+        item =>
+          item.name === name
+      );
+  }
+
+
+  /* ======================================================
+     Discovery
+  ====================================================== */
+
+  let state =
+    Probe.getState();
+
+
+  add(
+    '安裝狀態',
+    true,
+    state.installed
+  );
+
+
+  add(
+    '找到 Director',
+    true,
+    state.hasDirector
+  );
+
+
+  add(
+    '找到 ComponentScheduler',
+    true,
+    state.hasComponentScheduler
+  );
+
+
+  add(
+    '找到 3 個 Component',
+    3,
+    state.discoveredComponents
+  );
+
+
+  add(
+    '包裝 3 個 update',
+    3,
+    state.wrappedUpdates
+  );
+
+
+  add(
+    '包裝 1 個 lateUpdate',
+    1,
+    state.wrappedLateUpdates
+  );
+
+
+  /* ======================================================
+     模擬遊戲執行
+  ====================================================== */
+
+  const reelReturn1 =
+    reel.update(
+      0.0167
+    );
+
+
+  const idleReturn =
+    idle.update(
+      0.0167
+    );
+
+
+  const symbolReturn1 =
+    symbol.update(
+      0.0167
+    );
+
+
+  const reelReturn2 =
+    reel.update(
+      0.0167
+    );
+
+
+  const symbolReturn2 =
+    symbol.update(
+      0.0167
+    );
+
+
+  const reelLateReturn =
+    reel.lateUpdate(
+      0.0167
+    );
+
+
+  /* ======================================================
+     Reel
+  ====================================================== */
+
+  add(
+    'Reel update 次數',
+    2,
+    component(
+      'ReelController'
+    ).updateCount
+  );
+
+
+  add(
+    'Reel lateUpdate 次數',
+    1,
+    component(
+      'ReelController'
+    ).lateUpdateCount
+  );
+
+
+  add(
+    'Reel 總呼叫',
+    3,
+    component(
+      'ReelController'
+    ).totalCalls
+  );
+
+
+  add(
+    'Reel 最後 dt',
+    0.0167,
+    component(
+      'ReelController'
+    ).lastDt
+  );
+
+
+  add(
+    'Reel Node 名稱',
+    'ReelNode',
+    component(
+      'ReelController'
+    ).nodeName
+  );
+
+
+  /* ======================================================
+     Idle
+  ====================================================== */
+
+  add(
+    'Idle update 次數',
+    1,
+    component(
+      'IdleDecoration'
+    ).updateCount
+  );
+
+
+  add(
+    'Idle lateUpdate 次數',
+    0,
+    component(
+      'IdleDecoration'
+    ).lateUpdateCount
+  );
+
+
+  /* ======================================================
+     Symbol
+  ====================================================== */
+
+  add(
+    'Symbol update 次數',
+    2,
+    component(
+      'SymbolController'
+    ).updateCount
+  );
+
+
+  add(
+    'Symbol Node 名稱',
+    'SymbolNode',
+    component(
+      'SymbolController'
+    ).nodeName
+  );
+
+
+  /* ======================================================
+     原函式回傳值不可破壞
+  ====================================================== */
+
+  add(
+    'Reel update 回傳值保留',
+    'reel-0.0167',
+    reelReturn1
+  );
+
+
+  add(
+    'Idle update 回傳值保留',
+    'idle-0.0167',
+    idleReturn
+  );
+
+
+  add(
+    'Symbol update 回傳值保留',
+    'symbol-0.0167',
+    symbolReturn1
+  );
+
+
+  add(
+    'Reel lateUpdate 回傳值保留',
+    'reel-late-0.0167',
+    reelLateReturn
+  );
+
+
+  /* ======================================================
+     排行榜
+  ====================================================== */
+
+  const ranking =
+    Probe
+      .snapshot()
+      .ranking;
+
+
+  add(
+    '排行榜第一名',
+    'ReelController',
+    ranking[0].name
+  );
+
+
+  add(
+    '第一名總呼叫',
+    3,
+    ranking[0].totalCalls
+  );
+
+
+  /* ======================================================
+     安全條件
+  ====================================================== */
+
+  add(
+    'Probe 模式',
+    'PASSIVE_COMPONENT_INSTANCE_PROBE',
+    Probe.getMode()
+  );
+
+
+  add(
+    '沒有 setSpeed',
+    'undefined',
+    typeof Probe.setSpeed
+  );
+
+
+  add(
+    '沒有 Spin',
+    'undefined',
+    typeof Probe.spin
+  );
+
+
+  add(
+    '沒有下注功能',
+    'undefined',
+    typeof Probe.setBet
+  );
+
+
+  /* ======================================================
+     Reset Counts
+  ====================================================== */
+
+  Probe.resetCounts();
+
+
+  add(
+    '清零後 Reel 呼叫數',
+    0,
+    component(
+      'ReelController'
+    ).totalCalls
+  );
+
+
+  /* ======================================================
+     Uninstall
+  ====================================================== */
+
+  Probe.uninstall();
+
+
+  state =
+    Probe.getState();
+
+
+  add(
+    '卸載狀態',
+    false,
+    state.installed
+  );
+
+
+  add(
+    'Reel update 已恢復',
+    true,
+    reel.update ===
+      originalReelUpdate
+  );
+
+
+  add(
+    'Reel lateUpdate 已恢復',
+    true,
+    reel.lateUpdate ===
+      originalReelLateUpdate
+  );
+
+
+  add(
+    'Idle update 已恢復',
+    true,
+    idle.update ===
+      originalIdleUpdate
+  );
+
+
+  add(
+    'Symbol update 已恢復',
+    true,
+    symbol.update ===
+      originalSymbolUpdate
+  );
+
+
+  /* ======================================================
+     Output
+  ====================================================== */
+
+  let passed = 0;
+
+
+  const html =
+    tests.map(test => {
+
+      if (test.ok) {
+        passed++;
+      }
+
+      return `
+        <div class="${
+          test.ok
+            ? 'ok'
+            : 'fail'
+        }">
+
+          ${
+            test.ok
+              ? '✅'
+              : '❌'
+          }
+
+          ${test.name}
+
+          ｜預期：
+          ${test.expected}
+
+          ｜實際：
+          ${test.actual}
+
+        </div>
+      `;
+
+    }).join('');
+
+
+  box.innerHTML =
+    html +
+    `<hr><b>結果：${passed} / ${tests.length} 通過</b>`;
+
+})();
+</script>
+
+</body>
+</html>
