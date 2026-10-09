@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.2.1
+// @version      3.2.2
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；整合 Unified Speed 極速模式與後台一鍵維護模式。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -1956,6 +1956,12 @@ setInterval(xinyaoCheckMaintenance, 10000);
   function render() {
     if (!panel) return;
 
+    // 極速模式控制列由後段模組建立。
+    // 每次即時資料更新時主面板都會重繪；先把控制列從 DOM 暫時取下，
+    // 重繪完成後立即接回，避免每轉一次就消失 / 出現造成閃爍。
+    const preservedSpeedSection = panel.querySelector('#xinyaoUnifiedSpeedSection');
+    if (preservedSpeedSection) preservedSpeedSection.remove();
+
     if (minimized) {
       panel.innerHTML = `
         <div id="xinyaoHeader" style="font-weight:800;font-size:13px;cursor:pointer;">🌸 芯瑤 ATG</div>
@@ -2002,6 +2008,10 @@ setInterval(xinyaoCheckMaintenance, 10000);
       <div style="margin-top:2px;text-align:right;font-size:9px;opacity:.45;">本房資料：換房時重新記錄進房金額；同房重新整理會保留</div>
       ${pairBox}
     `;
+
+    if (preservedSpeedSection) {
+      panel.appendChild(preservedSpeedSection);
+    }
 
     bindPanelEvents();
   }
