@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.1.29
-// @description  電腦 / iOS / Android 共用 ATG 即時資料助手；支援後台一鍵維護模式。
+// @version      3.2.0
+// @description  電腦 / iOS / Android 共用 ATG 即時資料助手；整合 Unified Speed 極速模式與後台一鍵維護模式。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -5607,4 +5607,362 @@ setInterval(xinyaoCheckMaintenance, 10000);
   } else {
     waitForPairThenCreatePanel();
   }
+})();
+/* ===== 芯瑤 ATG Unified Speed v1.0｜整合至即時助手 ===== */
+(() => {
+  'use strict';
+
+  if (window.__XIANYAO_ATG_UNIFIED_SPEED_INTEGRATED__) return;
+  window.__XIANYAO_ATG_UNIFIED_SPEED_INTEGRATED__ = true;
+
+  const SPEED_VERSION = '1.0.0';
+  const SPEED_KEY = 'xinyao_atg_unified_speed_v1';
+  const SPEEDS = [1, 3, 5, 8, 10, 12, 16];
+  const DEFAULT_SPEED = 10;
+  const CLEAR_MAX_DURATION = 0.06;
+  const GAP_MAX_DELAY = 0.05;
+  const MIN_DURATION = 0.006;
+  const MIN_DELAY = 0.01;
+  const MAX_VISUAL_WAIT = 2.5;
+  const PATCH_MARK = '__xinyaoUnifiedSpeedIntegratedV100';
+  const BASE_DURATION = new WeakMap();
+
+  const speedState = {
+    speed: DEFAULT_SPEED,
+    tweenPatched: 0,
+    schedulePatched: 0,
+    tweenStarts: 0,
+    waitsScaled: 0,
+    lastPatchedAt: 0
+  };
+
+  function safe(fn, fallback = null) {
+    try {
+      const value = fn();
+      return value === undefined ? fallback : value;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function finite(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function loadSpeed() {
+    try {
+      const saved = finite(localStorage.getItem(SPEED_KEY));
+      if (saved !== null && SPEEDS.includes(saved)) return saved;
+    } catch (_) {}
+    return DEFAULT_SPEED;
+  }
+
+  function effectiveSpeed() {
+    if (window.__XIANYAO_MAINTENANCE_STATE__?.enabled) return 1;
+    return SPEEDS.includes(speedState.speed) ? speedState.speed : DEFAULT_SPEED;
+  }
+
+  function saveSpeed(value) {
+    try { localStorage.setItem(SPEED_KEY, String(value)); } catch (_) {}
+  }
+
+  function setSpeed(value, persist = true) {
+    const next = finite(value);
+    if (next === null || !SPEEDS.includes(next)) return false;
+    speedState.speed = next;
+    if (persist) saveSpeed(next);
+    updateSpeedUi();
+    try {
+      window.dispatchEvent(new CustomEvent('xinyao:speed-changed', {
+        detail: { speed: next, effectiveSpeed: effectiveSpeed(), version: SPEED_VERSION }
+      }));
+    } catch (_) {}
+    return true;
+  }
+
+  speedState.speed = loadSpeed();
+
+  function nodePath(node) {
+    const parts = [];
+    let current = node;
+    for (let i = 0; current && i < 12; i += 1) {
+      const name = safe(() => current.name, '') || '';
+      if (name) parts.unshift(String(name));
+      current = safe(() => current.parent, null) || safe(() => current._parent, null);
+    }
+    return parts.join('/');
+  }
+
+  function componentName(component) {
+    return String(
+      safe(() => component?.__classname__, '') ||
+      safe(() => component?.constructor?.__classname__, '') ||
+      safe(() => component?.constructor?.name, '') ||
+      ''
+    );
+  }
+
+  function relatedTarget(target) {
+    if (!target) return false;
+    const node = safe(() => target.node, null) || (safe(() => target.name, null) ? target : null);
+    const text = `${componentName(target)} ${safe(() => target.name, '') || ''} ${nodePath(node)}`;
+    return /(Symbol|Reel|Slot|Cascade|Spin|GameView|WinView|BigwinView|InfoBar|CurrentTimesView|Pay|Clear|Combo)/i.test(text);
+  }
+
+  function relatedComponent(component) {
+    if (!component) return false;
+    const text = `${componentName(component)} ${nodePath(safe(() => component.node, null))}`;
+    return /(Symbol|Reel|Slot|Cascade|SpinButton|GameView|WinView|BigwinView|InfoBar|CurrentTimesView|Pay|Clear|Combo)/i.test(text);
+  }
+
+  function actionTag(action) {
+    const viaMethod = finite(safe(() => action?.getTag?.(), null));
+    if (viaMethod !== null) return viaMethod;
+    return finite(safe(() => action?._tag, null));
+  }
+
+  function scaleDuration(base, speed, tag) {
+    if (!(base > 0) || speed <= 1) return base;
+    let next = base / speed;
+    if (tag === 1234) next = Math.min(next, CLEAR_MAX_DURATION);
+    return Math.max(MIN_DURATION, next);
+  }
+
+  function tuneActionTree(root, targetIsRelated) {
+    if (!root || (typeof root !== 'object' && typeof root !== 'function')) return;
+    const seen = new WeakSet();
+
+    function visit(value, depth, inheritedTagged = false) {
+      if (!value || (typeof value !== 'object' && typeof value !== 'function')) return;
+      if (depth > 10 || seen.has(value)) return;
+      seen.add(value);
+
+      const tag = actionTag(value);
+      const tagged = inheritedTagged || tag === 1234 || tag === 5678;
+      const shouldScale = targetIsRelated || tagged;
+
+      const duration = finite(safe(() => value._duration, null));
+      if (shouldScale && duration !== null && duration > 0) {
+        if (!BASE_DURATION.has(value)) BASE_DURATION.set(value, duration);
+        const base = BASE_DURATION.get(value);
+        const next = scaleDuration(base, effectiveSpeed(), tag);
+        try { value._duration = next; } catch (_) {}
+      }
+
+      let entries = [];
+      try { entries = Object.entries(value); } catch (_) { return; }
+      for (const [key, child] of entries) {
+        if (
+          key === '_target' || key === 'target' || key === '_owner' || key === 'owner' ||
+          key === '_node' || key === 'node' || key === '_eventTargets' || key === '_listeners'
+        ) continue;
+
+        if (Array.isArray(child)) {
+          for (const item of child) visit(item, depth + 1, tagged);
+        } else if (child && (typeof child === 'object' || typeof child === 'function')) {
+          visit(child, depth + 1, tagged);
+        }
+      }
+    }
+
+    visit(root, 0, false);
+  }
+
+  function patchTweenForWindow(win) {
+    const cc = safe(() => win.cc, null) || safe(() => win.legacyCC, null) || safe(() => win._cc, null);
+    const proto = safe(() => cc?.Tween?.prototype, null);
+    if (!proto || typeof proto.start !== 'function' || proto.start[PATCH_MARK]) return false;
+
+    const nativeStart = proto.start;
+    const wrappedStart = function (...args) {
+      try {
+        const target = safe(() => this._target, null) || safe(() => this.target, null);
+        const related = relatedTarget(target);
+        tuneActionTree(this, related);
+        speedState.tweenStarts += 1;
+      } catch (_) {}
+      return nativeStart.apply(this, args);
+    };
+
+    try { Object.defineProperty(wrappedStart, PATCH_MARK, { value: true }); } catch (_) { wrappedStart[PATCH_MARK] = true; }
+    try {
+      proto.start = wrappedStart;
+      speedState.tweenPatched += 1;
+      speedState.lastPatchedAt = Date.now();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function patchScheduleForWindow(win) {
+    const cc = safe(() => win.cc, null) || safe(() => win.legacyCC, null) || safe(() => win._cc, null);
+    const proto = safe(() => cc?.Component?.prototype, null);
+    if (!proto || typeof proto.scheduleOnce !== 'function' || proto.scheduleOnce[PATCH_MARK]) return false;
+
+    const nativeScheduleOnce = proto.scheduleOnce;
+    const wrappedScheduleOnce = function (callback, delay = 0, ...rest) {
+      let nextDelay = delay;
+      try {
+        const raw = finite(delay);
+        const speed = effectiveSpeed();
+        if (raw !== null && raw > 0 && raw <= MAX_VISUAL_WAIT && speed > 1 && relatedComponent(this)) {
+          nextDelay = Math.max(MIN_DELAY, Math.min(raw / speed, GAP_MAX_DELAY));
+          speedState.waitsScaled += 1;
+        }
+      } catch (_) {}
+      return nativeScheduleOnce.call(this, callback, nextDelay, ...rest);
+    };
+
+    try { Object.defineProperty(wrappedScheduleOnce, PATCH_MARK, { value: true }); } catch (_) { wrappedScheduleOnce[PATCH_MARK] = true; }
+    try {
+      proto.scheduleOnce = wrappedScheduleOnce;
+      speedState.schedulePatched += 1;
+      speedState.lastPatchedAt = Date.now();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function collectSameOriginWindows(root = window) {
+    const out = [];
+    const seen = new Set();
+    const visit = win => {
+      if (!win || seen.has(win)) return;
+      seen.add(win);
+      out.push(win);
+      let frames = [];
+      try { frames = [...win.document.querySelectorAll('iframe')]; } catch (_) {}
+      for (const frame of frames) {
+        try {
+          const child = frame.contentWindow;
+          if (!child) continue;
+          void child.document;
+          visit(child);
+        } catch (_) {}
+      }
+    };
+    visit(root);
+    return out;
+  }
+
+  function patchAll() {
+    for (const win of collectSameOriginWindows()) {
+      patchTweenForWindow(win);
+      patchScheduleForWindow(win);
+    }
+    updateSpeedUi();
+  }
+
+  function ensureSpeedStyle() {
+    if (document.getElementById('xinyao-atg-unified-speed-style')) return;
+    const style = document.createElement('style');
+    style.id = 'xinyao-atg-unified-speed-style';
+    style.textContent = `
+      #xinyaoATGLiveV200 #xinyaoUnifiedSpeedSection{margin-top:7px;padding-top:7px;border-top:1px solid rgba(255,255,255,.14)}
+      #xinyaoATGLiveV200 .xinyaoSpeedTitle{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px;font-size:11px;font-weight:800}
+      #xinyaoATGLiveV200 .xinyaoSpeedTitle b{color:#ffb8d4;font-size:12px}
+      #xinyaoATGLiveV200 .xinyaoSpeedGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+      #xinyaoATGLiveV200 .xinyaoSpeedBtn{border:1px solid rgba(255,255,255,.18);border-radius:7px;background:rgba(255,255,255,.08);color:#fff;padding:5px 2px;font-size:9px;font-weight:800;cursor:pointer}
+      #xinyaoATGLiveV200 .xinyaoSpeedBtn.active{background:#ff5f9e;border-color:#ff8fba}
+      #xinyaoATGLiveV200 .xinyaoSpeedMeta{margin-top:4px;font-size:8px;opacity:.58;line-height:1.35}
+    `;
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  function speedSectionHtml() {
+    const current = speedState.speed;
+    const effective = effectiveSpeed();
+    const maintenance = Boolean(window.__XIANYAO_MAINTENANCE_STATE__?.enabled);
+    const buttons = SPEEDS.map(value =>
+      `<button type="button" class="xinyaoSpeedBtn${value === current ? ' active' : ''}" data-xinyao-speed="${value}">${value}×</button>`
+    ).join('');
+
+    return `
+      <div id="xinyaoUnifiedSpeedSection">
+        <div class="xinyaoSpeedTitle">
+          <span>⚡ 芯瑤 ATG 極速模式</span>
+          <b id="xinyaoSpeedCurrent">${maintenance ? '維護中' : `${effective}×`}</b>
+        </div>
+        <div class="xinyaoSpeedGrid">${buttons}</div>
+        <div class="xinyaoSpeedMeta" id="xinyaoSpeedMeta">Tween ${speedState.tweenPatched ? '✓' : '…'}｜等待 ${speedState.schedulePatched ? '✓' : '…'}｜不修改下注、餘額與遊戲結果</div>
+      </div>
+    `;
+  }
+
+  function bindSpeedButtons(section) {
+    for (const button of section.querySelectorAll('[data-xinyao-speed]')) {
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        setSpeed(Number(button.dataset.xinyaoSpeed));
+      });
+    }
+  }
+
+  function ensureSpeedUi() {
+    ensureSpeedStyle();
+    const livePanel = document.getElementById('xinyaoATGLiveV200');
+    if (!livePanel) return;
+
+    // 收合狀態只保留原本的迷你標題，不額外塞控制列。
+    if (!livePanel.querySelector('.xinyaoRow')) return;
+
+    let section = livePanel.querySelector('#xinyaoUnifiedSpeedSection');
+    if (!section) {
+      livePanel.insertAdjacentHTML('beforeend', speedSectionHtml());
+      section = livePanel.querySelector('#xinyaoUnifiedSpeedSection');
+      if (section) bindSpeedButtons(section);
+      return;
+    }
+
+    updateSpeedUi();
+  }
+
+  function updateSpeedUi() {
+    const section = document.getElementById('xinyaoUnifiedSpeedSection');
+    if (!section) return;
+
+    const maintenance = Boolean(window.__XIANYAO_MAINTENANCE_STATE__?.enabled);
+    const currentEl = section.querySelector('#xinyaoSpeedCurrent');
+    if (currentEl) currentEl.textContent = maintenance ? '維護中' : `${effectiveSpeed()}×`;
+
+    for (const button of section.querySelectorAll('[data-xinyao-speed]')) {
+      button.classList.toggle('active', Number(button.dataset.xinyaoSpeed) === speedState.speed);
+    }
+
+    const meta = section.querySelector('#xinyaoSpeedMeta');
+    if (meta) {
+      meta.textContent = `Tween ${speedState.tweenPatched ? '✓' : '…'}｜等待 ${speedState.schedulePatched ? '✓' : '…'}｜不修改下注、餘額與遊戲結果`;
+    }
+  }
+
+  window.__XIANYAO_ATG_UNIFIED_SPEED__ = {
+    version: SPEED_VERSION,
+    get speed() { return speedState.speed; },
+    get effectiveSpeed() { return effectiveSpeed(); },
+    setSpeed,
+    getState() {
+      return {
+        version: SPEED_VERSION,
+        speed: speedState.speed,
+        effectiveSpeed: effectiveSpeed(),
+        tweenPatched: speedState.tweenPatched,
+        schedulePatched: speedState.schedulePatched,
+        tweenStarts: speedState.tweenStarts,
+        waitsScaled: speedState.waitsScaled
+      };
+    }
+  };
+
+  try {
+    window.addEventListener('xinyao:maintenance', () => updateSpeedUi());
+  } catch (_) {}
+
+  patchAll();
+  ensureSpeedUi();
+  setInterval(patchAll, 500);
+  setInterval(ensureSpeedUi, 250);
 })();
