@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.2.0
+// @version      3.2.1
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；整合 Unified Speed 極速模式與後台一鍵維護模式。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -5867,7 +5867,6 @@ setInterval(xinyaoCheckMaintenance, 10000);
       #xinyaoATGLiveV200 .xinyaoSpeedGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
       #xinyaoATGLiveV200 .xinyaoSpeedBtn{border:1px solid rgba(255,255,255,.18);border-radius:7px;background:rgba(255,255,255,.08);color:#fff;padding:5px 2px;font-size:9px;font-weight:800;cursor:pointer}
       #xinyaoATGLiveV200 .xinyaoSpeedBtn.active{background:#ff5f9e;border-color:#ff8fba}
-      #xinyaoATGLiveV200 .xinyaoSpeedMeta{margin-top:4px;font-size:8px;opacity:.58;line-height:1.35}
     `;
     (document.head || document.documentElement).appendChild(style);
   }
@@ -5887,7 +5886,6 @@ setInterval(xinyaoCheckMaintenance, 10000);
           <b id="xinyaoSpeedCurrent">${maintenance ? '維護中' : `${effective}×`}</b>
         </div>
         <div class="xinyaoSpeedGrid">${buttons}</div>
-        <div class="xinyaoSpeedMeta" id="xinyaoSpeedMeta">Tween ${speedState.tweenPatched ? '✓' : '…'}｜等待 ${speedState.schedulePatched ? '✓' : '…'}｜不修改下注、餘額與遊戲結果</div>
       </div>
     `;
   }
@@ -5933,10 +5931,6 @@ setInterval(xinyaoCheckMaintenance, 10000);
       button.classList.toggle('active', Number(button.dataset.xinyaoSpeed) === speedState.speed);
     }
 
-    const meta = section.querySelector('#xinyaoSpeedMeta');
-    if (meta) {
-      meta.textContent = `Tween ${speedState.tweenPatched ? '✓' : '…'}｜等待 ${speedState.schedulePatched ? '✓' : '…'}｜不修改下注、餘額與遊戲結果`;
-    }
   }
 
   window.__XIANYAO_ATG_UNIFIED_SPEED__ = {
