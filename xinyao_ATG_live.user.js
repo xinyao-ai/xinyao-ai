@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.2.3
+// @version      3.2.4
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；整合 Unified Speed 極速模式與後台一鍵維護模式。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -3334,7 +3334,9 @@ setInterval(xinyaoCheckMaintenance, 10000);
     calibrationPendingPointer: null,
     calibrationThenScan: false,
     autoTimer: null,
-    renderTimer: null
+    renderTimer: null,
+    // v3.2.4：手機滑動全房分析時暫停重建 DOM，避免手指滑動被即時刷新打斷。
+    panelInteractingUntil: 0
   };
 
   function clearStoredFullScanSession() {
@@ -5392,10 +5394,11 @@ setInterval(xinyaoCheckMaintenance, 10000);
   function render() {
     if (!state.panel) return;
 
-    // 手機上 ATG 資料更新很頻繁。使用者按住「同步到芯瑤」到 click 發生前，
-    // 暫停重建面板，避免真正的 <a> 在 pointerdown / click 之間被替換掉。
-    if (Date.now() < syncLinkArmedUntil) {
-      const wait = Math.max(30, syncLinkArmedUntil - Date.now() + 20);
+    // 手機上 ATG 資料更新很頻繁。使用者正在按按鈕或上下滑動面板時，
+    // 暫停重建 DOM，避免 pointer / touch 手勢被即時刷新打斷。
+    const renderHoldUntil = Math.max(syncLinkArmedUntil, state.panelInteractingUntil || 0);
+    if (Date.now() < renderHoldUntil) {
+      const wait = Math.max(30, renderHoldUntil - Date.now() + 20);
       if (!state.renderTimer) {
         state.renderTimer = setTimeout(() => {
           state.renderTimer = null;
@@ -5404,6 +5407,9 @@ setInterval(xinyaoCheckMaintenance, 10000);
       }
       return;
     }
+
+    // 重新整理內容後保留使用者目前的捲動位置。
+    const previousPanelScrollTop = state.panel.scrollTop || 0;
 
     const count = numberedCount();
     const expected = state.totalTableCount || '?';
@@ -5475,9 +5481,19 @@ setInterval(xinyaoCheckMaintenance, 10000);
         </div>` : ''}`;
     }
 
-    state.panel.style.width = ui.expanded ? '520px' : '330px';
-    state.panel.style.maxHeight = ui.expanded ? '88vh' : 'none';
-    state.panel.style.overflow = ui.expanded ? 'auto' : 'visible';
+    // v3.2.4：全房分析在手機橫向／直向都限制在可視高度內，
+    // 不論收合或完整分析都能直接在面板內上下滑動。
+    const viewportHeightUnit = window.CSS?.supports?.('height: 100dvh') ? '100dvh' : '100vh';
+    state.panel.style.width = ui.expanded
+      ? 'min(520px, calc(100vw - 24px))'
+      : 'min(330px, calc(100vw - 24px))';
+    state.panel.style.maxWidth = 'calc(100vw - 24px)';
+    state.panel.style.maxHeight = `calc(${viewportHeightUnit} - 24px)`;
+    state.panel.style.overflowX = 'hidden';
+    state.panel.style.overflowY = 'auto';
+    state.panel.style.webkitOverflowScrolling = 'touch';
+    state.panel.style.overscrollBehavior = 'contain';
+    state.panel.style.touchAction = 'pan-y';
 
     state.panel.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px;">
@@ -5518,6 +5534,11 @@ setInterval(xinyaoCheckMaintenance, 10000);
     `;
 
     bindUiEvents();
+
+    // innerHTML 會被即時資料更新重建；還原位置避免畫面每次更新跳回最上方。
+    if (previousPanelScrollTop > 0) {
+      state.panel.scrollTop = previousPanelScrollTop;
+    }
   }
 
   function inputStyle() {
@@ -5545,9 +5566,19 @@ setInterval(xinyaoCheckMaintenance, 10000);
     if (state.panel || !document.body) return;
     const panel = document.createElement('div');
     panel.id = 'xinyao-atg-room-scanner';
-    panel.style.cssText = 'position:fixed;top:12px;right:12px;width:330px;z-index:2147483647;background:rgba(22,18,28,.97);color:#fff;padding:12px;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.38);font-family:Arial,"Microsoft JhengHei",sans-serif;box-sizing:border-box;';
+    panel.style.cssText = 'position:fixed;top:12px;right:12px;width:min(330px,calc(100vw - 24px));max-width:calc(100vw - 24px);max-height:calc(100vh - 24px);overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;z-index:2147483647;background:rgba(22,18,28,.97);color:#fff;padding:12px;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.38);font-family:Arial,"Microsoft JhengHei",sans-serif;box-sizing:border-box;';
     document.body.appendChild(panel);
     state.panel = panel;
+
+    // 手機手指正在滑動時先不要重建 panel，否則頻繁的掃描資料更新會中斷捲動。
+    const holdPanelInteraction = (ms = 700) => {
+      state.panelInteractingUntil = Date.now() + ms;
+    };
+    panel.addEventListener('touchstart', () => holdPanelInteraction(900), { passive: true, capture: true });
+    panel.addEventListener('touchmove', () => holdPanelInteraction(900), { passive: true, capture: true });
+    panel.addEventListener('touchend', () => holdPanelInteraction(350), { passive: true, capture: true });
+    panel.addEventListener('scroll', () => holdPanelInteraction(500), { passive: true });
+    panel.addEventListener('wheel', () => holdPanelInteraction(500), { passive: true, capture: true });
 
     // 使用固定在 panel 本體上的 pointerdown 事件代理。
     // ATG 即時資料很頻繁，render() 會重建 panel 內容；若把 click 綁在每顆
