@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.2.4
+// @version      3.2.5
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；整合 Unified Speed 極速模式與後台一鍵維護模式。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -5481,18 +5481,34 @@ setInterval(xinyaoCheckMaintenance, 10000);
         </div>` : ''}`;
     }
 
-    // v3.2.4：全房分析在手機橫向／直向都限制在可視高度內，
-    // 不論收合或完整分析都能直接在面板內上下滑動。
-    const viewportHeightUnit = window.CSS?.supports?.('height: 100dvh') ? '100dvh' : '100vh';
+    // v3.2.5：完整分析在手機版直接固定於「可視畫面」上下邊界，
+    // 不再只依賴 100vh / 100dvh；Safari / Firefox 橫向工具列出現時也不會把底部內容裁掉。
+    const visualHeight = Math.max(220, Math.floor(
+      window.visualViewport?.height ||
+      window.innerHeight ||
+      document.documentElement?.clientHeight ||
+      600
+    ));
     state.panel.style.width = ui.expanded
-      ? 'min(520px, calc(100vw - 24px))'
-      : 'min(330px, calc(100vw - 24px))';
-    state.panel.style.maxWidth = 'calc(100vw - 24px)';
-    state.panel.style.maxHeight = `calc(${viewportHeightUnit} - 24px)`;
+      ? 'min(520px, calc(100vw - 16px))'
+      : 'min(330px, calc(100vw - 16px))';
+    state.panel.style.maxWidth = 'calc(100vw - 16px)';
+    state.panel.style.top = '8px';
+    if (ui.expanded) {
+      // top + bottom 同時指定，讓完整分析永遠只佔目前可見畫面；內容超出就由 panel 自己捲動。
+      state.panel.style.bottom = '8px';
+      state.panel.style.height = 'auto';
+      state.panel.style.maxHeight = 'none';
+    } else {
+      state.panel.style.bottom = 'auto';
+      state.panel.style.height = 'auto';
+      state.panel.style.maxHeight = `${Math.max(180, visualHeight - 16)}px`;
+    }
     state.panel.style.overflowX = 'hidden';
-    state.panel.style.overflowY = 'auto';
+    state.panel.style.overflowY = 'scroll';
     state.panel.style.webkitOverflowScrolling = 'touch';
     state.panel.style.overscrollBehavior = 'contain';
+    state.panel.style.overscrollBehaviorY = 'contain';
     state.panel.style.touchAction = 'pan-y';
 
     state.panel.innerHTML = `
@@ -5574,11 +5590,49 @@ setInterval(xinyaoCheckMaintenance, 10000);
     const holdPanelInteraction = (ms = 700) => {
       state.panelInteractingUntil = Date.now() + ms;
     };
-    panel.addEventListener('touchstart', () => holdPanelInteraction(900), { passive: true, capture: true });
-    panel.addEventListener('touchmove', () => holdPanelInteraction(900), { passive: true, capture: true });
-    panel.addEventListener('touchend', () => holdPanelInteraction(350), { passive: true, capture: true });
-    panel.addEventListener('scroll', () => holdPanelInteraction(500), { passive: true });
-    panel.addEventListener('wheel', () => holdPanelInteraction(500), { passive: true, capture: true });
+
+    // v3.2.5：ATG/Cocos 在部分手機瀏覽器會攔截 touchmove，
+    // 導致 CSS 明明有 overflow-y:auto 仍完全滑不動。
+    // 這裡直接把手指的垂直位移轉成 panel.scrollTop，讓 iOS / Android 都能真正捲動。
+    let touchStartY = null;
+    let touchStartScrollTop = 0;
+
+    panel.addEventListener('touchstart', event => {
+      const touch = event.touches?.[0];
+      if (!touch) return;
+      touchStartY = touch.clientY;
+      touchStartScrollTop = panel.scrollTop || 0;
+      holdPanelInteraction(1200);
+    }, { passive: true, capture: true });
+
+    panel.addEventListener('touchmove', event => {
+      const touch = event.touches?.[0];
+      if (!touch || touchStartY === null) return;
+
+      const deltaY = touchStartY - touch.clientY;
+      if (Math.abs(deltaY) < 2) return;
+
+      const maxScroll = Math.max(0, panel.scrollHeight - panel.clientHeight);
+      if (maxScroll <= 0) return;
+
+      panel.scrollTop = Math.max(0, Math.min(maxScroll, touchStartScrollTop + deltaY));
+      holdPanelInteraction(1200);
+
+      // 阻止底下 Cocos 遊戲把同一個滑動手勢吃掉。
+      if (event.cancelable) event.preventDefault();
+      event.stopPropagation();
+    }, { passive: false, capture: true });
+
+    const finishTouchScroll = () => {
+      touchStartY = null;
+      touchStartScrollTop = panel.scrollTop || 0;
+      holdPanelInteraction(500);
+    };
+
+    panel.addEventListener('touchend', finishTouchScroll, { passive: true, capture: true });
+    panel.addEventListener('touchcancel', finishTouchScroll, { passive: true, capture: true });
+    panel.addEventListener('scroll', () => holdPanelInteraction(700), { passive: true });
+    panel.addEventListener('wheel', () => holdPanelInteraction(700), { passive: true, capture: true });
 
     // 使用固定在 panel 本體上的 pointerdown 事件代理。
     // ATG 即時資料很頻繁，render() 會重建 panel 內容；若把 click 綁在每顆
