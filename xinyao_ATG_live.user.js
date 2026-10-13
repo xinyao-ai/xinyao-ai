@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手
 // @namespace    xinyao-atg-live
-// @version      3.2.2
+// @version      3.2.3
 // @description  電腦 / iOS / Android 共用 ATG 即時資料助手；整合 Unified Speed 極速模式與後台一鍵維護模式。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -2064,6 +2064,32 @@ setInterval(xinyaoCheckMaintenance, 10000);
       #xinyaoATGLiveV200 .xinyaoRow b { font-size:12px;font-weight:800; }
       #xinyaoATGLiveV200 .xinyaoLine { height:1px;margin:7px 0;background:rgba(255,255,255,.14); }
       #xinyaoATGLiveV200 input::placeholder { color:rgba(255,255,255,.48); }
+
+      /* v3.2.3：手機版面板可上下滑動，避免極速模式掉到螢幕下方 */
+      #xinyaoATGLiveV200{
+        box-sizing:border-box;
+        max-height:calc(100vh - 16px);
+        max-height:calc(100dvh - 16px);
+        overflow-x:hidden;
+        overflow-y:auto;
+        overscroll-behavior:contain;
+        -webkit-overflow-scrolling:touch;
+        touch-action:pan-y;
+        scrollbar-width:thin;
+        padding-bottom:calc(9px + env(safe-area-inset-bottom, 0px)) !important;
+      }
+
+      @media (max-width: 760px), (max-height: 760px){
+        #xinyaoATGLiveV200{
+          top:max(6px, env(safe-area-inset-top, 0px)) !important;
+          left:6px !important;
+          max-width:calc(100vw - 12px);
+          max-height:calc(100vh - 12px);
+          max-height:calc(100dvh - 12px);
+        }
+        #xinyaoATGLiveV200 .xinyaoRow{margin:3px 0;}
+        #xinyaoATGLiveV200 .xinyaoLine{margin:6px 0;}
+      }
     `;
     document.documentElement.appendChild(style);
 
@@ -2085,7 +2111,14 @@ setInterval(xinyaoCheckMaintenance, 10000);
       backdropFilter: 'blur(10px)',
       WebkitBackdropFilter: 'blur(10px)',
       userSelect: 'none',
-      WebkitUserSelect: 'none'
+      WebkitUserSelect: 'none',
+      boxSizing: 'border-box',
+      maxHeight: 'calc(100dvh - 16px)',
+      overflowX: 'hidden',
+      overflowY: 'auto',
+      overscrollBehavior: 'contain',
+      WebkitOverflowScrolling: 'touch',
+      touchAction: 'pan-y'
     });
 
     document.documentElement.appendChild(panel);
@@ -5875,8 +5908,15 @@ setInterval(xinyaoCheckMaintenance, 10000);
       #xinyaoATGLiveV200 .xinyaoSpeedTitle{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px;font-size:11px;font-weight:800}
       #xinyaoATGLiveV200 .xinyaoSpeedTitle b{color:#ffb8d4;font-size:12px}
       #xinyaoATGLiveV200 .xinyaoSpeedGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
-      #xinyaoATGLiveV200 .xinyaoSpeedBtn{border:1px solid rgba(255,255,255,.18);border-radius:7px;background:rgba(255,255,255,.08);color:#fff;padding:5px 2px;font-size:9px;font-weight:800;cursor:pointer}
+      #xinyaoATGLiveV200 .xinyaoSpeedBtn{border:1px solid rgba(255,255,255,.18);border-radius:7px;background:rgba(255,255,255,.08);color:#fff;padding:5px 2px;font-size:9px;font-weight:800;cursor:pointer;touch-action:manipulation}
       #xinyaoATGLiveV200 .xinyaoSpeedBtn.active{background:#ff5f9e;border-color:#ff8fba}
+      @media (max-width:760px), (max-height:760px){
+        #xinyaoATGLiveV200 #xinyaoUnifiedSpeedSection{
+          padding-bottom:max(2px, env(safe-area-inset-bottom, 0px));
+        }
+        #xinyaoATGLiveV200 .xinyaoSpeedGrid{gap:5px}
+        #xinyaoATGLiveV200 .xinyaoSpeedBtn{min-height:32px;font-size:10px}
+      }
     `;
     (document.head || document.documentElement).appendChild(style);
   }
