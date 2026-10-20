@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.1
+// @version      4.0.0-test.2
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -6254,7 +6254,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
             score,
             total: summary.total,
             unique: summary.unique,
-            items: summary.items.slice(0, 12)
+            items: summary.items.slice(0, 20),
+            tokens: tokens.slice(0, 120)
           });
         }
 
@@ -6338,8 +6339,12 @@ setInterval(xinyaoCheckMaintenance, 10000);
       #${PANEL_ID} .bp-title{font-size:12px;font-weight:900}
       #${PANEL_ID} .bp-mini{font-size:10px;opacity:.7}
       #${PANEL_ID} .bp-status{margin-top:5px;font-size:10px;color:#8deac1}
-      #${PANEL_ID} .bp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-top:8px}
+      #${PANEL_ID} .bp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:8px}
       #${PANEL_ID} .bp-item{padding:7px 4px;border-radius:10px;background:rgba(255,255,255,.065);text-align:center;min-width:0}
+      #${PANEL_ID} .bp-seq-title{margin-top:8px;font-size:9px;font-weight:850;opacity:.78}
+      #${PANEL_ID} .bp-seq-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;margin-top:5px}
+      #${PANEL_ID} .bp-cell{position:relative;display:flex;align-items:center;justify-content:center;min-height:26px;padding:3px;border-radius:7px;background:rgba(115,223,255,.08);font-size:9px;font-weight:900}
+      #${PANEL_ID} .bp-cell i{position:absolute;top:1px;left:3px;font-size:6px;font-style:normal;opacity:.35}
       #${PANEL_ID} .bp-token{display:block;font-size:10px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       #${PANEL_ID} .bp-count{display:block;margin-top:3px;color:#73dfff;font-size:12px;font-weight:950}
       #${PANEL_ID} .bp-path{margin-top:8px;padding-top:7px;border-top:1px solid rgba(255,255,255,.10);font-size:8px;line-height:1.35;opacity:.5;word-break:break-all}
@@ -6352,8 +6357,10 @@ setInterval(xinyaoCheckMaintenance, 10000);
           max-width:calc(100vw - 12px);
           padding:8px 9px;
         }
-        #${PANEL_ID} .bp-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+        #${PANEL_ID} .bp-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
         #${PANEL_ID} .bp-item{padding:6px 3px}
+        #${PANEL_ID} .bp-seq-grid{gap:2px}
+        #${PANEL_ID} .bp-cell{min-height:23px;font-size:8px;padding:2px}
       }
     `;
 
@@ -6410,16 +6417,23 @@ setInterval(xinyaoCheckMaintenance, 10000);
       return;
     }
 
-    const cards = candidate.items.slice(0, 6).map(item => `
+    const cards = candidate.items.slice(0, 12).map(item => `
       <div class="bp-item">
         <span class="bp-token">${esc(item.token)}</span>
         <span class="bp-count">×${item.count}</span>
       </div>
     `).join('');
 
+    const sequence = Array.isArray(candidate.tokens)
+      ? candidate.tokens.slice(0, 30).map((token, index) => `
+          <div class="bp-cell"><i>${index + 1}</i>${esc(token)}</div>
+        `).join('')
+      : '';
+
     body.innerHTML = `
       <div class="bp-status">● 已抓到本局盤面候選｜${esc(roomText())} 房</div>
       <div class="bp-grid">${cards}</div>
+      ${sequence ? `<div class="bp-seq-title">原始 30 格 ID 順序（6 欄測試）</div><div class="bp-seq-grid">${sequence}</div>` : ''}
       <div class="bp-path">
         ${candidate.total} 格｜${candidate.unique} 種｜候選 ${probe.candidateCount} 組<br>
         路徑：${esc(candidate.path)}
