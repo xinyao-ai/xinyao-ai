@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.15
+// @version      4.0.0-test.16
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -6367,10 +6367,10 @@ setInterval(xinyaoCheckMaintenance, 10000);
         top:8px;
         right:8px;
         z-index:2147483646;
-        width:280px;
+        width:258px;
         max-width:calc(100vw - 16px);
         box-sizing:border-box;
-        padding:9px 11px;
+        padding:8px 9px;
         border:1px solid rgba(255,255,255,.20);
         border-radius:14px;
         background:rgba(24,20,31,.92);
@@ -6382,38 +6382,40 @@ setInterval(xinyaoCheckMaintenance, 10000);
         user-select:none;
         -webkit-user-select:none;
       }
-      #${PANEL_ID} .bp-head{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.14)}
-      #${PANEL_ID} .bp-title{font-size:12px;font-weight:900;letter-spacing:.1px}
-      #${PANEL_ID} .bp-mini{display:flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:6px;background:rgba(255,255,255,.08);font-size:10px;opacity:.82}
-      #${PANEL_ID} .bp-status{margin-top:6px;font-size:10px;color:#8deac1;font-weight:800}
-      #${PANEL_ID} .bp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:8px}
-      #${PANEL_ID} .bp-item{padding:6px 3px 7px;border:1px solid rgba(255,255,255,.08);border-radius:9px;background:rgba(255,255,255,.055);text-align:center;min-width:0;overflow:visible}
-      #${PANEL_ID} .bp-icon-shell{display:flex;width:44px;height:44px;margin:0 auto;align-items:center;justify-content:center;overflow:visible}
-      #${PANEL_ID} .bp-icon{display:block;width:40px;height:40px;margin:0 auto;border-radius:9px;box-shadow:0 2px 8px rgba(0,0,0,.30)}
+      #${PANEL_ID} .bp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,.14)}
+      #${PANEL_ID} .bp-title{font-size:11px;font-weight:900;letter-spacing:.05px}
+      #${PANEL_ID} .bp-mini{display:flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:5px;background:rgba(255,255,255,.07);font-size:9px;opacity:.82}
+      #${PANEL_ID} .bp-status{margin-top:5px;font-size:9px;color:#8deac1;font-weight:800}
+      #${PANEL_ID} .bp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:6px}
+      #${PANEL_ID} .bp-item{padding:4px 2px 5px;border:1px solid rgba(255,255,255,.07);border-radius:7px;background:rgba(255,255,255,.045);text-align:center;min-width:0;overflow:visible}
+      #${PANEL_ID} .bp-icon-shell{display:flex;width:39px;height:39px;margin:0 auto;align-items:center;justify-content:center;overflow:visible}
+      #${PANEL_ID} .bp-icon{display:block;width:36px;height:36px;margin:0 auto;border-radius:8px;box-shadow:0 2px 7px rgba(0,0,0,.28)}
       #${PANEL_ID} .bp-icon-img{object-fit:contain;object-position:center center;box-sizing:border-box;padding:2px;background:rgba(255,255,255,.035);overflow:visible}
       #${PANEL_ID} .bp-multiplier{display:flex;align-items:center;justify-content:center;border-radius:50%;background:radial-gradient(circle at 35% 30%,#47d378,#15884d 70%);border:2px solid #e4b54b;color:#ffe16a;font-size:24px;font-weight:950;line-height:1}
       #${PANEL_ID} .bp-unknown{display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);color:#9eb4c7;font-size:18px;font-weight:900}
-      #${PANEL_ID} .bp-name{display:block;margin-top:3px;font-size:8px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.82}
+      #${PANEL_ID} .bp-name{display:block;margin-top:2px;font-size:7px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.80}
       #${PANEL_ID} .bp-seq-title{margin-top:8px;font-size:9px;font-weight:850;opacity:.78}
-      #${PANEL_ID} .bp-board-toggle{width:100%;margin-top:7px;border:1px solid rgba(255,184,212,.30);border-radius:8px;background:rgba(255,95,158,.10);color:#ffd5e6;padding:5px;font-size:8px;font-weight:850;cursor:pointer}
+      #${PANEL_ID} .bp-board-toggle{width:100%;margin-top:6px;border:1px solid rgba(255,184,212,.26);border-radius:7px;background:rgba(255,95,158,.08);color:#ffd5e6;padding:4px;font-size:7px;font-weight:850;cursor:pointer}
       #${PANEL_ID} .bp-board-wrap{display:none}
       #${PANEL_ID} .bp-board-wrap.open{display:block}
       #${PANEL_ID} .bp-seq-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;margin-top:5px}
       #${PANEL_ID} .bp-cell{position:relative;display:flex;align-items:center;justify-content:center;min-height:26px;padding:3px;border-radius:7px;background:rgba(255,255,255,.06);font-size:9px;font-weight:900}
       #${PANEL_ID} .bp-cell i{position:absolute;top:1px;left:3px;font-size:6px;font-style:normal;opacity:.35}
-      #${PANEL_ID} .bp-count{display:block;margin-top:3px;color:#ffb8d4;font-size:12px;font-weight:950}
-      #${PANEL_ID} .bp-path{margin-top:8px;padding-top:7px;border-top:1px solid rgba(255,255,255,.14);font-size:8px;line-height:1.35;opacity:.5;word-break:break-all}
+      #${PANEL_ID} .bp-count{display:block;margin-top:2px;color:#ffb8d4;font-size:11px;font-weight:950}
+      #${PANEL_ID} .bp-path{margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.14);font-size:7px;line-height:1.35;opacity:.46;word-break:break-all}
       #${PANEL_ID}.min .bp-body{display:none}
       @media (max-width:760px){
         #${PANEL_ID}{
           top:max(6px,env(safe-area-inset-top,0px));
           right:6px;
-          width:230px;
+          width:218px;
           max-width:calc(100vw - 12px);
-          padding:8px 9px;
+          padding:7px 8px;
         }
-        #${PANEL_ID} .bp-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
-        #${PANEL_ID} .bp-item{padding:6px 3px}
+        #${PANEL_ID} .bp-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:3px}
+        #${PANEL_ID} .bp-item{padding:4px 2px}
+        #${PANEL_ID} .bp-icon-shell{width:36px;height:36px}
+        #${PANEL_ID} .bp-icon{width:33px;height:33px}
         #${PANEL_ID} .bp-seq-grid{gap:2px}
         #${PANEL_ID} .bp-cell{min-height:23px;font-size:8px;padding:2px}
       }
