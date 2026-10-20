@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.19
+// @version      4.0.0-test.20
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -547,6 +547,11 @@ setInterval(xinyaoCheckMaintenance, 10000);
         score += hasButtonsGroup ? 62 : (hasControlBar ? 56 : 50);
         if (hasAnyButton) score += 12;
         if (text.length === 3) score += 4;
+      } else if (!hasNonRoomUi && text.length >= 3 && text.length <= 4) {
+        // 直式版目前房號可能只剩一顆圓形房號徽章，祖先名稱不含 button/room。
+        // 仍只接受純數字 3–4 位，並給低權重，避免壓過任何已知權威結構。
+        score += text.length === 4 ? 36 : 32;
+        if (roomishNode) score += 8;
       } else continue;
 
       if (roomishNode) score += 10;
@@ -6163,6 +6168,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     ['7', '紫寶石'],
     ['8', '藍寶石'],
     ['9', '綠寶石'],
+    ['10', '倍率球'],
     ['12', '倍數球'],
     ['13', '倍率符號']
   ]);
@@ -6193,8 +6199,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
       return `<span class="bp-icon-shell"><img class="bp-icon bp-icon-img" src="${src}" alt="${esc(symbolLabel(key))}" draggable="false"></span>`;
     }
 
-    if (key === '13') {
-      return '<span class="bp-icon bp-multiplier" aria-label="倍率符號">×</span>';
+    if (key === '10' || key === '13') {
+      return `<span class="bp-icon bp-multiplier" aria-label="${esc(symbolLabel(key))}">×</span>`;
     }
 
     return '<span class="bp-icon bp-unknown">?</span>';
@@ -6374,7 +6380,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     const bow = candidateCount(candidate, '3');
     const axe = candidateCount(candidate, '4');
     const multiplierOrb = candidateCount(candidate, '12');
-    const multiplier = candidateCount(candidate, '13');
+    const multiplier = candidateCount(candidate, '10') + candidateCount(candidate, '13');
     const premium = eye + snake + bow + axe;
     let score = 0;
     const reasons = [];
