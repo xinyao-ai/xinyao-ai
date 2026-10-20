@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.3
+// @version      4.0.0-test.4
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -6145,6 +6145,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     ['4', '戰斧'],
     ['5', '黃寶石'],
     ['6', '紅寶石'],
+    ['7', '紫寶石'],
     ['8', '藍寶石'],
     ['9', '綠寶石']
   ]);
