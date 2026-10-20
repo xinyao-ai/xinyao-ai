@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.27
+// @version      4.0.0-test.28
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -6270,25 +6270,25 @@ setInterval(xinyaoCheckMaintenance, 10000);
     return VERIFIED_SYMBOL_LABELS.get(key) || `ID ${key}`;
   }
 
-  const SYMBOL_ICON_SPRITE = 'https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/442530c6ab8466402c674caaa44606acb8170790/assets/atg-seth/test27_symbol_sprite.webp';
+  const SYMBOL_ICON_SPRITE = 'https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/b7157ef16dfbee9a99c8444d9ba129285df05a2b/assets/atg-seth/test28_symbol_sprite_transparent.webp';
 
-  // test27: all card artwork comes only from the clean transparent files supplied by the user.
-  // Sprite cells are 4×4; each icon occupies its own isolated transparent cell.
+  // test28: transparent sprite built from the user's clean source images.
+  // Use a real <img> and crop it inside the icon shell; this avoids the blank CSS background-image issue seen in test27.
   const SYMBOL_ICON_POSITIONS = new Map([
-    ['1',  [0, 0]], // 眼睛
-    ['2',  [1, 0]], // 蛇
+    ['1',  [1, 3]], // 眼睛
+    ['2',  [0, 0]], // 蛇
     ['3',  [2, 0]], // 弓箭
     ['4',  [3, 0]], // 戰斧
-    ['5',  [0, 1]], // 黃寶石
+    ['5',  [3, 1]], // 黃寶石
     ['6',  [1, 1]], // 紅寶石
     ['7',  [2, 1]], // 紫寶石
-    ['8',  [3, 1]], // 藍寶石
+    ['8',  [0, 1]], // 藍寶石
     ['9',  [0, 2]], // 綠寶石
-    ['10', [1, 2]], // 紅色倍數球素材
-    ['11', [2, 2]], // 紫色倍數球素材
-    ['12', [3, 2]], // 藍色倍數球素材
-    ['13', [0, 3]], // 綠色倍數球素材
-    ['15', [1, 3]]  // SCATTER
+    ['10', [1, 2]], // 紅倍率球
+    ['11', [2, 2]], // 紫倍數球
+    ['12', [3, 2]], // 藍倍數球
+    ['13', [0, 3]], // 綠倍率符號
+    ['15', [1, 0]]  // SCATTER
   ]);
 
   function symbolIconHtml(token) {
@@ -6296,7 +6296,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     const pos = SYMBOL_ICON_POSITIONS.get(key);
 
     if (pos) {
-      return `<span class="bp-icon-shell"><span class="bp-icon bp-icon-sprite" role="img" aria-label="${esc(symbolLabel(key))}" style="--bp-sx:${pos[0]};--bp-sy:${pos[1]};background-image:url('${SYMBOL_ICON_SPRITE}')"></span></span>`;
+      return `<span class="bp-icon-shell"><img class="bp-icon-sprite-img" src="${SYMBOL_ICON_SPRITE}" alt="${esc(symbolLabel(key))}" draggable="false" style="--bp-x:${pos[0]};--bp-y:${pos[1]}"></span>`;
     }
 
     return '<span class="bp-icon bp-unknown">?</span>';
@@ -6832,10 +6832,10 @@ setInterval(xinyaoCheckMaintenance, 10000);
       #${PANEL_ID} .bp-autostop.on{color:#ffcae0;border-color:rgba(255,95,158,.32)}
       #${PANEL_ID} .bp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:7px}
       #${PANEL_ID} .bp-item{padding:5px 3px 6px;border:1px solid rgba(255,255,255,.07);border-radius:8px;background:rgba(255,255,255,.045);text-align:center;min-width:0;overflow:visible}
-      #${PANEL_ID} .bp-icon-shell{display:flex;width:42px;height:42px;margin:0 auto;align-items:center;justify-content:center;overflow:hidden;background:transparent!important;border:0!important;box-shadow:none!important}
-      #${PANEL_ID} .bp-icon{display:block;width:38px;height:38px;margin:0 auto;border:0!important;border-radius:0!important;box-shadow:none!important;background-color:transparent!important;filter:none!important}
-      #${PANEL_ID} .bp-icon-sprite{background-repeat:no-repeat!important;background-size:152px 152px!important;background-position:calc(var(--bp-sx) * -38px) calc(var(--bp-sy) * -38px)!important}
-      #${PANEL_ID} .bp-unknown{display:flex;align-items:center;justify-content:center;background:transparent!important;color:#9eb4c7;font-size:18px;font-weight:900;box-shadow:none!important}
+      #${PANEL_ID} .bp-icon-shell{position:relative;display:block;width:42px;height:42px;margin:0 auto;overflow:hidden;background:transparent!important;border:0!important;box-shadow:none!important}
+      #${PANEL_ID} .bp-icon-sprite-img{position:absolute!important;left:0!important;top:0!important;width:168px!important;height:168px!important;max-width:none!important;max-height:none!important;object-fit:fill!important;transform:translate(calc(var(--bp-x) * -42px),calc(var(--bp-y) * -42px))!important;transform-origin:0 0!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;filter:none!important;pointer-events:none!important}
+      #${PANEL_ID} .bp-icon{display:block;width:42px;height:42px;margin:0 auto;border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important}
+      #${PANEL_ID} .bp-unknown{display:flex;align-items:center;justify-content:center;color:#9eb4c7;font-size:18px;font-weight:900}
       #${PANEL_ID} .bp-name{display:block;margin-top:2px;font-size:8px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.80}
       #${PANEL_ID} .bp-seq-title{margin-top:8px;font-size:9px;font-weight:850;opacity:.78}
       #${PANEL_ID} .bp-board-toggle{width:100%;margin-top:7px;border:1px solid rgba(255,184,212,.26);border-radius:7px;background:rgba(255,95,158,.08);color:#ffd5e6;padding:5px;font-size:8px;font-weight:850;cursor:pointer}
