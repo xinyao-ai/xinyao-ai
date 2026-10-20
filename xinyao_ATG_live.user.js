@@ -6136,6 +6136,24 @@ setInterval(xinyaoCheckMaintenance, 10000);
   const SYMBOL_FIELD_RE = /^(symbolid|symbol_id|symbol|iconid|icon_id|icon|code|name|type|tileid|tile_id|tile)$/i;
   const IGNORE_STRING_RE = /^(true|false|null|undefined|normal|base|default|main)$/i;
 
+  // 戰神賽特 2／覺醒之力：由實際 6×5 盤面與本局 30 格 ID 對照確認。
+  // 只記錄已被畫面直接驗證的 ID；未驗證 ID 不猜名稱。
+  const VERIFIED_SYMBOL_LABELS = new Map([
+    ['1', '眼睛'],
+    ['2', '蛇'],
+    ['3', '弓箭'],
+    ['4', '戰斧'],
+    ['5', '黃寶石'],
+    ['6', '紅寶石'],
+    ['8', '藍寶石'],
+    ['9', '綠寶石']
+  ]);
+
+  function symbolLabel(token) {
+    const key = String(token ?? '');
+    return VERIFIED_SYMBOL_LABELS.get(key) || `ID ${key}`;
+  }
+
   function safe(fn, fallback = null) {
     try {
       const value = fn();
@@ -6419,21 +6437,22 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
     const cards = candidate.items.slice(0, 12).map(item => `
       <div class="bp-item">
-        <span class="bp-token">${esc(item.token)}</span>
+        <span class="bp-token">${esc(symbolLabel(item.token))}</span>
         <span class="bp-count">×${item.count}</span>
+        <span style="display:block;margin-top:2px;font-size:7px;opacity:.42;">ID ${esc(item.token)}</span>
       </div>
     `).join('');
 
     const sequence = Array.isArray(candidate.tokens)
       ? candidate.tokens.slice(0, 30).map((token, index) => `
-          <div class="bp-cell"><i>${index + 1}</i>${esc(token)}</div>
+          <div class="bp-cell" title="ID ${esc(token)}"><i>${index + 1}</i>${esc(symbolLabel(token))}</div>
         `).join('')
       : '';
 
     body.innerHTML = `
       <div class="bp-status">● 已抓到本局盤面候選｜${esc(roomText())} 房</div>
       <div class="bp-grid">${cards}</div>
-      ${sequence ? `<div class="bp-seq-title">原始 30 格 ID 順序（6 欄測試）</div><div class="bp-seq-grid">${sequence}</div>` : ''}
+      ${sequence ? `<div class="bp-seq-title">原始 30 格盤面順序（6 欄）</div><div class="bp-seq-grid">${sequence}</div>` : ''}
       <div class="bp-path">
         ${candidate.total} 格｜${candidate.unique} 種｜候選 ${probe.candidateCount} 組<br>
         路徑：${esc(candidate.path)}
