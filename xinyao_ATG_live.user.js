@@ -6147,7 +6147,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
     ['6', '紅寶石'],
     ['7', '紫寶石'],
     ['8', '藍寶石'],
-    ['9', '綠寶石']
+    ['9', '綠寶石'],
+    ['13', '倍率符號']
   ]);
 
   function symbolLabel(token) {
