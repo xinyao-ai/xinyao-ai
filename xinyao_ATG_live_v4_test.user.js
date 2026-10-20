@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.18
+// @version      4.0.0-test.19
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -6163,6 +6163,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     ['7', '紫寶石'],
     ['8', '藍寶石'],
     ['9', '綠寶石'],
+    ['12', '倍數球'],
     ['13', '倍率符號']
   ]);
 
@@ -6180,7 +6181,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
     ['6', 'data:image/webp;base64,UklGRkgDAABXRUJQVlA4IDwDAADwEACdASpQAFAAPm02lkckIyIhKln4eIANiWQAy1UkOycJAbOHDt4PMr5xHpA3nfebP23ytvbfkoCvGWXioWve3pWL5erRytEGs/1XH92pY12v8bDX0lsPOyCrFc+kiqSbbbHEom798F2CUglZZfzvu+X0g7fDQk4yKCKIEVq88TYryXnPHMD0MXh0D3ONxmAA/vzFLk6Or3fC+4Ol+ZDnp7OrgCS5lEKYdYvSWo+VXcOT2vGo2pmP13a+RI6hWIzvlB1lVUAv9YRsQ783Bq4MVwWx6ooQYg3lm3fDxomX12Arc/oNuVVUYS+4ifTCTM11/urgmO/fTdq4y5bZM3HmUBTFUdQeJxZjKjfDID9FTDG0A9hvaw0dC1hrQ4G+Hj4iKcpbvbTXS+FnfFU31CNrVBhjX1AvfnDYxmJ6vbDnzVZ1/Rw536Ovm+zp5/7KLQrQR55XdmGNrDEN4c3cmgzF5BfoYw/OMXL/TZYoKE+UlY6U8MLUgYU5h7FvkM7gAnVeQiLO12QZvB6FxlpeVm0YArKobUx/yb98nMeHppr+nPO2HlFcA9RiH78z9Pw/Fdvg1tbnlsVcmpJSVNrmuZ0SX1xqBIs4GIf5ZItEurV4XGkejNflBWwvw6u6OuujXX/zD7vXLKcueyUa3TE5X0k4UXx211hjII0xqeZ1USnN4SMxjs9YDerexGphDZ8rfuO2STZjR6g/+NeENTJy1R7V9/8j2HJMl+3PvqRkssvkbb2/UN0JPpZubYerDNyduAv2v8mYX1ENjUjx3tnCF4/wKHbizUU1x9aGdaCe//x9PC89n1px26EZ3sDri9N0MaOE5YSF9zuXuoUPS/EZAF2XJ7j3K9kZb0nBJAZdwctQMUjZv1Y5toY1BVX6WyVNE4UM/cSUdx1UtDfPxdg5hBt51InZQ69x7+NQNOXeJhYG+zMIBxw2Fr0H4qlIWV5VnWH27buPWgSN5z1ncS/q+m5vyhtbcMpH6oiuxGcKULZAI/M0Dm49QhMBdK0eTkEBk83TQUmInT1iEqYlHk6rxL9krKy6WQ0hhFZdWIqsAoU6yIAis7BbgNxQy9UYwnvne67HWDotneIGiHwAAAA='],
     ['7', 'data:image/webp;base64,UklGRkwDAABXRUJQVlA4IEADAADQEQCdASpQAFAAPm0ukUakIqGhLNmZmIANiWYAcBZV37JvyJxYcW2f0QD9netD9ADyyPZQ/cH9lfaArDu2nLEqpn7JNdbhCXC7iA7u+rmSAg/qFvLKyU5p4XC1vOn5q86DN0jVZn/vy02lMHJxMU7kBHP5jRxSr44Sd4wvJmnYGqevooGs9aphYZ/xIWpeTqDx+mU4FX4IAP778G/9hsSas0X58WGWCVf/JVJE3QrhcrO0orM1i3sHfOAZXd17ZyDiYRbeCtG4CuvvWgfTD6Pf8q29rvmD+Rgq4u6TzeoERfdmUQA9D75i4BZEZzaNrAmPfyeL6GcmbMX6NBInmb2MvDqu2i2ghjD5BxdV/S2sOY0jIVD6sDIGFD+ggGcMyEQPgWBPT5Of622H/mJF5kyKoMbdVJCjIAYdYaDrhzuBwLv5/OJgR/bgK+e2H3BSDI6U1abZjZRHzdJcK1gRgVvvV/QJdvBWnnDf7W0kL+uuzBce9sY/XjvhjCZlkU33w7dKGOsp6l/NFpXY9XzFbws2EQEbzt5AgbdpwmaHQxd3pM3Q190bOSp1MMIkGDQOffBnDkdX5b1pt3fXu5sbK9WmE2gi+afqFIfMLCKa4RgMNO4ib7BthSOL+5Ka7m+F7fZjc9elTw5bvpvL21l3m17VqV6uxDGZz0qVZIhQXJBQEnhON9a4uFdDoUMs+x4D8gVJG+26O0DGArT2bGQQtX/t4tehYse/+Ek784udT4P/zRF7nKcd3EUyVrt++vY0wJu91ABQlg6Gymm0jYLISo5y3VX61n0jMhIMMUB8VPPyA348TEGUPtWIKYlmHgXxbm/Fk8zoSyzpzWFeenWh8ZZbuM02csa+SVNSWWgbub/Ht07+GhJXHCvJ7X2HvyFQ/3sfj84caRiwKdDCdQzasJ1Rq1CbFYkSG9TRVYfrwD0HwyVSa04Tg9FRtTcgqdwzt7mId1O/ypGtPU1aLK+t1trF/zg35GNbZI2OqZhKmvgApZdvpvNzGY24eNZBIa8dJNYtCZE2a78SGUnvXIvCz4byMXvVsZd6IXxL78R7ylRy0688C6E0SLxGJNrqa2FrHeb4vzh6K4COA2h3I9KgAAAA'],
     ['8', 'data:image/webp;base64,UklGRi4DAABXRUJQVlA4ICIDAACwEACdASpQAFAAPm0wk0ekIqGhKPtpWIANiWgAzID5fJcHOeaGl4gHTD5//0G/7P1AP711AHPg+xJ+5noktEEAlK6G11hvLIP7NJ+6RmAygWdUQ2VnbPRSJ60YtH5/0ptFDxc+FOmEkInxi6CdxuE6pu/85xAdGYmlNEZStrzeL5qKcz+kc2l3yekcY+wAAP77aJc/Q9CYJknVh+Ezv3PRVGXpnffNjwWh6ajA8A5vCwXj86AbDqkPXmz7C+OuXBQoXi0wNzTeVFp0ZYNgwJleEVN0sU+YUjOK8NCn2rhiP7FnhOjTajxaP0zlA1OMRcY4W8YGfFbmIpVksC0qz5dVulFvBgip3Cc4eGLvOKZaVisMz9IUaPPVKfPxmE6gLrRzsDLHaoAL5GcNuzOg2z3jGZnuIwn2dfEQtHuv5joc6tHyLEIxg9JZWyUYYdpTkkLksbf71ZSCcvxlUnz2/rflvXyej2f1RCuJaU/R3OlKfT33Bi7HtR//DGeo/FXLzwQi9gHu83N8ltsyvBdmZQOFWDrYXj5JZUWMVkBlY2sDeaehNzxkRW0YXQE8Wzf/6vFKdoclNv9eRw5ZHEh41ukadx/rZ3FcjVfGnyvrtwtS0+HFFtciVWhTsxUCkYC8i1SmtbAiSMLdV8n2hhADnoCUPMnN4m7gNHZUnkPeQ97dj6jwjl9GTY/6cJoNZ5XlsW0cfm2uqyxg5DwRnyI5SGctinF+oqzBpPJtEu24LP+T7v8adAnpUqI1XgfeMtaXf/BPqmdNvpf2r4nFYurArFu+bRdH+tBUOIKOh8n3BvOT8ExQeWa88ubCoROFb3isAvq7RNrOMD6yq+zNS4+3/IaF+A2jrtNA98MPKP5k2FRdeDy7bWQ2fk7R083OtnqC6SG+Wy8tjNTLbZg/JUvNPSrUszhfxiHSJ9/UUAmxqL5G+3sXW9eH/kflTMh3JyvCw50NAnvD/g2IvEptEUDqowMX3ob1CsIUkJQX1mqdfUsOhav3UtqvXDqQFRnw4ccFTImSnRz+GDsjZfoKHLhDhCeyZLmyMepXdUh73QaFH62cqAAA'],
-    ['9', 'data:image/webp;base64,UklGRpwCAABXRUJQVlA4IJACAAAwDwCdASpQAFAAPm0ylEgkIqIhJ7gJQIANiWQA1PPG7+TaDcA2zXmA88X0X/6rfFt48IiT0ACINMBnaOYRhvA2k4ooNEz4C+TSgscEm/A2u9kbyxbHKBwZtrj3kPhwBLp/4xFp0FnkdI1YnX1U5YHswVGs+Nww/O5eCBFeraVbr6gAAP767/W12ygSg/4jCn4+Xn0OIalkBgS1rByyoEpNgB+wLarD0LaqclqduHBkFiyqOxxCKuPN/UspB5WmhPW3bdvfxayb+7PaOy25weKWYumQ1f3sn3dXgM/s9hsQw6uXwTLwZNNl6uDlhMYRW35Mr1ZUnwObTG9G4MU/rAqSJEav1wQdNSU4H0TW1iNpOvZ18ouVvhHCzn70ACbZ4UiYMo8e0s68LAarNbzmUAOue7CdHMFIJ8IJnBtpAAXsd8ih1+jYo0B/xDJDhgd2tqTr4Bnw3LTzMxzKOUFc/Py/tK7fxt3RYiotsYUo3NMz8DLZlSfAcghRt2vNW+Bac9KTQNNFXt49NcR2gEbA+ukeZnmEmRtoFcGkIZZDgcpqGrFpDZD10auzo5nRQk0kiiaKXNwCxHYvQOe47E10mGxmb/DDhkOa64KfV/j/KNRxXeRneP4mjHaID8b+gggrDZdHH/Al/QDgfbGrxKSYvXIzcFdpSmJm2wZfeRgeC7RGF6HIBeqtTOt1usxxMynx80a0lHmxZpeCJMzK2bZ2+ZMZU1LtMnT5K/zHUrF4nla5Jvr8GMh1G6pk8fl6l/v7sCt+yu7iraUfV9sYGnM3Jv3Npq/jDXNFnimHquANJhROnLK8H8Y6BwUfxrR+DunvyNP+ZRIo/w65MEmm37bUw9U+b9KGlDEHg+vgAGNqdnAAAA==']
+    ['9', 'data:image/webp;base64,UklGRpwCAABXRUJQVlA4IJACAAAwDwCdASpQAFAAPm0ylEgkIqIhJ7gJQIANiWQA1PPG7+TaDcA2zXmA88X0X/6rfFt48IiT0ACINMBnaOYRhvA2k4ooNEz4C+TSgscEm/A2u9kbyxbHKBwZtrj3kPhwBLp/4xFp0FnkdI1YnX1U5YHswVGs+Nww/O5eCBFeraVbr6gAAP767/W12ygSg/4jCn4+Xn0OIalkBgS1rByyoEpNgB+wLarD0LaqclqduHBkFiyqOxxCKuPN/UspB5WmhPW3bdvfxayb+7PaOy25weKWYumQ1f3sn3dXgM/s9hsQw6uXwTLwZNNl6uDlhMYRW35Mr1ZUnwObTG9G4MU/rAqSJEav1wQdNSU4H0TW1iNpOvZ18ouVvhHCzn70ACbZ4UiYMo8e0s68LAarNbzmUAOue7CdHMFIJ8IJnBtpAAXsd8ih1+jYo0B/xDJDhgd2tqTr4Bnw3LTzMxzKOUFc/Py/tK7fxt3RYiotsYUo3NMz8DLZlSfAcghRt2vNW+Bac9KTQNNFXt49NcR2gEbA+ukeZnmEmRtoFcGkIZZDgcpqGrFpDZD10auzo5nRQk0kiiaKXNwCxHYvQOe47E10mGxmb/DDhkOa64KfV/j/KNRxXeRneP4mjHaID8b+gggrDZdHH/Al/QDgfbGrxKSYvXIzcFdpSmJm2wZfeRgeC7RGF6HIBeqtTOt1usxxMynx80a0lHmxZpeCJMzK2bZ2+ZMZU1LtMnT5K/zHUrF4nla5Jvr8GMh1G6pk8fl6l/v7sCt+yu7iraUfV9sYGnM3Jv3Npq/jDXNFnimHquANJhROnLK8H8Y6BwUfxrR+DunvyNP+ZRIo/w65MEmm37bUw9U+b9KGlDEHg+vgAGNqdnAAAA=='],
+    ['12', 'data:image/webp;base64,UklGRkoEAABXRUJQVlA4ID4EAABwFACdASpAAEAAPplAmkglpCKhMBn7ALATCWwAnTKEhd/IeYnUP8LvV06eZrzrzpvFP6Zfme88D0Mebt1GfoAdLL+4+JeSTZ8dsc2Lhhpa5pnlFTJWboOh8hJgJuofPZ6wv23jIaZzOtdaHdB5NzamzHE1uuBYNC6cSC3rlEUYySqjxNjgYNewllIsMhj5nrv69wh6cHk2NSOsbpdDz/zHNKYH/0lij3B4FFgAAP75snrx/Bqc64mBxHx3ZcfwEOCh2zw2K5ltGa0ifuolAev7Ebyy/9WKrN4Ubls4Wd8t+vBAIONXHvlSK6s0xm3w2edRKGFK4Z628eL2QKvbecvyIoVS9Bch22FQGQuiqs82H8QMHKrulRCvNBt4cihPEDzKJNYFuHwmVZZkv+Se8RC7SxoWRP5/2m19QbK5MaJTrbbX/0T3E/NfYy4KCmDe0sFa2qu4hX4bveojYbRTAtsF9LBFCXl5BmQOehjcXLFOzVjPYYE/8650K1pRjTRbd6WF016fvbu2W4J1Ts5GxTD/OqKULXIbqhlH9C76ot+sWpj5f9BzrqfWdyc+CORUTvtr3/yU9LDbmHN7W0uX+vnhWuz3WZGJDnuF7fbYFogr8bxvIKwd9TshtJu4ja+4xwUBzSH0Lg7286YMBI+i9I30n3WDWuiOSKCkCX1SlNnXM1Zk8PgcQX7Xxl/GliFAFk8nv1fBFMEv/feeRICPQkHosl8azx/C+swvRNMBAgQbjh7Yi58Tls1QBUi7QDew+xn20aktgN27zd0jL79MigH4ztngNtJMIsxPtDro2Fg3LNzw2lJoS07/Qya5ovhOKZtDSmCf1RenmczENE9y2cqxoumXrSC4I7ZqYJTlbx/H7T1citwPulnL/zRYaPybvgDKELFzMapnC8/wqansOnHC6+JnC4ss1euTubVOMawIrTkbcsdA0WMrHGsUH36ghTsUuBkmNGmx3hjkXKiBJb1MMoEcj2KQClfs6e8dmUAyWMONS1uK2iyS//FzNdUGga01gj+gCrpPqH+Wn7guPa107Lxo1vwWpslz9exqrOtvw55sMME8/IMw29ZVAnlWNcm0FLg4rh1ppPltwCQmihLC/NLLImPs1P9sxdetdGnbTnEm29jw2CcWP5s2RjEIlNsonBrd+OqBcldz2aFr9saS6LsnnwusDSoTwI2BzFxTH/nYQ2yDMZ7f5064+BJ7g3tHsxcriKQ36jPOuS7GVFgPHZ92oOEAWPDKi8zhHbIzDgp04JVH4k2gLV6rGxPVo8dJKx7LAk3otms39fIfz3D3oKr/5idgKFErIhmmNEKY8uqsLk71ThzU80inZpOtEle/xILmVMODV/uMneerWcPHZ5QmUSV3A4+S6HyS61OugXx5zqx3OFy/E3wEMvFdXso9P1/rwIs4ff1mffUKSgFaqqzhfmXbAV/6wNtHIAA=']
   ]);
 
   function symbolIconHtml(token) {
@@ -6371,11 +6373,16 @@ setInterval(xinyaoCheckMaintenance, 10000);
     const snake = candidateCount(candidate, '2');
     const bow = candidateCount(candidate, '3');
     const axe = candidateCount(candidate, '4');
+    const multiplierOrb = candidateCount(candidate, '12');
     const multiplier = candidateCount(candidate, '13');
     const premium = eye + snake + bow + axe;
     let score = 0;
     const reasons = [];
 
+    if (multiplierOrb > 0) {
+      score += Math.min(50, 34 + (multiplierOrb - 1) * 8);
+      reasons.push(`倍數球 ×${multiplierOrb}`);
+    }
     if (multiplier > 0) {
       score += Math.min(46, 34 + (multiplier - 1) * 8);
       reasons.push(`倍率符號 ×${multiplier}`);
