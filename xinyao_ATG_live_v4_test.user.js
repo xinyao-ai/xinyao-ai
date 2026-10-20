@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.20
+// @version      4.0.0-test.21
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -570,6 +570,89 @@ setInterval(xinyaoCheckMaintenance, 10000);
     return { key: `room:${best.roomNumber}`, roomNumber: best.roomNumber, source: 'cocos' };
   }
 
+
+  function resolveRoomIdentityFromLooseCocosText(gameWindow) {
+    try {
+      const cocos = gameWindow?.cc || gameWindow?.legacyCC || gameWindow?._cc;
+      const scene = cocos?.director?.getScene?.();
+      const Component = cocos?.Component;
+      if (!scene || !Component || typeof scene.getComponentsInChildren !== 'function') return null;
+
+      const candidates = [];
+      const components = scene.getComponentsInChildren(Component) || [];
+      const visibleSize = (() => {
+        try {
+          const size = cocos?.view?.getVisibleSize?.();
+          return {
+            width: Number(size?.width) || 0,
+            height: Number(size?.height) || 0
+          };
+        } catch (_) {
+          return { width:0, height:0 };
+        }
+      })();
+
+      for (const component of components) {
+        const node = component?.node;
+        if (!node || node.activeInHierarchy === false) continue;
+
+        const rawValues = [
+          component?.string,
+          component?._string,
+          component?.text,
+          component?._text,
+          component?.value
+        ];
+        let text = '';
+        for (const raw of rawValues) {
+          const value = String(raw ?? '').trim();
+          if (/^\d{3,4}$/.test(value)) {
+            text = value;
+            break;
+          }
+        }
+        if (!text) continue;
+
+        const roomNumber = Number(text);
+        if (!Number.isFinite(roomNumber) || roomNumber < 1 || roomNumber > 4100) continue;
+
+        const names = [];
+        let cursor = node;
+        for (let depth = 0; cursor && depth < 10; depth += 1) {
+          names.push(String(cursor.name || ''));
+          cursor = cursor.parent || cursor._parent || null;
+        }
+        const path = names.join('/').toLowerCase();
+        if (/(balance|credit|wallet|amount|stake|bet|payout|jackpot|grand|major|minor|mini|score|win|prize|line|page|spincontent)/i.test(path)) continue;
+
+        let score = text.length === 4 ? 26 : 22;
+        if (/(room|table|machine|slot.*table|num|number)/i.test(path)) score += 55;
+        if (/(button|btn|buttons|control|bottom)/i.test(path)) score += 16;
+
+        try {
+          const pos = node.worldPosition || node.position || node._position;
+          const x = Number(pos?.x);
+          const y = Number(pos?.y);
+          if (Number.isFinite(x) && Number.isFinite(y) && visibleSize.width > 0 && visibleSize.height > 0) {
+            // Portrait ATG room badge sits in the lower-left control area.
+            if (x <= visibleSize.width * 0.42 && y <= visibleSize.height * 0.38) score += 28;
+            else if (x <= visibleSize.width * 0.55 && y <= visibleSize.height * 0.5) score += 10;
+          }
+        } catch (_) {}
+
+        candidates.push({ roomNumber, score, path });
+      }
+
+      if (!candidates.length) return null;
+      candidates.sort((a,b) => b.score - a.score);
+      const best = candidates[0];
+      if (!best || best.score < 40) return null;
+      return { key:`room:${best.roomNumber}`, roomNumber:best.roomNumber, source:'cocos-loose-text' };
+    } catch (_) {
+      return null;
+    }
+  }
+
   function collectSameOriginLiveWindows(rootWindow = window) {
     const windows = [];
     const seen = new Set();
@@ -594,9 +677,11 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
   function resolveRoomIdentityFromCocos() {
     if (isMachineSelectionOpenFromCocos()) return null;
-    for (const gameWindow of collectSameOriginLiveWindows()) {
+    const windows = collectSameOriginLiveWindows();
+
+    for (const gameWindow of windows) {
       try {
-        const cocos = gameWindow.cc;
+        const cocos = gameWindow.cc || gameWindow.legacyCC || gameWindow._cc;
         const scene = cocos?.director?.getScene?.();
         const Label = cocos?.Label;
         if (!scene || !Label || typeof scene.getComponentsInChildren !== 'function') continue;
@@ -604,6 +689,12 @@ setInterval(xinyaoCheckMaintenance, 10000);
         if (identity) return identity;
       } catch (_) {}
     }
+
+    for (const gameWindow of windows) {
+      const loose = resolveRoomIdentityFromLooseCocosText(gameWindow);
+      if (loose) return loose;
+    }
+
     return null;
   }
 
@@ -6170,7 +6261,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
     ['9', '綠寶石'],
     ['10', '倍率球'],
     ['12', '倍數球'],
-    ['13', '倍率符號']
+    ['13', '倍率符號'],
+    ['15', 'SCATTER']
   ]);
 
   function symbolLabel(token) {
@@ -6201,6 +6293,10 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
     if (key === '10' || key === '13') {
       return `<span class="bp-icon bp-multiplier" aria-label="${esc(symbolLabel(key))}">×</span>`;
+    }
+
+    if (key === '15') {
+      return '<span class="bp-icon bp-scatter" aria-label="SCATTER">S</span>';
     }
 
     return '<span class="bp-icon bp-unknown">?</span>';
@@ -6381,10 +6477,15 @@ setInterval(xinyaoCheckMaintenance, 10000);
     const axe = candidateCount(candidate, '4');
     const multiplierOrb = candidateCount(candidate, '12');
     const multiplier = candidateCount(candidate, '10') + candidateCount(candidate, '13');
+    const scatter = candidateCount(candidate, '15');
     const premium = eye + snake + bow + axe;
     let score = 0;
     const reasons = [];
 
+    if (scatter > 0) {
+      score += scatter >= 3 ? 45 : (scatter === 2 ? 25 : 10);
+      reasons.push(`SCATTER ×${scatter}`);
+    }
     if (multiplierOrb > 0) {
       score += Math.min(50, 34 + (multiplierOrb - 1) * 8);
       reasons.push(`倍數球 ×${multiplierOrb}`);
@@ -6652,6 +6753,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
       #${PANEL_ID} .bp-icon{display:block;width:38px;height:38px;margin:0 auto;border-radius:8px;box-shadow:0 2px 7px rgba(0,0,0,.28)}
       #${PANEL_ID} .bp-icon-img{object-fit:contain;object-position:center center;box-sizing:border-box;padding:2px;background:rgba(255,255,255,.035);overflow:visible}
       #${PANEL_ID} .bp-multiplier{display:flex;align-items:center;justify-content:center;border-radius:50%;background:radial-gradient(circle at 35% 30%,#47d378,#15884d 70%);border:2px solid #e4b54b;color:#ffe16a;font-size:24px;font-weight:950;line-height:1}
+      #${PANEL_ID} .bp-scatter{display:flex;align-items:center;justify-content:center;border-radius:9px;background:radial-gradient(circle at 35% 30%,#ffd26d,#b22f59 72%);border:1px solid rgba(255,221,128,.78);color:#fff4b8;font-size:18px;font-weight:950;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,.45)}
       #${PANEL_ID} .bp-unknown{display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);color:#9eb4c7;font-size:18px;font-weight:900}
       #${PANEL_ID} .bp-name{display:block;margin-top:2px;font-size:8px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.80}
       #${PANEL_ID} .bp-seq-title{margin-top:8px;font-size:9px;font-weight:850;opacity:.78}
