@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.9
+// @version      4.0.0-test.10
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -6156,6 +6156,34 @@ setInterval(xinyaoCheckMaintenance, 10000);
     return VERIFIED_SYMBOL_LABELS.get(key) || `ID ${key}`;
   }
 
+  function svgData(svg) {
+    return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+  }
+
+  function gemSvg(inner, outer, diamond = false) {
+    const shape = diamond
+      ? '<polygon points="32,5 59,32 32,59 5,32" fill="' + outer + '" stroke="#e9b84d" stroke-width="3"/><polygon points="32,12 52,32 32,52 12,32" fill="' + inner + '"/><path d="M12 32h40M32 12v40M18 18l28 28M46 18L18 46" stroke="rgba(255,255,255,.34)" stroke-width="2"/>'
+      : '<circle cx="32" cy="32" r="27" fill="' + outer + '" stroke="#e9b84d" stroke-width="3"/><circle cx="32" cy="32" r="20" fill="' + inner + '"/><path d="M18 18l28 28M46 18L18 46M13 32h38" stroke="rgba(255,255,255,.28)" stroke-width="2"/>';
+    return svgData('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">' + shape + '</svg>');
+  }
+
+  const SYMBOL_ICONS = new Map([
+    ['1', svgData('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M5 31C14 15 25 10 32 10s18 5 27 21c-9 16-20 21-27 21S14 47 5 31Z" fill="#16a7a5" stroke="#e6b74d" stroke-width="4"/><path d="M11 31c7-8 14-12 21-12s14 4 21 12c-7 8-14 12-21 12S18 39 11 31Z" fill="#f4efe4"/><circle cx="32" cy="31" r="10" fill="#26d0cf" stroke="#1c4250" stroke-width="3"/><circle cx="32" cy="31" r="4.5" fill="#1a1130"/><path d="M9 18Q31 3 55 17M13 49Q31 61 51 48" fill="none" stroke="#e6b74d" stroke-width="3" stroke-linecap="round"/></svg>')],
+    ['2', svgData('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M30 57C18 49 18 36 28 29c-9-4-11-13-4-20 7-7 20-5 24 5 3 7-2 12-8 15 10 7 10 19-1 28Z" fill="#24a9a5" stroke="#e6b74d" stroke-width="4"/><path d="M22 17c5-8 17-9 24-1l-8 5-8-1Z" fill="#d94838"/><circle cx="39" cy="15" r="2.5" fill="#ffe36d"/></svg>')],
+    ['3', svgData('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" fill="#178f67" stroke="#e6b74d" stroke-width="3"/><path d="M18 47Q42 32 20 15" fill="none" stroke="#e9c56c" stroke-width="4"/><path d="M20 15L47 45" stroke="#e9c56c" stroke-width="3"/><path d="M44 40l6 8-9-5Z" fill="#e9c56c"/><path d="M18 47l2-32" stroke="#d99245" stroke-width="2"/></svg>')],
+    ['4', svgData('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" fill="#9b5d20" stroke="#e6b74d" stroke-width="3"/><path d="M17 40l29-22" stroke="#f0c56d" stroke-width="5" stroke-linecap="round"/><path d="M41 13c8 1 13 5 14 11-7-1-12 1-16 6Z" fill="#f0c56d"/><path d="M23 36c-8 0-13-4-15-10 7 0 12-2 16-6Z" fill="#f0c56d"/></svg>')],
+    ['5', gemSvg('#ffd83d','#e6a81e',false)],
+    ['6', gemSvg('#ff4f50','#c62828',false)],
+    ['7', gemSvg('#b953e8','#6f2faf',false)],
+    ['8', gemSvg('#39a8ff','#1768b9',true)],
+    ['9', gemSvg('#29cf66','#138e45',true)],
+    ['13', svgData('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" fill="#1e9c58" stroke="#e6b74d" stroke-width="4"/><text x="32" y="39" text-anchor="middle" font-family="Arial,sans-serif" font-size="24" font-weight="900" fill="#ffd95a">×</text></svg>')]
+  ]);
+
+  function symbolIcon(token) {
+    return SYMBOL_ICONS.get(String(token ?? '')) || '';
+  }
+
   function safe(fn, fallback = null) {
     try {
       const value = fn();
@@ -6360,12 +6388,16 @@ setInterval(xinyaoCheckMaintenance, 10000);
       #${PANEL_ID} .bp-mini{font-size:10px;opacity:.7}
       #${PANEL_ID} .bp-status{margin-top:5px;font-size:10px;color:#8deac1}
       #${PANEL_ID} .bp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:8px}
-      #${PANEL_ID} .bp-item{padding:7px 4px;border-radius:10px;background:rgba(255,255,255,.065);text-align:center;min-width:0}
+      #${PANEL_ID} .bp-item{padding:6px 3px 7px;border-radius:10px;background:rgba(255,255,255,.065);text-align:center;min-width:0}
+      #${PANEL_ID} .bp-icon{display:block;width:42px;height:42px;object-fit:contain;margin:0 auto;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.28)}
+      #${PANEL_ID} .bp-name{display:block;margin-top:3px;font-size:8px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.86}
       #${PANEL_ID} .bp-seq-title{margin-top:8px;font-size:9px;font-weight:850;opacity:.78}
+      #${PANEL_ID} .bp-board-toggle{width:100%;margin-top:7px;border:1px solid rgba(115,223,255,.28);border-radius:8px;background:rgba(115,223,255,.07);color:#dff8ff;padding:5px;font-size:8px;font-weight:850;cursor:pointer}
+      #${PANEL_ID} .bp-board-wrap{display:none}
+      #${PANEL_ID} .bp-board-wrap.open{display:block}
       #${PANEL_ID} .bp-seq-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;margin-top:5px}
       #${PANEL_ID} .bp-cell{position:relative;display:flex;align-items:center;justify-content:center;min-height:26px;padding:3px;border-radius:7px;background:rgba(115,223,255,.08);font-size:9px;font-weight:900}
       #${PANEL_ID} .bp-cell i{position:absolute;top:1px;left:3px;font-size:6px;font-style:normal;opacity:.35}
-      #${PANEL_ID} .bp-token{display:block;font-size:10px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       #${PANEL_ID} .bp-count{display:block;margin-top:3px;color:#73dfff;font-size:12px;font-weight:950}
       #${PANEL_ID} .bp-path{margin-top:8px;padding-top:7px;border-top:1px solid rgba(255,255,255,.10);font-size:8px;line-height:1.35;opacity:.5;word-break:break-all}
       #${PANEL_ID}.min .bp-body{display:none}
@@ -6397,7 +6429,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     panel.id = PANEL_ID;
     panel.innerHTML = `
       <div class="bp-head">
-        <div class="bp-title">🌸 盤面偵測測試</div>
+        <div class="bp-title">🌸 芯瑤盤面監測</div>
         <div class="bp-mini">－</div>
       </div>
       <div class="bp-body"></div>
@@ -6437,13 +6469,16 @@ setInterval(xinyaoCheckMaintenance, 10000);
       return;
     }
 
-    const cards = candidate.items.slice(0, 12).map(item => `
-      <div class="bp-item">
-        <span class="bp-token">${esc(symbolLabel(item.token))}</span>
-        <span class="bp-count">×${item.count}</span>
-        <span style="display:block;margin-top:2px;font-size:7px;opacity:.42;">ID ${esc(item.token)}</span>
-      </div>
-    `).join('');
+    const cards = candidate.items.slice(0, 12).map(item => {
+      const icon = symbolIcon(item.token);
+      return `
+        <div class="bp-item" title="${esc(symbolLabel(item.token))}｜ID ${esc(item.token)}">
+          ${icon ? `<img class="bp-icon" src="${icon}" alt="${esc(symbolLabel(item.token))}">` : ''}
+          <span class="bp-name">${esc(symbolLabel(item.token))}</span>
+          <span class="bp-count">×${item.count}</span>
+        </div>
+      `;
+    }).join('');
 
     const sequence = Array.isArray(candidate.tokens)
       ? candidate.tokens.slice(0, 30).map((token, index) => `
@@ -6452,14 +6487,28 @@ setInterval(xinyaoCheckMaintenance, 10000);
       : '';
 
     body.innerHTML = `
-      <div class="bp-status">● 已抓到本局盤面候選｜${esc(roomText())} 房</div>
+      <div class="bp-status">● 已完成盤面偵測｜${esc(roomText())} 房</div>
       <div class="bp-grid">${cards}</div>
-      ${sequence ? `<div class="bp-seq-title">原始 30 格盤面順序（6 欄）</div><div class="bp-seq-grid">${sequence}</div>` : ''}
-      <div class="bp-path">
-        ${candidate.total} 格｜${candidate.unique} 種｜候選 ${probe.candidateCount} 組<br>
-        路徑：${esc(candidate.path)}
+      <button type="button" class="bp-board-toggle">查看 30 格盤面</button>
+      <div class="bp-board-wrap">
+        ${sequence ? `<div class="bp-seq-title">30 格盤面順序（6 欄）</div><div class="bp-seq-grid">${sequence}</div>` : ''}
+        <div class="bp-path">
+          ${candidate.total} 格｜${candidate.unique} 種圖案<br>
+          偵測來源：${esc(candidate.path)}
+        </div>
       </div>
     `;
+
+    const boardToggle = body.querySelector('.bp-board-toggle');
+    const boardWrap = body.querySelector('.bp-board-wrap');
+    if (boardToggle && boardWrap) {
+      boardToggle.onclick = event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const open = boardWrap.classList.toggle('open');
+        boardToggle.textContent = open ? '收起 30 格盤面' : '查看 30 格盤面';
+      };
+    }
   }
 
   function handleSpinFinal(event) {
@@ -6504,520 +6553,3 @@ setInterval(xinyaoCheckMaintenance, 10000);
   }
 })();
 
-/* ===== 芯瑤 ATG HUD Lab｜Cocos 圖示素材偵測 v0.4 ===== */
-(function xinyaoSpriteProbeModuleV04() {
-  'use strict';
-
-  if (window.__XIANYAO_ATG_SPRITE_PROBE_V04__) return;
-  window.__XIANYAO_ATG_SPRITE_PROBE_V04__ = true;
-
-  const HOST_PANEL_ID = 'xinyao-atg-board-probe-v01';
-  const SECTION_ID = 'xinyao-atg-sprite-probe-v04';
-  const EVENT_NAME = 'xinyao:spin-final-observed';
-
-  const spriteState = {
-    scanning: false,
-    frames: [],
-    error: ''
-  };
-
-  function safe(fn, fallback = null) {
-    try {
-      const value = fn();
-      return value === undefined ? fallback : value;
-    } catch (_) {
-      return fallback;
-    }
-  }
-
-  function collectSameOriginWindows(root = window) {
-    const out = [];
-    const seen = new Set();
-    const visit = win => {
-      if (!win || seen.has(win)) return;
-      seen.add(win);
-      out.push(win);
-      let frames = [];
-      try { frames = [...win.document.querySelectorAll('iframe')]; } catch (_) {}
-      for (const frame of frames) {
-        try {
-          const child = frame.contentWindow;
-          if (!child) continue;
-          void child.document;
-          visit(child);
-        } catch (_) {}
-      }
-    };
-    visit(root);
-    return out;
-  }
-
-  function ccFor(win) {
-    return safe(() => win.cc, null) || safe(() => win.legacyCC, null) || safe(() => win._cc, null);
-  }
-
-  function nodePath(node) {
-    const parts = [];
-    let current = node;
-    for (let i = 0; current && i < 12; i += 1) {
-      const name = safe(() => current.name, '') || '';
-      if (name) parts.unshift(String(name));
-      current = safe(() => current.parent, null) || safe(() => current._parent, null);
-    }
-    return parts.join('/');
-  }
-
-  function symbolIdFromName(name) {
-    const match = String(name || '').match(/^symbol[_-]?0*(\d+)$/i);
-    return match ? String(Number(match[1])) : '';
-  }
-
-  function isDrawable(value) {
-    if (!value) return false;
-    try {
-      if (typeof HTMLImageElement !== 'undefined' && value instanceof HTMLImageElement) return true;
-      if (typeof HTMLCanvasElement !== 'undefined' && value instanceof HTMLCanvasElement) return true;
-      if (typeof HTMLVideoElement !== 'undefined' && value instanceof HTMLVideoElement) return true;
-      if (typeof ImageBitmap !== 'undefined' && value instanceof ImageBitmap) return true;
-      if (typeof OffscreenCanvas !== 'undefined' && value instanceof OffscreenCanvas) return true;
-    } catch (_) {}
-    return false;
-  }
-
-  function unwrapDrawable(value, depth = 0, seen = new WeakSet()) {
-    if (!value || depth > 5) return null;
-    if (isDrawable(value)) return value;
-
-    if ((typeof value !== 'object' && typeof value !== 'function') || seen.has(value)) return null;
-    seen.add(value);
-
-    const keys = [
-      '_nativeAsset','nativeAsset','_image','image',
-      '_data','data','_source','source',
-      '_texture','texture','_texture2D','texture2D'
-    ];
-
-    for (const key of keys) {
-      const child = safe(() => value[key], null);
-      if (!child) continue;
-      const found = unwrapDrawable(child, depth + 1, seen);
-      if (found) return found;
-    }
-
-    return null;
-  }
-
-  function assetCandidates(win, texture, spriteFrame) {
-    const out = [];
-    const push = value => {
-      if (value && !out.includes(value)) out.push(value);
-    };
-
-    push(texture);
-    push(safe(() => texture?._image, null));
-    push(safe(() => texture?.image, null));
-    push(safe(() => texture?._nativeAsset, null));
-    push(safe(() => spriteFrame?._texture, null));
-
-    const cc = ccFor(win);
-    const uuids = new Set([
-      safe(() => texture?._uuid, ''),
-      safe(() => texture?.uuid, ''),
-      safe(() => spriteFrame?._uuid, ''),
-      safe(() => spriteFrame?.uuid, '')
-    ].filter(Boolean));
-
-    try {
-      const assets = cc?.assetManager?.assets;
-      for (const uuid of uuids) {
-        push(assets?.get?.(uuid));
-      }
-    } catch (_) {}
-
-    try {
-      const cache = cc?.loader?._cache;
-      for (const uuid of uuids) {
-        push(cache?.[uuid]?.content);
-        push(cache?.[uuid]?.asset);
-        push(cache?.[uuid]);
-      }
-    } catch (_) {}
-
-    return out;
-  }
-
-  function drawableFor(win, texture, spriteFrame) {
-    for (const candidate of assetCandidates(win, texture, spriteFrame)) {
-      const found = unwrapDrawable(candidate);
-      if (found) return found;
-    }
-    return null;
-  }
-
-  function sourceSize(source) {
-    return {
-      width:Number(
-        safe(() => source?.naturalWidth, 0) ||
-        safe(() => source?.videoWidth, 0) ||
-        safe(() => source?.width, 0) || 0
-      ),
-      height:Number(
-        safe(() => source?.naturalHeight, 0) ||
-        safe(() => source?.videoHeight, 0) ||
-        safe(() => source?.height, 0) || 0
-      )
-    };
-  }
-
-  function findNativeUrl(value, depth = 0, seen = new WeakSet()) {
-    if (!value || depth > 4) return '';
-    if ((typeof value !== 'object' && typeof value !== 'function') || seen.has(value)) return '';
-    seen.add(value);
-
-    const directKeys = ['currentSrc','src','nativeUrl','_nativeUrl','url','_url'];
-    for (const key of directKeys) {
-      const raw = safe(() => value[key], '');
-      if (typeof raw !== 'string') continue;
-      const text = raw.trim();
-      if (text && !/^db:\/\//i.test(text)) return text;
-    }
-
-    const childKeys = ['_nativeAsset','nativeAsset','_image','image','_data','data','_source','source'];
-    for (const key of childKeys) {
-      const child = safe(() => value[key], null);
-      const found = findNativeUrl(child, depth + 1, seen);
-      if (found) return found;
-    }
-    return '';
-  }
-
-  function resolveUrl(win, texture, spriteFrame) {
-    const values = assetCandidates(win, texture, spriteFrame);
-    for (const value of values) {
-      const raw = findNativeUrl(value);
-      if (!raw) continue;
-      if (/^(data:|blob:|https?:)/i.test(raw)) return raw;
-      try { return new URL(raw, String(win?.location?.href || location.href)).href; } catch (_) {}
-    }
-    return '';
-  }
-
-  function makeFrameInfo(win, node, spriteFrame) {
-    const texture =
-      safe(() => spriteFrame.getTexture?.(), null) ||
-      safe(() => spriteFrame._texture, null) ||
-      null;
-
-    const rect =
-      safe(() => spriteFrame.getRect?.(), null) ||
-      safe(() => spriteFrame._rect, null) ||
-      null;
-
-    const originalSize =
-      safe(() => spriteFrame.getOriginalSize?.(), null) ||
-      safe(() => spriteFrame._originalSize, null) ||
-      null;
-
-    const name = String(
-      safe(() => spriteFrame.name, '') ||
-      safe(() => spriteFrame._name, '') ||
-      ''
-    );
-    const symbolId = symbolIdFromName(name);
-    if (!symbolId || !rect) return null;
-
-    const source = drawableFor(win, texture, spriteFrame);
-    const nativeUrl = resolveUrl(win, texture, spriteFrame);
-    const sourceDim = sourceSize(source);
-
-    const textureWidth = Number(
-      sourceDim.width ||
-      safe(() => texture?.width, 0) ||
-      safe(() => texture?._width, 0) ||
-      0
-    );
-    const textureHeight = Number(
-      sourceDim.height ||
-      safe(() => texture?.height, 0) ||
-      safe(() => texture?._height, 0) ||
-      0
-    );
-
-    return {
-      symbolId,
-      name,
-      path:nodePath(node),
-      count:1,
-      source,
-      nativeUrl,
-      textureWidth,
-      textureHeight,
-      rect:{
-        x:Number(rect.x||0),
-        y:Number(rect.y||0),
-        width:Number(rect.width||0),
-        height:Number(rect.height||0)
-      },
-      originalSize:originalSize ? {
-        width:Number(originalSize.width||0),
-        height:Number(originalSize.height||0)
-      } : null,
-      rotated:Boolean(safe(() => spriteFrame.isRotated?.(), false))
-    };
-  }
-
-  function collectFrames() {
-    const grouped = new Map();
-
-    for (const win of collectSameOriginWindows()) {
-      const cc = ccFor(win);
-      const scene = safe(() => cc?.director?.getScene?.(), null);
-      const Sprite = safe(() => cc?.Sprite, null);
-      if (!scene || !Sprite) continue;
-
-      const seenNodes = new WeakSet();
-      const visit = (node, depth = 0) => {
-        if (!node || depth > 30 || seenNodes.has(node)) return;
-        seenNodes.add(node);
-
-        const active = safe(() => node.activeInHierarchy, safe(() => node.active, true));
-        if (active !== false) {
-          let sprites = [];
-          try { sprites = node.getComponents?.(Sprite) || []; } catch (_) {}
-
-          for (const component of sprites) {
-            if (!component || safe(() => component.enabled, true) === false) continue;
-            const sf = safe(() => component.spriteFrame, null) || safe(() => component._spriteFrame, null);
-            const info = makeFrameInfo(win, node, sf);
-            if (!info) continue;
-
-            const existing = grouped.get(info.symbolId);
-            if (existing) {
-              existing.count += 1;
-              if (!existing.source && info.source) existing.source = info.source;
-              if (!existing.nativeUrl && info.nativeUrl) existing.nativeUrl = info.nativeUrl;
-              if ((!existing.textureWidth || !existing.textureHeight) && info.textureWidth && info.textureHeight) {
-                existing.textureWidth = info.textureWidth;
-                existing.textureHeight = info.textureHeight;
-              }
-            } else {
-              grouped.set(info.symbolId, info);
-            }
-          }
-        }
-
-        let children=[];
-        try { children = node.children || node._children || []; } catch (_) {}
-        for (const child of children) visit(child, depth + 1);
-      };
-
-      visit(scene,0);
-    }
-
-    const frames=[...grouped.values()].sort((a,b)=>Number(a.symbolId)-Number(b.symbolId));
-    try {
-      const byId={};
-      for (const item of frames) byId[item.symbolId]=item;
-      window.__XIANYAO_ATG_SYMBOL_SPRITES__={frames,byId,updatedAt:Date.now(),source:'asset-unwrapped'};
-    } catch (_) {}
-    return frames;
-  }
-
-  function drawFromSource(canvas, item) {
-    if (!item?.source || !item?.rect) return false;
-    const dim=sourceSize(item.source);
-    if (!dim.width || !dim.height || !item.rect.width || !item.rect.height) return false;
-
-    const ctx=canvas.getContext('2d');
-    if (!ctx) return false;
-    canvas.width=96;
-    canvas.height=96;
-    ctx.clearRect(0,0,96,96);
-
-    try {
-      const sx=Math.max(0,item.rect.x);
-      let sy=dim.height-item.rect.y-item.rect.height;
-      if (!(sy>=0 && sy+item.rect.height<=dim.height)) sy=item.rect.y;
-
-      if (!item.rotated) {
-        ctx.drawImage(item.source,sx,sy,item.rect.width,item.rect.height,0,0,96,96);
-      } else {
-        ctx.save();
-        ctx.translate(48,48);
-        ctx.rotate(-Math.PI/2);
-        ctx.drawImage(item.source,sx,sy,item.rect.width,item.rect.height,-48,-48,96,96);
-        ctx.restore();
-      }
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  function atlasPreview(item) {
-    if (!item?.nativeUrl || !item?.rect || item.rotated) return null;
-    const tw=Number(item.textureWidth||0), th=Number(item.textureHeight||0);
-    if (!tw || !th) return null;
-
-    const rw=Number(item.rect.width||0), rh=Number(item.rect.height||0);
-    if (!rw || !rh) return null;
-
-    const max=46;
-    const scale=Math.min(max/rw,max/rh);
-    const topY=th-item.rect.y-rh;
-
-    const crop=document.createElement('div');
-    crop.className='sp-atlas';
-    crop.style.width=`${rw*scale}px`;
-    crop.style.height=`${rh*scale}px`;
-    crop.style.backgroundImage=`url("${String(item.nativeUrl).replace(/"/g,'\\"')}")`;
-    crop.style.backgroundRepeat='no-repeat';
-    crop.style.backgroundSize=`${tw*scale}px ${th*scale}px`;
-    crop.style.backgroundPosition=`${-item.rect.x*scale}px ${-topY*scale}px`;
-    return crop;
-  }
-
-  function buildPreview(item) {
-    const wrap=document.createElement('div');
-    wrap.className='sp-preview';
-
-    const canvas=document.createElement('canvas');
-    if (drawFromSource(canvas,item)) {
-      wrap.appendChild(canvas);
-      return {element:wrap,method:'asset-canvas'};
-    }
-
-    const atlas=atlasPreview(item);
-    if (atlas) {
-      wrap.appendChild(atlas);
-      return {element:wrap,method:'asset-url'};
-    }
-
-    const empty=document.createElement('div');
-    empty.className='sp-empty';
-    empty.textContent='無預覽';
-    wrap.appendChild(empty);
-    return {element:wrap,method:'no-preview'};
-  }
-
-  function ensureStyle() {
-    if (document.getElementById('xinyao-atg-sprite-probe-style-v04')) return;
-    const style=document.createElement('style');
-    style.id='xinyao-atg-sprite-probe-style-v04';
-    style.textContent=`
-      #${SECTION_ID}{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.10)}
-      #${SECTION_ID} .sp-head{display:flex;align-items:center;justify-content:space-between;gap:7px}
-      #${SECTION_ID} .sp-title{font-size:9px;font-weight:900;opacity:.88}
-      #${SECTION_ID} .sp-btn{border:1px solid rgba(115,223,255,.35);border-radius:8px;background:rgba(115,223,255,.08);color:#dff8ff;padding:4px 7px;font-size:8px;font-weight:850;cursor:pointer}
-      #${SECTION_ID} .sp-status{margin-top:5px;font-size:8px;line-height:1.4;opacity:.62}
-      #${SECTION_ID} .sp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:6px}
-      #${SECTION_ID} .sp-card{min-width:0;padding:4px 3px;border-radius:9px;background:rgba(255,255,255,.055);text-align:center}
-      #${SECTION_ID} .sp-preview{display:flex;align-items:center;justify-content:center;width:48px;height:48px;max-width:100%;margin:0 auto;overflow:hidden;border-radius:8px;background:rgba(255,255,255,.025)}
-      #${SECTION_ID} canvas{display:block;width:46px;height:46px}
-      #${SECTION_ID} .sp-atlas{background-repeat:no-repeat;flex:0 0 auto}
-      #${SECTION_ID} .sp-empty{font-size:7px;opacity:.35}
-      #${SECTION_ID} .sp-name{margin-top:2px;font-size:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.82}
-      #${SECTION_ID} .sp-count{font-size:8px;font-weight:900;color:#73dfff}
-      #${SECTION_ID} .sp-tech{font-size:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.35}
-      @media(max-width:760px){
-        #${SECTION_ID} .sp-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
-      }
-    `;
-    (document.head||document.documentElement).appendChild(style);
-  }
-
-  function ensureSection() {
-    ensureStyle();
-    const host=document.getElementById(HOST_PANEL_ID);
-    const body=host?.querySelector('.bp-body');
-    if(!body) return null;
-
-    let section=body.querySelector(`#${SECTION_ID}`);
-    if(section) return section;
-
-    section=document.createElement('div');
-    section.id=SECTION_ID;
-    section.innerHTML=`
-      <div class="sp-head">
-        <div class="sp-title">🧩 遊戲原始圖示素材 v4</div>
-        <button type="button" class="sp-btn">重新掃描</button>
-      </div>
-      <div class="sp-status">深層讀取 Cocos Texture / ImageAsset…</div>
-      <div class="sp-grid"></div>
-    `;
-    section.querySelector('.sp-btn')?.addEventListener('click',event=>{
-      event.preventDefault();
-      event.stopPropagation();
-      runScan();
-    });
-    body.appendChild(section);
-    return section;
-  }
-
-  function render() {
-    const section=ensureSection();
-    if(!section) return;
-    const status=section.querySelector('.sp-status');
-    const grid=section.querySelector('.sp-grid');
-    if(!status||!grid) return;
-
-    if(spriteState.scanning){
-      status.textContent='正在讀取遊戲 Texture / ImageAsset…';
-      return;
-    }
-
-    const previewCount=spriteState.frames.filter(item=>item.source||item.nativeUrl).length;
-    if(spriteState.error) status.textContent=spriteState.error;
-    else if(!spriteState.frames.length) status.textContent='尚未掃到 symbol_XX；完成一局後會自動重試。';
-    else status.textContent=`抓到 ${spriteState.frames.length} 種 Symbol｜可取圖來源 ${previewCount} 種`;
-
-    grid.innerHTML='';
-    for(const item of spriteState.frames.slice(0,16)){
-      const card=document.createElement('div');
-      card.className='sp-card';
-
-      const preview=buildPreview(item);
-      card.appendChild(preview.element);
-
-      const name=document.createElement('div');
-      name.className='sp-name';
-      name.textContent=`ID ${item.symbolId}｜${item.name}`;
-
-      const count=document.createElement('div');
-      count.className='sp-count';
-      count.textContent=`×${item.count}`;
-
-      const tech=document.createElement('div');
-      tech.className='sp-tech';
-      tech.textContent=`${preview.method}｜src${item.source?'✓':'×'}｜url${item.nativeUrl?'✓':'×'}`;
-
-      card.appendChild(name);
-      card.appendChild(count);
-      card.appendChild(tech);
-      grid.appendChild(card);
-    }
-  }
-
-  function runScan() {
-    if(spriteState.scanning) return;
-    spriteState.scanning=true;
-    spriteState.error='';
-    render();
-
-    setTimeout(()=>{
-      try{
-        spriteState.frames=collectFrames();
-        if(!spriteState.frames.length) spriteState.error='這局沒有抓到 symbol_XX 節點；下一局再試一次。';
-      }catch(_){
-        spriteState.frames=[];
-        spriteState.error='Texture 深層讀取失敗，下一局會再重試。';
-      }finally{
-        spriteState.scanning=false;
-        render();
-      }
-    },120);
-  }
-
-  window.addEventListener(EVENT_NAME,()=>setTimeout(runScan,500));
-  setInterval(()=>{ if(document.getElementById(HOST_PANEL_ID)) render(); },900);
-})();
