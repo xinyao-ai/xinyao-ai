@@ -6504,15 +6504,15 @@ setInterval(xinyaoCheckMaintenance, 10000);
   }
 })();
 
-/* ===== 芯瑤 ATG HUD Lab｜Cocos 圖示素材偵測 v0.2 ===== */
-(function xinyaoSpriteProbeModuleV02() {
+/* ===== 芯瑤 ATG HUD Lab｜Cocos 圖示素材偵測 v0.3 ===== */
+(function xinyaoSpriteProbeModuleV03() {
   'use strict';
 
-  if (window.__XIANYAO_ATG_SPRITE_PROBE_V02__) return;
-  window.__XIANYAO_ATG_SPRITE_PROBE_V02__ = true;
+  if (window.__XIANYAO_ATG_SPRITE_PROBE_V03__) return;
+  window.__XIANYAO_ATG_SPRITE_PROBE_V03__ = true;
 
   const HOST_PANEL_ID = 'xinyao-atg-board-probe-v01';
-  const SECTION_ID = 'xinyao-atg-sprite-probe-v02';
+  const SECTION_ID = 'xinyao-atg-sprite-probe-v03';
   const EVENT_NAME = 'xinyao:spin-final-observed';
 
   const spriteState = {
@@ -6534,15 +6534,12 @@ setInterval(xinyaoCheckMaintenance, 10000);
   function collectSameOriginWindows(root = window) {
     const out = [];
     const seen = new Set();
-
     const visit = win => {
       if (!win || seen.has(win)) return;
       seen.add(win);
       out.push(win);
-
       let frames = [];
       try { frames = [...win.document.querySelectorAll('iframe')]; } catch (_) {}
-
       for (const frame of frames) {
         try {
           const child = frame.contentWindow;
@@ -6552,9 +6549,12 @@ setInterval(xinyaoCheckMaintenance, 10000);
         } catch (_) {}
       }
     };
-
     visit(root);
     return out;
+  }
+
+  function ccFor(win) {
+    return safe(() => win.cc, null) || safe(() => win.legacyCC, null) || safe(() => win._cc, null);
   }
 
   function nodePath(node) {
@@ -6568,180 +6568,120 @@ setInterval(xinyaoCheckMaintenance, 10000);
     return parts.join('/');
   }
 
-  function textureSource(texture) {
-    const candidates = [
-      safe(() => texture?.getHtmlElementObj?.(), null),
-      safe(() => texture?._image, null),
-      safe(() => texture?._nativeAsset, null),
-      safe(() => texture?.image, null),
-      safe(() => texture?._nativeAsset?._image, null),
-      safe(() => texture?._nativeAsset?.image, null)
-    ];
-    return candidates.find(value =>
-      value && (
-        typeof HTMLImageElement !== 'undefined' && value instanceof HTMLImageElement ||
-        typeof HTMLCanvasElement !== 'undefined' && value instanceof HTMLCanvasElement ||
-        typeof ImageBitmap !== 'undefined' && value instanceof ImageBitmap ||
-        typeof OffscreenCanvas !== 'undefined' && value instanceof OffscreenCanvas ||
-        typeof HTMLVideoElement !== 'undefined' && value instanceof HTMLVideoElement
-      )
-    ) || null;
-  }
-
-  function sourceSize(source) {
-    const width = Number(
-      safe(() => source?.naturalWidth, 0) ||
-      safe(() => source?.videoWidth, 0) ||
-      safe(() => source?.width, 0) ||
-      0
-    );
-    const height = Number(
-      safe(() => source?.naturalHeight, 0) ||
-      safe(() => source?.videoHeight, 0) ||
-      safe(() => source?.height, 0) ||
-      0
-    );
-    return { width, height };
-  }
-
-  function textureSize(texture, source) {
-    const sourceDim = sourceSize(source);
-    return {
-      width: Number(
-        sourceDim.width ||
-        safe(() => texture?.width, 0) ||
-        safe(() => texture?._width, 0) ||
-        safe(() => texture?._image?.width, 0) ||
-        safe(() => texture?._nativeAsset?.width, 0) ||
-        0
-      ),
-      height: Number(
-        sourceDim.height ||
-        safe(() => texture?.height, 0) ||
-        safe(() => texture?._height, 0) ||
-        safe(() => texture?._image?.height, 0) ||
-        safe(() => texture?._nativeAsset?.height, 0) ||
-        0
-      )
-    };
-  }
-
-  function resolveAssetUrl(win, texture, spriteFrame, source) {
-    const rawCandidates = [
-      safe(() => source?.currentSrc, ''),
-      safe(() => source?.src, ''),
-      safe(() => texture?.nativeUrl, ''),
-      safe(() => texture?._nativeUrl, ''),
-      safe(() => texture?.url, ''),
-      safe(() => texture?._url, ''),
-      safe(() => texture?._native, ''),
-      safe(() => texture?._nativeAsset?.nativeUrl, ''),
-      safe(() => texture?._nativeAsset?._nativeUrl, ''),
-      safe(() => texture?._nativeAsset?.url, ''),
-      safe(() => texture?._nativeAsset?._url, ''),
-      safe(() => texture?._nativeAsset?.src, ''),
-      safe(() => spriteFrame?._atlas?.nativeUrl, ''),
-      safe(() => spriteFrame?._atlas?._nativeUrl, ''),
-      safe(() => spriteFrame?._atlas?.url, ''),
-      safe(() => spriteFrame?._atlas?._url, '')
-    ];
-
-    for (const rawValue of rawCandidates) {
-      const raw = String(rawValue || '').trim();
-      if (!raw || /^db:\/\//i.test(raw)) continue;
-      if (/^(data:|blob:|https?:)/i.test(raw)) return raw;
-      try {
-        return new URL(raw, String(win?.location?.href || location.href)).href;
-      } catch (_) {}
-    }
-
-    return '';
-  }
-
   function symbolIdFromName(name) {
     const match = String(name || '').match(/^symbol[_-]?0*(\d+)$/i);
     return match ? String(Number(match[1])) : '';
   }
 
-  function frameInfo(spriteFrame, node, win) {
-    if (!spriteFrame) return null;
+  function findLargestCanvas(win) {
+    let canvases = [];
+    try { canvases = [...win.document.querySelectorAll('canvas')]; } catch (_) {}
+    return canvases
+      .filter(canvas => Number(canvas.width || 0) > 10 && Number(canvas.height || 0) > 10)
+      .sort((a,b) => (b.width*b.height) - (a.width*a.height))[0] || null;
+  }
 
-    const texture =
-      safe(() => spriteFrame.getTexture?.(), null) ||
-      safe(() => spriteFrame._texture, null) ||
-      null;
+  function worldBounds(node, cc) {
+    const direct = safe(() => node.getBoundingBoxToWorld?.(), null);
+    if (direct && Number(direct.width) > 2 && Number(direct.height) > 2) {
+      return {
+        x:Number(direct.x || 0),
+        y:Number(direct.y || 0),
+        width:Number(direct.width || 0),
+        height:Number(direct.height || 0)
+      };
+    }
 
-    const rect =
-      safe(() => spriteFrame.getRect?.(), null) ||
-      safe(() => spriteFrame._rect, null) ||
-      null;
+    const size =
+      safe(() => node.getContentSize?.(), null) ||
+      safe(() => node._contentSize, null);
+    const anchor =
+      safe(() => node.getAnchorPoint?.(), null) ||
+      safe(() => node._anchorPoint, null) ||
+      {x:0.5,y:0.5};
 
-    const originalSize =
-      safe(() => spriteFrame.getOriginalSize?.(), null) ||
-      safe(() => spriteFrame._originalSize, null) ||
-      null;
+    const zero = safe(() => cc?.v2?.(0,0), null) || {x:0,y:0};
+    const world = safe(() => node.convertToWorldSpaceAR?.(zero), null);
+    if (!size || !world) return null;
 
-    const source = textureSource(texture);
-    const texSize = textureSize(texture, source);
-
-    const name = String(
-      safe(() => spriteFrame.name, '') ||
-      safe(() => spriteFrame._name, '') ||
-      safe(() => texture?.name, '') ||
-      safe(() => texture?._name, '') ||
-      '未命名'
-    );
-
-    const nativeUrl = resolveAssetUrl(win, texture, spriteFrame, source);
-    const symbolId = symbolIdFromName(name);
-    const path = nodePath(node);
-    const lower = `${path} ${name}`.toLowerCase();
-
-    let score = 0;
-    if (symbolId) score += 100;
-    if (/(symbol|reel|slot)/i.test(lower)) score += 30;
-    if (/(item|cell|grid|icon)/i.test(lower)) score += 12;
-    if (/(effect|glow|light|mask|frame|bg|background|particle)/i.test(lower)) score -= 16;
-
-    const rw = Number(rect?.width || 0);
-    const rh = Number(rect?.height || 0);
-    if (rw >= 40 && rh >= 40) score += 5;
-    if (rw >= 70 && rh >= 70) score += 5;
-    if (rw > 600 || rh > 600) score -= 10;
-
-    if ((!source && !nativeUrl) || !rw || !rh) score -= 30;
+    const width = Number(size.width || 0);
+    const height = Number(size.height || 0);
+    if (!(width > 2 && height > 2)) return null;
 
     return {
-      key: [name, nativeUrl, rect?.x, rect?.y, rw, rh, Boolean(safe(() => spriteFrame.isRotated?.(), false))].join('|'),
-      name,
-      symbolId,
-      path,
-      nativeUrl,
-      score,
-      count: 1,
-      source,
-      textureSize: texSize,
-      rect: rect ? { x:Number(rect.x||0), y:Number(rect.y||0), width:rw, height:rh } : null,
-      originalSize: originalSize ? { width:Number(originalSize.width||0), height:Number(originalSize.height||0) } : null,
-      rotated: Boolean(safe(() => spriteFrame.isRotated?.(), false))
+      x:Number(world.x || 0) - width * Number(anchor?.x ?? 0.5),
+      y:Number(world.y || 0) - height * Number(anchor?.y ?? 0.5),
+      width,
+      height
     };
   }
 
-  function collectFramesFromWindow(win) {
-    const cc =
-      safe(() => win.cc, null) ||
-      safe(() => win.legacyCC, null) ||
-      safe(() => win._cc, null);
+  function captureSymbol(win, node) {
+    try {
+      const cc = ccFor(win);
+      const canvas = findLargestCanvas(win);
+      if (!cc || !canvas) return '';
 
+      const bounds = worldBounds(node, cc);
+      if (!bounds) return '';
+
+      const visible =
+        safe(() => cc.view?.getVisibleSize?.(), null) ||
+        safe(() => cc.winSize, null);
+      const origin =
+        safe(() => cc.view?.getVisibleOrigin?.(), null) ||
+        {x:0,y:0};
+
+      const vw = Number(visible?.width || 0);
+      const vh = Number(visible?.height || 0);
+      if (!vw || !vh) return '';
+
+      // 稍微放大裁切範圍，避免符號外框被切掉。
+      const padX = bounds.width * 0.08;
+      const padY = bounds.height * 0.08;
+      const bx = bounds.x - padX;
+      const by = bounds.y - padY;
+      const bw = bounds.width + padX * 2;
+      const bh = bounds.height + padY * 2;
+
+      let sx = ((bx - Number(origin.x || 0)) / vw) * canvas.width;
+      let sw = (bw / vw) * canvas.width;
+      let sh = (bh / vh) * canvas.height;
+      let sy = canvas.height - (((by - Number(origin.y || 0)) + bh) / vh) * canvas.height;
+
+      sx = Math.max(0, sx);
+      sy = Math.max(0, sy);
+      sw = Math.min(sw, canvas.width - sx);
+      sh = Math.min(sh, canvas.height - sy);
+
+      if (!(sw > 4 && sh > 4)) return '';
+
+      const out = document.createElement('canvas');
+      out.width = 96;
+      out.height = 96;
+      const ctx = out.getContext('2d');
+      if (!ctx) return '';
+
+      ctx.clearRect(0,0,out.width,out.height);
+      ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, out.width, out.height);
+
+      return out.toDataURL('image/png');
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function collectSymbolsFromWindow(win) {
+    const cc = ccFor(win);
     const scene = safe(() => cc?.director?.getScene?.(), null);
     const Sprite = safe(() => cc?.Sprite, null);
     if (!scene || !Sprite) return [];
 
-    const unique = new Map();
+    const out = [];
     const seenNodes = new WeakSet();
 
     const visit = (node, depth = 0) => {
-      if (!node || depth > 28 || seenNodes.has(node)) return;
+      if (!node || depth > 30 || seenNodes.has(node)) return;
       seenNodes.add(node);
 
       const active = safe(() => node.activeInHierarchy, safe(() => node.active, true));
@@ -6752,17 +6692,24 @@ setInterval(xinyaoCheckMaintenance, 10000);
         for (const component of sprites) {
           if (!component || safe(() => component.enabled, true) === false) continue;
           const sf = safe(() => component.spriteFrame, null) || safe(() => component._spriteFrame, null);
-          const info = frameInfo(sf, node, win);
-          if (!info) continue;
+          if (!sf) continue;
 
-          const existing = unique.get(info.key);
-          if (existing) {
-            existing.count += 1;
-            existing.score = Math.max(existing.score, info.score);
-            if (info.path.length < existing.path.length) existing.path = info.path;
-          } else {
-            unique.set(info.key, info);
-          }
+          const name = String(
+            safe(() => sf.name, '') ||
+            safe(() => sf._name, '') ||
+            ''
+          );
+          const symbolId = symbolIdFromName(name);
+          if (!symbolId) continue;
+
+          out.push({
+            symbolId,
+            name,
+            path:nodePath(node),
+            node,
+            win,
+            image:''
+          });
         }
       }
 
@@ -6772,180 +6719,80 @@ setInterval(xinyaoCheckMaintenance, 10000);
     };
 
     visit(scene, 0);
-    return [...unique.values()];
+    return out;
   }
 
-  function scanFrames() {
-    const merged = new Map();
+  function scanSymbols() {
+    const grouped = new Map();
 
     for (const win of collectSameOriginWindows()) {
-      for (const info of collectFramesFromWindow(win)) {
-        const existing = merged.get(info.key);
-        if (existing) {
-          existing.count += info.count;
-          existing.score = Math.max(existing.score, info.score);
-        } else {
-          merged.set(info.key, info);
+      for (const item of collectSymbolsFromWindow(win)) {
+        let group = grouped.get(item.symbolId);
+        if (!group) {
+          group = {
+            symbolId:item.symbolId,
+            name:item.name,
+            count:0,
+            image:'',
+            path:item.path
+          };
+          grouped.set(item.symbolId, group);
+        }
+
+        group.count += 1;
+
+        if (!group.image) {
+          const image = captureSymbol(item.win, item.node);
+          if (image) group.image = image;
         }
       }
     }
 
-    const frames = [...merged.values()]
-      .filter(item => item.score >= 0)
-      .sort((a, b) =>
-        Number(Boolean(b.symbolId)) - Number(Boolean(a.symbolId)) ||
-        b.score - a.score ||
-        b.count - a.count ||
-        a.name.localeCompare(b.name)
-      )
-      .slice(0, 40);
+    const frames = [...grouped.values()]
+      .sort((a,b) => Number(a.symbolId) - Number(b.symbolId));
 
     try {
       const byId = {};
-      for (const item of frames) {
-        if (item.symbolId && !byId[item.symbolId]) byId[item.symbolId] = item;
-      }
-      window.__XIANYAO_ATG_SYMBOL_SPRITES__ = { frames, byId, updatedAt: Date.now() };
+      for (const item of frames) byId[item.symbolId] = item;
+      window.__XIANYAO_ATG_SYMBOL_SPRITES__ = {
+        frames,
+        byId,
+        updatedAt:Date.now(),
+        source:'canvas-crop'
+      };
     } catch (_) {}
 
     return frames;
   }
 
   function ensureStyle() {
-    if (document.getElementById('xinyao-atg-sprite-probe-style-v02')) return;
-
+    if (document.getElementById('xinyao-atg-sprite-probe-style-v03')) return;
     const style = document.createElement('style');
-    style.id = 'xinyao-atg-sprite-probe-style-v02';
+    style.id = 'xinyao-atg-sprite-probe-style-v03';
     style.textContent = `
       #${SECTION_ID}{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.10)}
       #${SECTION_ID} .sp-head{display:flex;align-items:center;justify-content:space-between;gap:7px}
-      #${SECTION_ID} .sp-title{font-size:9px;font-weight:900;opacity:.85}
+      #${SECTION_ID} .sp-title{font-size:9px;font-weight:900;opacity:.88}
       #${SECTION_ID} .sp-btn{border:1px solid rgba(115,223,255,.35);border-radius:8px;background:rgba(115,223,255,.08);color:#dff8ff;padding:4px 7px;font-size:8px;font-weight:850;cursor:pointer}
       #${SECTION_ID} .sp-status{margin-top:5px;font-size:8px;line-height:1.4;opacity:.62}
       #${SECTION_ID} .sp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:6px}
       #${SECTION_ID} .sp-card{min-width:0;padding:4px 3px;border-radius:9px;background:rgba(255,255,255,.055);text-align:center}
-      #${SECTION_ID} .sp-preview{display:flex;align-items:center;justify-content:center;width:46px;height:46px;max-width:100%;margin:0 auto;overflow:hidden;border-radius:7px;background:rgba(255,255,255,.025)}
-      #${SECTION_ID} canvas{display:block;max-width:42px;max-height:42px}
-      #${SECTION_ID} .sp-atlas{background-repeat:no-repeat;flex:0 0 auto}
-      #${SECTION_ID} .sp-img{display:block;width:42px;height:42px;object-fit:contain}
+      #${SECTION_ID} .sp-preview{display:flex;align-items:center;justify-content:center;width:48px;height:48px;max-width:100%;margin:0 auto;overflow:hidden;border-radius:8px;background:rgba(255,255,255,.025)}
+      #${SECTION_ID} .sp-preview img{display:block;width:46px;height:46px;object-fit:contain}
+      #${SECTION_ID} .sp-empty{font-size:7px;opacity:.35}
       #${SECTION_ID} .sp-name{margin-top:2px;font-size:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.82}
       #${SECTION_ID} .sp-count{font-size:8px;font-weight:900;color:#73dfff}
-      #${SECTION_ID} .sp-tech{font-size:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.35}
-      @media (max-width:760px){
+      @media(max-width:760px){
         #${SECTION_ID} .sp-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
-        #${SECTION_ID} .sp-preview{width:40px;height:40px}
-        #${SECTION_ID} .sp-img{width:36px;height:36px}
+        #${SECTION_ID} .sp-preview{width:42px;height:42px}
+        #${SECTION_ID} .sp-preview img{width:40px;height:40px}
       }
     `;
     (document.head || document.documentElement).appendChild(style);
   }
 
-  function drawFrame(canvas, item) {
-    if (!canvas || !item?.source || !item?.rect) return false;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return false;
-
-    const source = item.source;
-    const { width: sw, height: sh } = sourceSize(source);
-    const rect = item.rect;
-    if (!sw || !sh || !rect.width || !rect.height) return false;
-
-    const outW = Math.max(1, Math.round(item.originalSize?.width || rect.width));
-    const outH = Math.max(1, Math.round(item.originalSize?.height || rect.height));
-    canvas.width = Math.min(160, outW);
-    canvas.height = Math.min(160, outH);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    try {
-      const sx = Math.max(0, rect.x);
-      const syBottom = Math.max(0, rect.y);
-      let sy = sh - syBottom - rect.height;
-      if (!(sy >= 0 && sy + rect.height <= sh)) sy = syBottom;
-
-      if (!item.rotated) {
-        ctx.drawImage(
-          source,
-          sx, sy, rect.width, rect.height,
-          0, 0, canvas.width, canvas.height
-        );
-      } else {
-        ctx.save();
-        ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.rotate(-Math.PI / 2);
-        ctx.drawImage(
-          source,
-          sx, sy, rect.width, rect.height,
-          -canvas.height / 2, -canvas.width / 2, canvas.height, canvas.width
-        );
-        ctx.restore();
-      }
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  function atlasPreview(item) {
-    if (!item?.nativeUrl || !item?.rect || item.rotated) return null;
-
-    const tw = Number(item.textureSize?.width || 0);
-    const th = Number(item.textureSize?.height || 0);
-    const rw = Number(item.rect.width || 0);
-    const rh = Number(item.rect.height || 0);
-    if (!tw || !th || !rw || !rh) return null;
-
-    const max = 42;
-    const scale = Math.min(max / rw, max / rh);
-    const topY = th - Number(item.rect.y || 0) - rh;
-
-    const crop = document.createElement('div');
-    crop.className = 'sp-atlas';
-    crop.style.width = `${Math.max(1, rw * scale)}px`;
-    crop.style.height = `${Math.max(1, rh * scale)}px`;
-    crop.style.backgroundImage = `url("${String(item.nativeUrl).replace(/"/g, '\\"')}")`;
-    crop.style.backgroundSize = `${tw * scale}px ${th * scale}px`;
-    crop.style.backgroundPosition = `${-Number(item.rect.x || 0) * scale}px ${-topY * scale}px`;
-    return crop;
-  }
-
-  function imagePreview(item) {
-    if (!item?.nativeUrl) return null;
-    const img = document.createElement('img');
-    img.className = 'sp-img';
-    img.alt = item.name || 'sprite';
-    img.src = item.nativeUrl;
-    return img;
-  }
-
-  function buildPreview(item) {
-    const wrap = document.createElement('div');
-    wrap.className = 'sp-preview';
-
-    const canvas = document.createElement('canvas');
-    if (drawFrame(canvas, item)) {
-      wrap.appendChild(canvas);
-      return { element: wrap, method: 'canvas' };
-    }
-
-    const atlas = atlasPreview(item);
-    if (atlas) {
-      wrap.appendChild(atlas);
-      return { element: wrap, method: 'atlas-url' };
-    }
-
-    const img = imagePreview(item);
-    if (img) {
-      wrap.appendChild(img);
-      return { element: wrap, method: 'image-url' };
-    }
-
-    return { element: wrap, method: 'no-preview' };
-  }
-
   function ensureSection() {
     ensureStyle();
-
     const host = document.getElementById(HOST_PANEL_ID);
     const body = host?.querySelector('.bp-body');
     if (!body) return null;
@@ -6957,10 +6804,10 @@ setInterval(xinyaoCheckMaintenance, 10000);
     section.id = SECTION_ID;
     section.innerHTML = `
       <div class="sp-head">
-        <div class="sp-title">🧩 遊戲原始圖示素材 v2</div>
+        <div class="sp-title">🧩 遊戲原始圖示素材 v3</div>
         <button type="button" class="sp-btn">重新掃描</button>
       </div>
-      <div class="sp-status">等待盤面完成後掃描 Cocos Sprite…</div>
+      <div class="sp-status">改用遊戲畫面 Canvas 直接裁取符號…</div>
       <div class="sp-grid"></div>
     `;
 
@@ -6983,47 +6830,52 @@ setInterval(xinyaoCheckMaintenance, 10000);
     if (!status || !grid) return;
 
     if (spriteState.scanning) {
-      status.textContent = '掃描遊戲 Sprite 與 Texture URL 中…';
+      status.textContent = '正在從目前盤面裁取 Symbol 圖片…';
       return;
     }
 
-    const symbolFrames = spriteState.frames.filter(item => item.symbolId);
+    const captured = spriteState.frames.filter(item => item.image).length;
 
     if (spriteState.error) {
       status.textContent = spriteState.error;
     } else if (!spriteState.frames.length) {
-      status.textContent = '尚未找到可顯示的 Sprite，請完成一局後再掃描。';
+      status.textContent = '尚未掃到 symbol_XX 節點，完成一局後會自動重試。';
     } else {
-      status.textContent = `找到 ${symbolFrames.length} 種盤面 symbol Sprite｜優先用原始 Texture/Atlas 顯示`;
+      status.textContent = `抓到 ${spriteState.frames.length} 種 Symbol｜成功裁圖 ${captured} 種`;
     }
 
     grid.innerHTML = '';
 
-    const visible = symbolFrames.length ? symbolFrames.slice(0, 16) : spriteState.frames.slice(0, 16);
-
-    for (const item of visible) {
+    for (const item of spriteState.frames.slice(0,16)) {
       const card = document.createElement('div');
       card.className = 'sp-card';
-      card.title = `${item.name}\n${item.path}\n${item.nativeUrl || '無 URL'}`;
 
-      const preview = buildPreview(item);
-      card.appendChild(preview.element);
+      const preview = document.createElement('div');
+      preview.className = 'sp-preview';
+
+      if (item.image) {
+        const img = document.createElement('img');
+        img.src = item.image;
+        img.alt = `ID ${item.symbolId}`;
+        preview.appendChild(img);
+      } else {
+        const empty = document.createElement('div');
+        empty.className = 'sp-empty';
+        empty.textContent = '無預覽';
+        preview.appendChild(empty);
+      }
 
       const name = document.createElement('div');
       name.className = 'sp-name';
-      name.textContent = item.symbolId ? `ID ${item.symbolId}｜${item.name}` : (item.name || '未命名');
+      name.textContent = `ID ${item.symbolId}｜${item.name}`;
 
       const count = document.createElement('div');
       count.className = 'sp-count';
       count.textContent = `×${item.count}`;
 
-      const tech = document.createElement('div');
-      tech.className = 'sp-tech';
-      tech.textContent = `${preview.method}${item.nativeUrl ? '｜URL✓' : '｜URL×'}｜${item.textureSize?.width || 0}×${item.textureSize?.height || 0}`;
-
+      card.appendChild(preview);
       card.appendChild(name);
       card.appendChild(count);
-      card.appendChild(tech);
       grid.appendChild(card);
     }
   }
@@ -7036,23 +6888,24 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
     setTimeout(() => {
       try {
-        spriteState.frames = scanFrames();
+        spriteState.frames = scanSymbols();
         spriteState.lastScanAt = Date.now();
         if (!spriteState.frames.length) {
-          spriteState.error = '這局沒有掃到可用 Sprite；下一局完成後會再試一次。';
+          spriteState.error = '這局沒有抓到 symbol_XX 節點；下一局會再試一次。';
         }
       } catch (_) {
         spriteState.frames = [];
-        spriteState.error = '圖示素材掃描失敗，下一局會再重試。';
+        spriteState.error = 'Canvas 裁圖失敗，下一局會再重試。';
       } finally {
         spriteState.scanning = false;
         render();
       }
-    }, 80);
+    }, 120);
   }
 
   window.addEventListener(EVENT_NAME, () => {
-    setTimeout(runScan, 420);
+    // 等符號停止後裁圖，比讀 Texture URL 更穩定。
+    setTimeout(runScan, 650);
   });
 
   setInterval(() => {
