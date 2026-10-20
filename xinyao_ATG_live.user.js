@@ -1689,6 +1689,19 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
     if (!finalState || !isFinalGameState(finalState)) return changed;
 
+    // v4 HUD Lab：只在「本局已完成」時把盤面原始資料交給被動偵測器。
+    // 不改遊戲資料、不預測下一局，也不影響下注 / 派彩 / 結算。
+    try {
+      window.dispatchEvent(new CustomEvent('xinyao:spin-final-observed', {
+        detail: {
+          spinId,
+          roomNumber: state.currentRoomNumber,
+          finalState,
+          engine
+        }
+      }));
+    } catch (_) {}
+
     let payout = toNumber(finalState.totalWinnings);
     if (payout === null) {
       const candidates = engine.gameState
@@ -6094,4 +6107,364 @@ setInterval(xinyaoCheckMaintenance, 10000);
   ensureSpeedUi();
   setInterval(patchAll, 500);
   setInterval(ensureSpeedUi, 250);
+})();
+
+
+/* ===== 芯瑤 ATG HUD Lab｜盤面圖案偵測測試 v0.1 ===== */
+(() => {
+  'use strict';
+
+  if (window.__XIANYAO_ATG_BOARD_PROBE_V01__) return;
+  window.__XIANYAO_ATG_BOARD_PROBE_V01__ = true;
+
+  const PANEL_ID = 'xinyao-atg-board-probe-v01';
+  const EVENT_NAME = 'xinyao:spin-final-observed';
+
+  const probe = {
+    lastSpinId: '',
+    roomNumber: null,
+    updatedAt: 0,
+    candidate: null,
+    candidateCount: 0,
+    status: '等待第一局完成資料…',
+    minimized: false
+  };
+
+  const POSITIVE_PATH_RE = /(symbol|symbols|reel|reels|grid|matrix|board|screen|layout|cell|cells|tile|tiles|icon|icons|strip|view|result)/i;
+  const STRONG_PATH_RE = /(symbol|symbols|reel|reels|grid|matrix|board|screen|layout|cell|cells|tile|tiles)/i;
+  const NEGATIVE_PATH_RE = /(win|winning|pay|payout|stake|balance|amount|credit|bet|multiplier|award|reward|line|ways|cluster|position|coordinate)/i;
+  const SYMBOL_FIELD_RE = /^(symbolid|symbol_id|symbol|iconid|icon_id|icon|code|name|type|tileid|tile_id|tile)$/i;
+  const IGNORE_STRING_RE = /^(true|false|null|undefined|normal|base|default|main)$/i;
+
+  function safe(fn, fallback = null) {
+    try {
+      const value = fn();
+      return value === undefined ? fallback : value;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function normalizeToken(value) {
+    if (value === null || value === undefined) return null;
+
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) return null;
+      return String(value);
+    }
+
+    if (typeof value === 'string') {
+      const text = value.trim();
+      if (!text || text.length > 48 || IGNORE_STRING_RE.test(text)) return null;
+      return text;
+    }
+
+    return null;
+  }
+
+  function tokenFromObject(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+
+    for (const [key, raw] of Object.entries(value)) {
+      if (!SYMBOL_FIELD_RE.test(String(key))) continue;
+      const token = normalizeToken(raw);
+      if (token !== null) return token;
+    }
+
+    return null;
+  }
+
+  function flattenSymbolArray(value, out = [], depth = 0) {
+    if (!Array.isArray(value) || depth > 5 || out.length > 160) return out;
+
+    for (const item of value) {
+      if (Array.isArray(item)) {
+        flattenSymbolArray(item, out, depth + 1);
+        continue;
+      }
+
+      const scalar = normalizeToken(item);
+      if (scalar !== null) {
+        out.push(scalar);
+        continue;
+      }
+
+      const objectToken = tokenFromObject(item);
+      if (objectToken !== null) out.push(objectToken);
+    }
+
+    return out;
+  }
+
+  function summarizeTokens(tokens) {
+    const counts = new Map();
+
+    for (const token of tokens) {
+      counts.set(token, (counts.get(token) || 0) + 1);
+    }
+
+    const items = [...counts.entries()]
+      .map(([token, count]) => ({ token, count }))
+      .sort((a, b) => b.count - a.count || String(a.token).localeCompare(String(b.token)));
+
+    return {
+      total: tokens.length,
+      unique: items.length,
+      items
+    };
+  }
+
+  function scoreCandidate(path, summary) {
+    if (!summary || summary.total < 6 || summary.total > 120) return -Infinity;
+    if (summary.unique < 2 || summary.unique > 40) return -Infinity;
+
+    let score = 0;
+
+    if (POSITIVE_PATH_RE.test(path)) score += 12;
+    if (STRONG_PATH_RE.test(path)) score += 16;
+    if (NEGATIVE_PATH_RE.test(path)) score -= 18;
+
+    if ([15, 20, 24, 25, 30, 36, 40, 48, 50].includes(summary.total)) score += 18;
+    else if (summary.total >= 12 && summary.total <= 60) score += 8;
+
+    if (summary.unique >= 4 && summary.unique <= 18) score += 10;
+
+    const maxCount = summary.items[0]?.count || 0;
+    if (maxCount >= 2 && maxCount <= Math.ceil(summary.total * 0.65)) score += 6;
+
+    return score;
+  }
+
+  function collectCandidates(root, rootName = 'finalState') {
+    const out = [];
+    const seen = new WeakSet();
+
+    function visit(value, path, depth) {
+      if (!value || typeof value !== 'object' || depth > 9 || seen.has(value)) return;
+      seen.add(value);
+
+      if (Array.isArray(value)) {
+        const tokens = flattenSymbolArray(value);
+        const summary = summarizeTokens(tokens);
+        const score = scoreCandidate(path, summary);
+
+        if (Number.isFinite(score)) {
+          out.push({
+            path,
+            score,
+            total: summary.total,
+            unique: summary.unique,
+            items: summary.items.slice(0, 12)
+          });
+        }
+
+        for (let i = 0; i < Math.min(value.length, 80); i += 1) {
+          const child = value[i];
+          if (child && typeof child === 'object') visit(child, `${path}[${i}]`, depth + 1);
+        }
+        return;
+      }
+
+      for (const [key, child] of Object.entries(value)) {
+        if (!child || typeof child !== 'object') continue;
+        visit(child, path ? `${path}.${key}` : String(key), depth + 1);
+      }
+    }
+
+    visit(root, rootName, 0);
+
+    return out
+      .sort((a, b) => b.score - a.score || Math.abs(a.total - 30) - Math.abs(b.total - 30))
+      .slice(0, 20);
+  }
+
+  function chooseCandidate(finalState, engine) {
+    let candidates = collectCandidates(finalState, 'finalState');
+
+    if (!candidates.length || candidates[0].score < 18) {
+      const fromEngine = collectCandidates(engine, 'engine');
+      candidates = [...candidates, ...fromEngine]
+        .sort((a, b) => b.score - a.score || Math.abs(a.total - 30) - Math.abs(b.total - 30))
+        .slice(0, 20);
+    }
+
+    return {
+      best: candidates[0] || null,
+      count: candidates.length
+    };
+  }
+
+  function roomText() {
+    const value = probe.roomNumber;
+    if (value === null || value === undefined || value === '') return '—';
+    return String(value).padStart(4, '0');
+  }
+
+  function esc(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function ensureStyle() {
+    if (document.getElementById('xinyao-atg-board-probe-style-v01')) return;
+
+    const style = document.createElement('style');
+    style.id = 'xinyao-atg-board-probe-style-v01';
+    style.textContent = `
+      #${PANEL_ID}{
+        position:fixed;
+        top:10px;
+        right:10px;
+        z-index:2147483646;
+        width:280px;
+        max-width:calc(100vw - 20px);
+        box-sizing:border-box;
+        padding:10px 11px;
+        border:1px solid rgba(93,224,255,.44);
+        border-radius:15px;
+        background:rgba(10,20,29,.92);
+        color:#fff;
+        box-shadow:0 10px 28px rgba(0,0,0,.38);
+        backdrop-filter:blur(12px);
+        -webkit-backdrop-filter:blur(12px);
+        font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif;
+        user-select:none;
+        -webkit-user-select:none;
+      }
+      #${PANEL_ID} .bp-head{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer}
+      #${PANEL_ID} .bp-title{font-size:12px;font-weight:900}
+      #${PANEL_ID} .bp-mini{font-size:10px;opacity:.7}
+      #${PANEL_ID} .bp-status{margin-top:5px;font-size:10px;color:#8deac1}
+      #${PANEL_ID} .bp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-top:8px}
+      #${PANEL_ID} .bp-item{padding:7px 4px;border-radius:10px;background:rgba(255,255,255,.065);text-align:center;min-width:0}
+      #${PANEL_ID} .bp-token{display:block;font-size:10px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #${PANEL_ID} .bp-count{display:block;margin-top:3px;color:#73dfff;font-size:12px;font-weight:950}
+      #${PANEL_ID} .bp-path{margin-top:8px;padding-top:7px;border-top:1px solid rgba(255,255,255,.10);font-size:8px;line-height:1.35;opacity:.5;word-break:break-all}
+      #${PANEL_ID}.min .bp-body{display:none}
+      @media (max-width:760px){
+        #${PANEL_ID}{
+          top:max(6px,env(safe-area-inset-top,0px));
+          right:6px;
+          width:230px;
+          max-width:calc(100vw - 12px);
+          padding:8px 9px;
+        }
+        #${PANEL_ID} .bp-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+        #${PANEL_ID} .bp-item{padding:6px 3px}
+      }
+    `;
+
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  function ensurePanel() {
+    ensureStyle();
+
+    let panel = document.getElementById(PANEL_ID);
+    if (panel) return panel;
+
+    panel = document.createElement('div');
+    panel.id = PANEL_ID;
+    panel.innerHTML = `
+      <div class="bp-head">
+        <div class="bp-title">🌸 盤面偵測測試</div>
+        <div class="bp-mini">－</div>
+      </div>
+      <div class="bp-body"></div>
+    `;
+
+    panel.querySelector('.bp-head')?.addEventListener('click', () => {
+      probe.minimized = !probe.minimized;
+      panel.classList.toggle('min', probe.minimized);
+      const icon = panel.querySelector('.bp-mini');
+      if (icon) icon.textContent = probe.minimized ? '＋' : '－';
+    });
+
+    (document.body || document.documentElement).appendChild(panel);
+    return panel;
+  }
+
+  function render() {
+    if (window.__XIANYAO_MAINTENANCE_STATE__?.enabled) {
+      const existing = document.getElementById(PANEL_ID);
+      if (existing) existing.style.display = 'none';
+      return;
+    }
+
+    const panel = ensurePanel();
+    panel.style.display = '';
+
+    const body = panel.querySelector('.bp-body');
+    if (!body) return;
+
+    const candidate = probe.candidate;
+
+    if (!candidate) {
+      body.innerHTML = `
+        <div class="bp-status">● ${esc(probe.status)}</div>
+        <div class="bp-path">房號 ${esc(roomText())}｜完成一局後才分析已結束盤面</div>
+      `;
+      return;
+    }
+
+    const cards = candidate.items.slice(0, 6).map(item => `
+      <div class="bp-item">
+        <span class="bp-token">${esc(item.token)}</span>
+        <span class="bp-count">×${item.count}</span>
+      </div>
+    `).join('');
+
+    body.innerHTML = `
+      <div class="bp-status">● 已抓到本局盤面候選｜${esc(roomText())} 房</div>
+      <div class="bp-grid">${cards}</div>
+      <div class="bp-path">
+        ${candidate.total} 格｜${candidate.unique} 種｜候選 ${probe.candidateCount} 組<br>
+        路徑：${esc(candidate.path)}
+      </div>
+    `;
+  }
+
+  function handleSpinFinal(event) {
+    const detail = event?.detail || {};
+    const spinId = String(detail.spinId || '');
+    if (!spinId || spinId === probe.lastSpinId) return;
+
+    probe.lastSpinId = spinId;
+    probe.roomNumber = detail.roomNumber ?? null;
+    probe.updatedAt = Date.now();
+
+    const result = chooseCandidate(detail.finalState, detail.engine);
+    probe.candidate = result.best;
+    probe.candidateCount = result.count;
+    probe.status = result.best
+      ? '已完成本局盤面候選分析'
+      : '本局還找不到可靠的盤面陣列';
+
+    render();
+
+    try {
+      window.__XIANYAO_ATG_BOARD_PROBE_STATE__ = {
+        spinId: probe.lastSpinId,
+        roomNumber: probe.roomNumber,
+        updatedAt: probe.updatedAt,
+        candidate: probe.candidate,
+        candidateCount: probe.candidateCount
+      };
+    } catch (_) {}
+  }
+
+  window.addEventListener(EVENT_NAME, handleSpinFinal);
+
+  try {
+    window.addEventListener('xinyao:maintenance', render);
+  } catch (_) {}
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', render, { once:true });
+  } else {
+    render();
+  }
 })();
