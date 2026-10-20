@@ -6504,20 +6504,19 @@ setInterval(xinyaoCheckMaintenance, 10000);
   }
 })();
 
-/* ===== 芯瑤 ATG HUD Lab｜Cocos 圖示素材偵測 v0.3 ===== */
-(function xinyaoSpriteProbeModuleV03() {
+/* ===== 芯瑤 ATG HUD Lab｜Cocos 圖示素材偵測 v0.4 ===== */
+(function xinyaoSpriteProbeModuleV04() {
   'use strict';
 
-  if (window.__XIANYAO_ATG_SPRITE_PROBE_V03__) return;
-  window.__XIANYAO_ATG_SPRITE_PROBE_V03__ = true;
+  if (window.__XIANYAO_ATG_SPRITE_PROBE_V04__) return;
+  window.__XIANYAO_ATG_SPRITE_PROBE_V04__ = true;
 
   const HOST_PANEL_ID = 'xinyao-atg-board-probe-v01';
-  const SECTION_ID = 'xinyao-atg-sprite-probe-v03';
+  const SECTION_ID = 'xinyao-atg-sprite-probe-v04';
   const EVENT_NAME = 'xinyao:spin-final-observed';
 
   const spriteState = {
     scanning: false,
-    lastScanAt: 0,
     frames: [],
     error: ''
   };
@@ -6573,203 +6572,339 @@ setInterval(xinyaoCheckMaintenance, 10000);
     return match ? String(Number(match[1])) : '';
   }
 
-  function findLargestCanvas(win) {
-    let canvases = [];
-    try { canvases = [...win.document.querySelectorAll('canvas')]; } catch (_) {}
-    return canvases
-      .filter(canvas => Number(canvas.width || 0) > 10 && Number(canvas.height || 0) > 10)
-      .sort((a,b) => (b.width*b.height) - (a.width*a.height))[0] || null;
-  }
-
-  function worldBounds(node, cc) {
-    const direct = safe(() => node.getBoundingBoxToWorld?.(), null);
-    if (direct && Number(direct.width) > 2 && Number(direct.height) > 2) {
-      return {
-        x:Number(direct.x || 0),
-        y:Number(direct.y || 0),
-        width:Number(direct.width || 0),
-        height:Number(direct.height || 0)
-      };
-    }
-
-    const size =
-      safe(() => node.getContentSize?.(), null) ||
-      safe(() => node._contentSize, null);
-    const anchor =
-      safe(() => node.getAnchorPoint?.(), null) ||
-      safe(() => node._anchorPoint, null) ||
-      {x:0.5,y:0.5};
-
-    const zero = safe(() => cc?.v2?.(0,0), null) || {x:0,y:0};
-    const world = safe(() => node.convertToWorldSpaceAR?.(zero), null);
-    if (!size || !world) return null;
-
-    const width = Number(size.width || 0);
-    const height = Number(size.height || 0);
-    if (!(width > 2 && height > 2)) return null;
-
-    return {
-      x:Number(world.x || 0) - width * Number(anchor?.x ?? 0.5),
-      y:Number(world.y || 0) - height * Number(anchor?.y ?? 0.5),
-      width,
-      height
-    };
-  }
-
-  function captureSymbol(win, node) {
+  function isDrawable(value) {
+    if (!value) return false;
     try {
-      const cc = ccFor(win);
-      const canvas = findLargestCanvas(win);
-      if (!cc || !canvas) return '';
-
-      const bounds = worldBounds(node, cc);
-      if (!bounds) return '';
-
-      const visible =
-        safe(() => cc.view?.getVisibleSize?.(), null) ||
-        safe(() => cc.winSize, null);
-      const origin =
-        safe(() => cc.view?.getVisibleOrigin?.(), null) ||
-        {x:0,y:0};
-
-      const vw = Number(visible?.width || 0);
-      const vh = Number(visible?.height || 0);
-      if (!vw || !vh) return '';
-
-      // 稍微放大裁切範圍，避免符號外框被切掉。
-      const padX = bounds.width * 0.08;
-      const padY = bounds.height * 0.08;
-      const bx = bounds.x - padX;
-      const by = bounds.y - padY;
-      const bw = bounds.width + padX * 2;
-      const bh = bounds.height + padY * 2;
-
-      let sx = ((bx - Number(origin.x || 0)) / vw) * canvas.width;
-      let sw = (bw / vw) * canvas.width;
-      let sh = (bh / vh) * canvas.height;
-      let sy = canvas.height - (((by - Number(origin.y || 0)) + bh) / vh) * canvas.height;
-
-      sx = Math.max(0, sx);
-      sy = Math.max(0, sy);
-      sw = Math.min(sw, canvas.width - sx);
-      sh = Math.min(sh, canvas.height - sy);
-
-      if (!(sw > 4 && sh > 4)) return '';
-
-      const out = document.createElement('canvas');
-      out.width = 96;
-      out.height = 96;
-      const ctx = out.getContext('2d');
-      if (!ctx) return '';
-
-      ctx.clearRect(0,0,out.width,out.height);
-      ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, out.width, out.height);
-
-      return out.toDataURL('image/png');
-    } catch (_) {
-      return '';
-    }
+      if (typeof HTMLImageElement !== 'undefined' && value instanceof HTMLImageElement) return true;
+      if (typeof HTMLCanvasElement !== 'undefined' && value instanceof HTMLCanvasElement) return true;
+      if (typeof HTMLVideoElement !== 'undefined' && value instanceof HTMLVideoElement) return true;
+      if (typeof ImageBitmap !== 'undefined' && value instanceof ImageBitmap) return true;
+      if (typeof OffscreenCanvas !== 'undefined' && value instanceof OffscreenCanvas) return true;
+    } catch (_) {}
+    return false;
   }
 
-  function collectSymbolsFromWindow(win) {
-    const cc = ccFor(win);
-    const scene = safe(() => cc?.director?.getScene?.(), null);
-    const Sprite = safe(() => cc?.Sprite, null);
-    if (!scene || !Sprite) return [];
+  function unwrapDrawable(value, depth = 0, seen = new WeakSet()) {
+    if (!value || depth > 5) return null;
+    if (isDrawable(value)) return value;
 
+    if ((typeof value !== 'object' && typeof value !== 'function') || seen.has(value)) return null;
+    seen.add(value);
+
+    const keys = [
+      '_nativeAsset','nativeAsset','_image','image',
+      '_data','data','_source','source',
+      '_texture','texture','_texture2D','texture2D'
+    ];
+
+    for (const key of keys) {
+      const child = safe(() => value[key], null);
+      if (!child) continue;
+      const found = unwrapDrawable(child, depth + 1, seen);
+      if (found) return found;
+    }
+
+    return null;
+  }
+
+  function assetCandidates(win, texture, spriteFrame) {
     const out = [];
-    const seenNodes = new WeakSet();
-
-    const visit = (node, depth = 0) => {
-      if (!node || depth > 30 || seenNodes.has(node)) return;
-      seenNodes.add(node);
-
-      const active = safe(() => node.activeInHierarchy, safe(() => node.active, true));
-      if (active !== false) {
-        let sprites = [];
-        try { sprites = node.getComponents?.(Sprite) || []; } catch (_) {}
-
-        for (const component of sprites) {
-          if (!component || safe(() => component.enabled, true) === false) continue;
-          const sf = safe(() => component.spriteFrame, null) || safe(() => component._spriteFrame, null);
-          if (!sf) continue;
-
-          const name = String(
-            safe(() => sf.name, '') ||
-            safe(() => sf._name, '') ||
-            ''
-          );
-          const symbolId = symbolIdFromName(name);
-          if (!symbolId) continue;
-
-          out.push({
-            symbolId,
-            name,
-            path:nodePath(node),
-            node,
-            win,
-            image:''
-          });
-        }
-      }
-
-      let children = [];
-      try { children = node.children || node._children || []; } catch (_) {}
-      for (const child of children) visit(child, depth + 1);
+    const push = value => {
+      if (value && !out.includes(value)) out.push(value);
     };
 
-    visit(scene, 0);
+    push(texture);
+    push(safe(() => texture?._image, null));
+    push(safe(() => texture?.image, null));
+    push(safe(() => texture?._nativeAsset, null));
+    push(safe(() => spriteFrame?._texture, null));
+
+    const cc = ccFor(win);
+    const uuids = new Set([
+      safe(() => texture?._uuid, ''),
+      safe(() => texture?.uuid, ''),
+      safe(() => spriteFrame?._uuid, ''),
+      safe(() => spriteFrame?.uuid, '')
+    ].filter(Boolean));
+
+    try {
+      const assets = cc?.assetManager?.assets;
+      for (const uuid of uuids) {
+        push(assets?.get?.(uuid));
+      }
+    } catch (_) {}
+
+    try {
+      const cache = cc?.loader?._cache;
+      for (const uuid of uuids) {
+        push(cache?.[uuid]?.content);
+        push(cache?.[uuid]?.asset);
+        push(cache?.[uuid]);
+      }
+    } catch (_) {}
+
     return out;
   }
 
-  function scanSymbols() {
+  function drawableFor(win, texture, spriteFrame) {
+    for (const candidate of assetCandidates(win, texture, spriteFrame)) {
+      const found = unwrapDrawable(candidate);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function sourceSize(source) {
+    return {
+      width:Number(
+        safe(() => source?.naturalWidth, 0) ||
+        safe(() => source?.videoWidth, 0) ||
+        safe(() => source?.width, 0) || 0
+      ),
+      height:Number(
+        safe(() => source?.naturalHeight, 0) ||
+        safe(() => source?.videoHeight, 0) ||
+        safe(() => source?.height, 0) || 0
+      )
+    };
+  }
+
+  function findNativeUrl(value, depth = 0, seen = new WeakSet()) {
+    if (!value || depth > 4) return '';
+    if ((typeof value !== 'object' && typeof value !== 'function') || seen.has(value)) return '';
+    seen.add(value);
+
+    const directKeys = ['currentSrc','src','nativeUrl','_nativeUrl','url','_url'];
+    for (const key of directKeys) {
+      const raw = safe(() => value[key], '');
+      if (typeof raw !== 'string') continue;
+      const text = raw.trim();
+      if (text && !/^db:\/\//i.test(text)) return text;
+    }
+
+    const childKeys = ['_nativeAsset','nativeAsset','_image','image','_data','data','_source','source'];
+    for (const key of childKeys) {
+      const child = safe(() => value[key], null);
+      const found = findNativeUrl(child, depth + 1, seen);
+      if (found) return found;
+    }
+    return '';
+  }
+
+  function resolveUrl(win, texture, spriteFrame) {
+    const values = assetCandidates(win, texture, spriteFrame);
+    for (const value of values) {
+      const raw = findNativeUrl(value);
+      if (!raw) continue;
+      if (/^(data:|blob:|https?:)/i.test(raw)) return raw;
+      try { return new URL(raw, String(win?.location?.href || location.href)).href; } catch (_) {}
+    }
+    return '';
+  }
+
+  function makeFrameInfo(win, node, spriteFrame) {
+    const texture =
+      safe(() => spriteFrame.getTexture?.(), null) ||
+      safe(() => spriteFrame._texture, null) ||
+      null;
+
+    const rect =
+      safe(() => spriteFrame.getRect?.(), null) ||
+      safe(() => spriteFrame._rect, null) ||
+      null;
+
+    const originalSize =
+      safe(() => spriteFrame.getOriginalSize?.(), null) ||
+      safe(() => spriteFrame._originalSize, null) ||
+      null;
+
+    const name = String(
+      safe(() => spriteFrame.name, '') ||
+      safe(() => spriteFrame._name, '') ||
+      ''
+    );
+    const symbolId = symbolIdFromName(name);
+    if (!symbolId || !rect) return null;
+
+    const source = drawableFor(win, texture, spriteFrame);
+    const nativeUrl = resolveUrl(win, texture, spriteFrame);
+    const sourceDim = sourceSize(source);
+
+    const textureWidth = Number(
+      sourceDim.width ||
+      safe(() => texture?.width, 0) ||
+      safe(() => texture?._width, 0) ||
+      0
+    );
+    const textureHeight = Number(
+      sourceDim.height ||
+      safe(() => texture?.height, 0) ||
+      safe(() => texture?._height, 0) ||
+      0
+    );
+
+    return {
+      symbolId,
+      name,
+      path:nodePath(node),
+      count:1,
+      source,
+      nativeUrl,
+      textureWidth,
+      textureHeight,
+      rect:{
+        x:Number(rect.x||0),
+        y:Number(rect.y||0),
+        width:Number(rect.width||0),
+        height:Number(rect.height||0)
+      },
+      originalSize:originalSize ? {
+        width:Number(originalSize.width||0),
+        height:Number(originalSize.height||0)
+      } : null,
+      rotated:Boolean(safe(() => spriteFrame.isRotated?.(), false))
+    };
+  }
+
+  function collectFrames() {
     const grouped = new Map();
 
     for (const win of collectSameOriginWindows()) {
-      for (const item of collectSymbolsFromWindow(win)) {
-        let group = grouped.get(item.symbolId);
-        if (!group) {
-          group = {
-            symbolId:item.symbolId,
-            name:item.name,
-            count:0,
-            image:'',
-            path:item.path
-          };
-          grouped.set(item.symbolId, group);
+      const cc = ccFor(win);
+      const scene = safe(() => cc?.director?.getScene?.(), null);
+      const Sprite = safe(() => cc?.Sprite, null);
+      if (!scene || !Sprite) continue;
+
+      const seenNodes = new WeakSet();
+      const visit = (node, depth = 0) => {
+        if (!node || depth > 30 || seenNodes.has(node)) return;
+        seenNodes.add(node);
+
+        const active = safe(() => node.activeInHierarchy, safe(() => node.active, true));
+        if (active !== false) {
+          let sprites = [];
+          try { sprites = node.getComponents?.(Sprite) || []; } catch (_) {}
+
+          for (const component of sprites) {
+            if (!component || safe(() => component.enabled, true) === false) continue;
+            const sf = safe(() => component.spriteFrame, null) || safe(() => component._spriteFrame, null);
+            const info = makeFrameInfo(win, node, sf);
+            if (!info) continue;
+
+            const existing = grouped.get(info.symbolId);
+            if (existing) {
+              existing.count += 1;
+              if (!existing.source && info.source) existing.source = info.source;
+              if (!existing.nativeUrl && info.nativeUrl) existing.nativeUrl = info.nativeUrl;
+              if ((!existing.textureWidth || !existing.textureHeight) && info.textureWidth && info.textureHeight) {
+                existing.textureWidth = info.textureWidth;
+                existing.textureHeight = info.textureHeight;
+              }
+            } else {
+              grouped.set(info.symbolId, info);
+            }
+          }
         }
 
-        group.count += 1;
+        let children=[];
+        try { children = node.children || node._children || []; } catch (_) {}
+        for (const child of children) visit(child, depth + 1);
+      };
 
-        if (!group.image) {
-          const image = captureSymbol(item.win, item.node);
-          if (image) group.image = image;
-        }
-      }
+      visit(scene,0);
     }
 
-    const frames = [...grouped.values()]
-      .sort((a,b) => Number(a.symbolId) - Number(b.symbolId));
-
+    const frames=[...grouped.values()].sort((a,b)=>Number(a.symbolId)-Number(b.symbolId));
     try {
-      const byId = {};
-      for (const item of frames) byId[item.symbolId] = item;
-      window.__XIANYAO_ATG_SYMBOL_SPRITES__ = {
-        frames,
-        byId,
-        updatedAt:Date.now(),
-        source:'canvas-crop'
-      };
+      const byId={};
+      for (const item of frames) byId[item.symbolId]=item;
+      window.__XIANYAO_ATG_SYMBOL_SPRITES__={frames,byId,updatedAt:Date.now(),source:'asset-unwrapped'};
     } catch (_) {}
-
     return frames;
   }
 
+  function drawFromSource(canvas, item) {
+    if (!item?.source || !item?.rect) return false;
+    const dim=sourceSize(item.source);
+    if (!dim.width || !dim.height || !item.rect.width || !item.rect.height) return false;
+
+    const ctx=canvas.getContext('2d');
+    if (!ctx) return false;
+    canvas.width=96;
+    canvas.height=96;
+    ctx.clearRect(0,0,96,96);
+
+    try {
+      const sx=Math.max(0,item.rect.x);
+      let sy=dim.height-item.rect.y-item.rect.height;
+      if (!(sy>=0 && sy+item.rect.height<=dim.height)) sy=item.rect.y;
+
+      if (!item.rotated) {
+        ctx.drawImage(item.source,sx,sy,item.rect.width,item.rect.height,0,0,96,96);
+      } else {
+        ctx.save();
+        ctx.translate(48,48);
+        ctx.rotate(-Math.PI/2);
+        ctx.drawImage(item.source,sx,sy,item.rect.width,item.rect.height,-48,-48,96,96);
+        ctx.restore();
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function atlasPreview(item) {
+    if (!item?.nativeUrl || !item?.rect || item.rotated) return null;
+    const tw=Number(item.textureWidth||0), th=Number(item.textureHeight||0);
+    if (!tw || !th) return null;
+
+    const rw=Number(item.rect.width||0), rh=Number(item.rect.height||0);
+    if (!rw || !rh) return null;
+
+    const max=46;
+    const scale=Math.min(max/rw,max/rh);
+    const topY=th-item.rect.y-rh;
+
+    const crop=document.createElement('div');
+    crop.className='sp-atlas';
+    crop.style.width=`${rw*scale}px`;
+    crop.style.height=`${rh*scale}px`;
+    crop.style.backgroundImage=`url("${String(item.nativeUrl).replace(/"/g,'\\"')}")`;
+    crop.style.backgroundRepeat='no-repeat';
+    crop.style.backgroundSize=`${tw*scale}px ${th*scale}px`;
+    crop.style.backgroundPosition=`${-item.rect.x*scale}px ${-topY*scale}px`;
+    return crop;
+  }
+
+  function buildPreview(item) {
+    const wrap=document.createElement('div');
+    wrap.className='sp-preview';
+
+    const canvas=document.createElement('canvas');
+    if (drawFromSource(canvas,item)) {
+      wrap.appendChild(canvas);
+      return {element:wrap,method:'asset-canvas'};
+    }
+
+    const atlas=atlasPreview(item);
+    if (atlas) {
+      wrap.appendChild(atlas);
+      return {element:wrap,method:'asset-url'};
+    }
+
+    const empty=document.createElement('div');
+    empty.className='sp-empty';
+    empty.textContent='無預覽';
+    wrap.appendChild(empty);
+    return {element:wrap,method:'no-preview'};
+  }
+
   function ensureStyle() {
-    if (document.getElementById('xinyao-atg-sprite-probe-style-v03')) return;
-    const style = document.createElement('style');
-    style.id = 'xinyao-atg-sprite-probe-style-v03';
-    style.textContent = `
+    if (document.getElementById('xinyao-atg-sprite-probe-style-v04')) return;
+    const style=document.createElement('style');
+    style.id='xinyao-atg-sprite-probe-style-v04';
+    style.textContent=`
       #${SECTION_ID}{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.10)}
       #${SECTION_ID} .sp-head{display:flex;align-items:center;justify-content:space-between;gap:7px}
       #${SECTION_ID} .sp-title{font-size:9px;font-weight:900;opacity:.88}
@@ -6778,137 +6913,111 @@ setInterval(xinyaoCheckMaintenance, 10000);
       #${SECTION_ID} .sp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:6px}
       #${SECTION_ID} .sp-card{min-width:0;padding:4px 3px;border-radius:9px;background:rgba(255,255,255,.055);text-align:center}
       #${SECTION_ID} .sp-preview{display:flex;align-items:center;justify-content:center;width:48px;height:48px;max-width:100%;margin:0 auto;overflow:hidden;border-radius:8px;background:rgba(255,255,255,.025)}
-      #${SECTION_ID} .sp-preview img{display:block;width:46px;height:46px;object-fit:contain}
+      #${SECTION_ID} canvas{display:block;width:46px;height:46px}
+      #${SECTION_ID} .sp-atlas{background-repeat:no-repeat;flex:0 0 auto}
       #${SECTION_ID} .sp-empty{font-size:7px;opacity:.35}
       #${SECTION_ID} .sp-name{margin-top:2px;font-size:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.82}
       #${SECTION_ID} .sp-count{font-size:8px;font-weight:900;color:#73dfff}
+      #${SECTION_ID} .sp-tech{font-size:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.35}
       @media(max-width:760px){
         #${SECTION_ID} .sp-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
-        #${SECTION_ID} .sp-preview{width:42px;height:42px}
-        #${SECTION_ID} .sp-preview img{width:40px;height:40px}
       }
     `;
-    (document.head || document.documentElement).appendChild(style);
+    (document.head||document.documentElement).appendChild(style);
   }
 
   function ensureSection() {
     ensureStyle();
-    const host = document.getElementById(HOST_PANEL_ID);
-    const body = host?.querySelector('.bp-body');
-    if (!body) return null;
+    const host=document.getElementById(HOST_PANEL_ID);
+    const body=host?.querySelector('.bp-body');
+    if(!body) return null;
 
-    let section = body.querySelector(`#${SECTION_ID}`);
-    if (section) return section;
+    let section=body.querySelector(`#${SECTION_ID}`);
+    if(section) return section;
 
-    section = document.createElement('div');
-    section.id = SECTION_ID;
-    section.innerHTML = `
+    section=document.createElement('div');
+    section.id=SECTION_ID;
+    section.innerHTML=`
       <div class="sp-head">
-        <div class="sp-title">🧩 遊戲原始圖示素材 v3</div>
+        <div class="sp-title">🧩 遊戲原始圖示素材 v4</div>
         <button type="button" class="sp-btn">重新掃描</button>
       </div>
-      <div class="sp-status">改用遊戲畫面 Canvas 直接裁取符號…</div>
+      <div class="sp-status">深層讀取 Cocos Texture / ImageAsset…</div>
       <div class="sp-grid"></div>
     `;
-
-    section.querySelector('.sp-btn')?.addEventListener('click', event => {
+    section.querySelector('.sp-btn')?.addEventListener('click',event=>{
       event.preventDefault();
       event.stopPropagation();
       runScan();
     });
-
     body.appendChild(section);
     return section;
   }
 
   function render() {
-    const section = ensureSection();
-    if (!section) return;
+    const section=ensureSection();
+    if(!section) return;
+    const status=section.querySelector('.sp-status');
+    const grid=section.querySelector('.sp-grid');
+    if(!status||!grid) return;
 
-    const status = section.querySelector('.sp-status');
-    const grid = section.querySelector('.sp-grid');
-    if (!status || !grid) return;
-
-    if (spriteState.scanning) {
-      status.textContent = '正在從目前盤面裁取 Symbol 圖片…';
+    if(spriteState.scanning){
+      status.textContent='正在讀取遊戲 Texture / ImageAsset…';
       return;
     }
 
-    const captured = spriteState.frames.filter(item => item.image).length;
+    const previewCount=spriteState.frames.filter(item=>item.source||item.nativeUrl).length;
+    if(spriteState.error) status.textContent=spriteState.error;
+    else if(!spriteState.frames.length) status.textContent='尚未掃到 symbol_XX；完成一局後會自動重試。';
+    else status.textContent=`抓到 ${spriteState.frames.length} 種 Symbol｜可取圖來源 ${previewCount} 種`;
 
-    if (spriteState.error) {
-      status.textContent = spriteState.error;
-    } else if (!spriteState.frames.length) {
-      status.textContent = '尚未掃到 symbol_XX 節點，完成一局後會自動重試。';
-    } else {
-      status.textContent = `抓到 ${spriteState.frames.length} 種 Symbol｜成功裁圖 ${captured} 種`;
-    }
+    grid.innerHTML='';
+    for(const item of spriteState.frames.slice(0,16)){
+      const card=document.createElement('div');
+      card.className='sp-card';
 
-    grid.innerHTML = '';
+      const preview=buildPreview(item);
+      card.appendChild(preview.element);
 
-    for (const item of spriteState.frames.slice(0,16)) {
-      const card = document.createElement('div');
-      card.className = 'sp-card';
+      const name=document.createElement('div');
+      name.className='sp-name';
+      name.textContent=`ID ${item.symbolId}｜${item.name}`;
 
-      const preview = document.createElement('div');
-      preview.className = 'sp-preview';
+      const count=document.createElement('div');
+      count.className='sp-count';
+      count.textContent=`×${item.count}`;
 
-      if (item.image) {
-        const img = document.createElement('img');
-        img.src = item.image;
-        img.alt = `ID ${item.symbolId}`;
-        preview.appendChild(img);
-      } else {
-        const empty = document.createElement('div');
-        empty.className = 'sp-empty';
-        empty.textContent = '無預覽';
-        preview.appendChild(empty);
-      }
+      const tech=document.createElement('div');
+      tech.className='sp-tech';
+      tech.textContent=`${preview.method}｜src${item.source?'✓':'×'}｜url${item.nativeUrl?'✓':'×'}`;
 
-      const name = document.createElement('div');
-      name.className = 'sp-name';
-      name.textContent = `ID ${item.symbolId}｜${item.name}`;
-
-      const count = document.createElement('div');
-      count.className = 'sp-count';
-      count.textContent = `×${item.count}`;
-
-      card.appendChild(preview);
       card.appendChild(name);
       card.appendChild(count);
+      card.appendChild(tech);
       grid.appendChild(card);
     }
   }
 
   function runScan() {
-    if (spriteState.scanning) return;
-    spriteState.scanning = true;
-    spriteState.error = '';
+    if(spriteState.scanning) return;
+    spriteState.scanning=true;
+    spriteState.error='';
     render();
 
-    setTimeout(() => {
-      try {
-        spriteState.frames = scanSymbols();
-        spriteState.lastScanAt = Date.now();
-        if (!spriteState.frames.length) {
-          spriteState.error = '這局沒有抓到 symbol_XX 節點；下一局會再試一次。';
-        }
-      } catch (_) {
-        spriteState.frames = [];
-        spriteState.error = 'Canvas 裁圖失敗，下一局會再重試。';
-      } finally {
-        spriteState.scanning = false;
+    setTimeout(()=>{
+      try{
+        spriteState.frames=collectFrames();
+        if(!spriteState.frames.length) spriteState.error='這局沒有抓到 symbol_XX 節點；下一局再試一次。';
+      }catch(_){
+        spriteState.frames=[];
+        spriteState.error='Texture 深層讀取失敗，下一局會再重試。';
+      }finally{
+        spriteState.scanning=false;
         render();
       }
-    }, 120);
+    },120);
   }
 
-  window.addEventListener(EVENT_NAME, () => {
-    // 等符號停止後裁圖，比讀 Texture URL 更穩定。
-    setTimeout(runScan, 650);
-  });
-
-  setInterval(() => {
-    if (document.getElementById(HOST_PANEL_ID)) render();
-  }, 900);
+  window.addEventListener(EVENT_NAME,()=>setTimeout(runScan,500));
+  setInterval(()=>{ if(document.getElementById(HOST_PANEL_ID)) render(); },900);
 })();
