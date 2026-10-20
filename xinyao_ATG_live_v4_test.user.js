@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.12
+// @version      4.0.0-test.13
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -6156,7 +6156,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     return VERIFIED_SYMBOL_LABELS.get(key) || `ID ${key}`;
   }
 
-  const SETH_SYMBOL_SPRITE_URL = 'https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/476a3132fae652d6ce3798b7aff9cf765c16c8d5/assets/atg-seth/symbols_padded.webp';
+  const SETH_SYMBOL_SPRITE_URL = 'https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/f49b26a82b8ef5205c680331b102f33ba7ad6704/assets/atg-seth/symbols_safe_v3.webp';
 
   function symbolIconHtml(token) {
     const key = String(token ?? '');
@@ -6382,7 +6382,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
       #${PANEL_ID} .bp-status{margin-top:5px;font-size:10px;color:#8deac1}
       #${PANEL_ID} .bp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:8px}
       #${PANEL_ID} .bp-item{padding:6px 3px 7px;border-radius:10px;background:rgba(255,255,255,.065);text-align:center;min-width:0}
-      #${PANEL_ID} .bp-icon{display:block;width:44px;height:44px;margin:0 auto;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.30)}
+      #${PANEL_ID} .bp-icon{display:block;width:42px;height:42px;margin:0 auto;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.30)}
       #${PANEL_ID} .bp-sprite{background-repeat:no-repeat;background-size:300% 300%;background-color:#111b2a}
       #${PANEL_ID} .bp-multiplier{display:flex;align-items:center;justify-content:center;border-radius:50%;background:radial-gradient(circle at 35% 30%,#47d378,#15884d 70%);border:2px solid #e4b54b;color:#ffe16a;font-size:24px;font-weight:950;line-height:1}
       #${PANEL_ID} .bp-unknown{display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);color:#9eb4c7;font-size:18px;font-weight:900}
