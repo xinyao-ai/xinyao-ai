@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.10
+// @version      4.0.0-test.11
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -6156,32 +6156,25 @@ setInterval(xinyaoCheckMaintenance, 10000);
     return VERIFIED_SYMBOL_LABELS.get(key) || `ID ${key}`;
   }
 
-  function svgData(svg) {
-    return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
-  }
+  const SETH_SYMBOL_SPRITE_URL = 'https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/78110a0f6ff354b031909c2d67a2e5c4d6ce6c22/assets/atg-seth/symbols.webp';
 
-  function gemSvg(inner, outer, diamond = false) {
-    const shape = diamond
-      ? '<polygon points="32,5 59,32 32,59 5,32" fill="' + outer + '" stroke="#e9b84d" stroke-width="3"/><polygon points="32,12 52,32 32,52 12,32" fill="' + inner + '"/><path d="M12 32h40M32 12v40M18 18l28 28M46 18L18 46" stroke="rgba(255,255,255,.34)" stroke-width="2"/>'
-      : '<circle cx="32" cy="32" r="27" fill="' + outer + '" stroke="#e9b84d" stroke-width="3"/><circle cx="32" cy="32" r="20" fill="' + inner + '"/><path d="M18 18l28 28M46 18L18 46M13 32h38" stroke="rgba(255,255,255,.28)" stroke-width="2"/>';
-    return svgData('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">' + shape + '</svg>');
-  }
+  function symbolIconHtml(token) {
+    const key = String(token ?? '');
+    const id = Number(key);
 
-  const SYMBOL_ICONS = new Map([
-    ['1', svgData('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M5 31C14 15 25 10 32 10s18 5 27 21c-9 16-20 21-27 21S14 47 5 31Z" fill="#16a7a5" stroke="#e6b74d" stroke-width="4"/><path d="M11 31c7-8 14-12 21-12s14 4 21 12c-7 8-14 12-21 12S18 39 11 31Z" fill="#f4efe4"/><circle cx="32" cy="31" r="10" fill="#26d0cf" stroke="#1c4250" stroke-width="3"/><circle cx="32" cy="31" r="4.5" fill="#1a1130"/><path d="M9 18Q31 3 55 17M13 49Q31 61 51 48" fill="none" stroke="#e6b74d" stroke-width="3" stroke-linecap="round"/></svg>')],
-    ['2', svgData('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M30 57C18 49 18 36 28 29c-9-4-11-13-4-20 7-7 20-5 24 5 3 7-2 12-8 15 10 7 10 19-1 28Z" fill="#24a9a5" stroke="#e6b74d" stroke-width="4"/><path d="M22 17c5-8 17-9 24-1l-8 5-8-1Z" fill="#d94838"/><circle cx="39" cy="15" r="2.5" fill="#ffe36d"/></svg>')],
-    ['3', svgData('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" fill="#178f67" stroke="#e6b74d" stroke-width="3"/><path d="M18 47Q42 32 20 15" fill="none" stroke="#e9c56c" stroke-width="4"/><path d="M20 15L47 45" stroke="#e9c56c" stroke-width="3"/><path d="M44 40l6 8-9-5Z" fill="#e9c56c"/><path d="M18 47l2-32" stroke="#d99245" stroke-width="2"/></svg>')],
-    ['4', svgData('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" fill="#9b5d20" stroke="#e6b74d" stroke-width="3"/><path d="M17 40l29-22" stroke="#f0c56d" stroke-width="5" stroke-linecap="round"/><path d="M41 13c8 1 13 5 14 11-7-1-12 1-16 6Z" fill="#f0c56d"/><path d="M23 36c-8 0-13-4-15-10 7 0 12-2 16-6Z" fill="#f0c56d"/></svg>')],
-    ['5', gemSvg('#ffd83d','#e6a81e',false)],
-    ['6', gemSvg('#ff4f50','#c62828',false)],
-    ['7', gemSvg('#b953e8','#6f2faf',false)],
-    ['8', gemSvg('#39a8ff','#1768b9',true)],
-    ['9', gemSvg('#29cf66','#138e45',true)],
-    ['13', svgData('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" fill="#1e9c58" stroke="#e6b74d" stroke-width="4"/><text x="32" y="39" text-anchor="middle" font-family="Arial,sans-serif" font-size="24" font-weight="900" fill="#ffd95a">×</text></svg>')]
-  ]);
+    if (Number.isInteger(id) && id >= 1 && id <= 9) {
+      const col = (id - 1) % 3;
+      const row = Math.floor((id - 1) / 3);
+      const x = col * 50;
+      const y = row * 50;
+      return `<span class="bp-icon bp-sprite" style="background-image:url('${SETH_SYMBOL_SPRITE_URL}');background-position:${x}% ${y}%;" aria-label="${symbolLabel(key)}"></span>`;
+    }
 
-  function symbolIcon(token) {
-    return SYMBOL_ICONS.get(String(token ?? '')) || '';
+    if (key === '13') {
+      return '<span class="bp-icon bp-multiplier" aria-label="倍率符號">×</span>';
+    }
+
+    return '<span class="bp-icon bp-unknown">?</span>';
   }
 
   function safe(fn, fallback = null) {
@@ -6389,7 +6382,10 @@ setInterval(xinyaoCheckMaintenance, 10000);
       #${PANEL_ID} .bp-status{margin-top:5px;font-size:10px;color:#8deac1}
       #${PANEL_ID} .bp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:8px}
       #${PANEL_ID} .bp-item{padding:6px 3px 7px;border-radius:10px;background:rgba(255,255,255,.065);text-align:center;min-width:0}
-      #${PANEL_ID} .bp-icon{display:block;width:42px;height:42px;object-fit:contain;margin:0 auto;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.28)}
+      #${PANEL_ID} .bp-icon{display:block;width:44px;height:44px;margin:0 auto;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.30)}
+      #${PANEL_ID} .bp-sprite{background-repeat:no-repeat;background-size:300% 300%;background-color:#111b2a}
+      #${PANEL_ID} .bp-multiplier{display:flex;align-items:center;justify-content:center;border-radius:50%;background:radial-gradient(circle at 35% 30%,#47d378,#15884d 70%);border:2px solid #e4b54b;color:#ffe16a;font-size:24px;font-weight:950;line-height:1}
+      #${PANEL_ID} .bp-unknown{display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);color:#9eb4c7;font-size:18px;font-weight:900}
       #${PANEL_ID} .bp-name{display:block;margin-top:3px;font-size:8px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.86}
       #${PANEL_ID} .bp-seq-title{margin-top:8px;font-size:9px;font-weight:850;opacity:.78}
       #${PANEL_ID} .bp-board-toggle{width:100%;margin-top:7px;border:1px solid rgba(115,223,255,.28);border-radius:8px;background:rgba(115,223,255,.07);color:#dff8ff;padding:5px;font-size:8px;font-weight:850;cursor:pointer}
@@ -6470,10 +6466,9 @@ setInterval(xinyaoCheckMaintenance, 10000);
     }
 
     const cards = candidate.items.slice(0, 12).map(item => {
-      const icon = symbolIcon(item.token);
       return `
         <div class="bp-item" title="${esc(symbolLabel(item.token))}｜ID ${esc(item.token)}">
-          ${icon ? `<img class="bp-icon" src="${icon}" alt="${esc(symbolLabel(item.token))}">` : ''}
+          ${symbolIconHtml(item.token)}
           <span class="bp-name">${esc(symbolLabel(item.token))}</span>
           <span class="bp-count">×${item.count}</span>
         </div>
