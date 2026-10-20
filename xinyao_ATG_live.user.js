@@ -6503,3 +6503,408 @@ setInterval(xinyaoCheckMaintenance, 10000);
     render();
   }
 })();
+
+/* ===== 芯瑤 ATG HUD Lab｜Cocos 圖示素材偵測 v0.1 ===== */
+(function xinyaoSpriteProbeModule() {
+  'use strict';
+
+  if (window.__XIANYAO_ATG_SPRITE_PROBE_V01__) return;
+  window.__XIANYAO_ATG_SPRITE_PROBE_V01__ = true;
+
+  const HOST_PANEL_ID = 'xinyao-atg-board-probe-v01';
+  const SECTION_ID = 'xinyao-atg-sprite-probe-v01';
+  const EVENT_NAME = 'xinyao:spin-final-observed';
+
+  const spriteState = {
+    scanning: false,
+    lastScanAt: 0,
+    frames: [],
+    error: ''
+  };
+
+  function safe(fn, fallback = null) {
+    try {
+      const value = fn();
+      return value === undefined ? fallback : value;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function collectSameOriginWindows(root = window) {
+    const out = [];
+    const seen = new Set();
+
+    const visit = win => {
+      if (!win || seen.has(win)) return;
+      seen.add(win);
+      out.push(win);
+
+      let frames = [];
+      try { frames = [...win.document.querySelectorAll('iframe')]; } catch (_) {}
+
+      for (const frame of frames) {
+        try {
+          const child = frame.contentWindow;
+          if (!child) continue;
+          void child.document;
+          visit(child);
+        } catch (_) {}
+      }
+    };
+
+    visit(root);
+    return out;
+  }
+
+  function nodePath(node) {
+    const parts = [];
+    let current = node;
+    for (let i = 0; current && i < 12; i += 1) {
+      const name = safe(() => current.name, '') || '';
+      if (name) parts.unshift(String(name));
+      current = safe(() => current.parent, null) || safe(() => current._parent, null);
+    }
+    return parts.join('/');
+  }
+
+  function textureSource(texture) {
+    return (
+      safe(() => texture?.getHtmlElementObj?.(), null) ||
+      safe(() => texture?._image, null) ||
+      safe(() => texture?._nativeAsset, null) ||
+      safe(() => texture?.image, null) ||
+      null
+    );
+  }
+
+  function sourceSize(source) {
+    const width = Number(
+      safe(() => source?.naturalWidth, 0) ||
+      safe(() => source?.videoWidth, 0) ||
+      safe(() => source?.width, 0) ||
+      0
+    );
+    const height = Number(
+      safe(() => source?.naturalHeight, 0) ||
+      safe(() => source?.videoHeight, 0) ||
+      safe(() => source?.height, 0) ||
+      0
+    );
+    return { width, height };
+  }
+
+  function frameInfo(spriteFrame, node) {
+    if (!spriteFrame) return null;
+
+    const texture =
+      safe(() => spriteFrame.getTexture?.(), null) ||
+      safe(() => spriteFrame._texture, null) ||
+      null;
+
+    const rect =
+      safe(() => spriteFrame.getRect?.(), null) ||
+      safe(() => spriteFrame._rect, null) ||
+      null;
+
+    const originalSize =
+      safe(() => spriteFrame.getOriginalSize?.(), null) ||
+      safe(() => spriteFrame._originalSize, null) ||
+      null;
+
+    const source = textureSource(texture);
+    const size = sourceSize(source);
+
+    const name = String(
+      safe(() => spriteFrame.name, '') ||
+      safe(() => spriteFrame._name, '') ||
+      safe(() => texture?.name, '') ||
+      safe(() => texture?._name, '') ||
+      '未命名'
+    );
+
+    const nativeUrl = String(
+      safe(() => texture?.nativeUrl, '') ||
+      safe(() => texture?._nativeUrl, '') ||
+      safe(() => source?.currentSrc, '') ||
+      safe(() => source?.src, '') ||
+      ''
+    );
+
+    const path = nodePath(node);
+    const lower = `${path} ${name}`.toLowerCase();
+
+    let score = 0;
+    if (/(symbol|reel|slot)/i.test(lower)) score += 30;
+    if (/(item|cell|grid|icon)/i.test(lower)) score += 12;
+    if (/(effect|glow|light|mask|frame|bg|background|particle)/i.test(lower)) score -= 16;
+
+    const rw = Number(rect?.width || 0);
+    const rh = Number(rect?.height || 0);
+    if (rw >= 40 && rh >= 40) score += 5;
+    if (rw >= 70 && rh >= 70) score += 5;
+    if (rw > 600 || rh > 600) score -= 10;
+
+    if (!source || !size.width || !size.height || !rw || !rh) score -= 30;
+
+    return {
+      key: [name, nativeUrl, rect?.x, rect?.y, rw, rh, Boolean(safe(() => spriteFrame.isRotated?.(), false))].join('|'),
+      name,
+      path,
+      nativeUrl,
+      score,
+      count: 1,
+      source,
+      rect: rect ? { x:Number(rect.x||0), y:Number(rect.y||0), width:rw, height:rh } : null,
+      originalSize: originalSize ? { width:Number(originalSize.width||0), height:Number(originalSize.height||0) } : null,
+      rotated: Boolean(safe(() => spriteFrame.isRotated?.(), false))
+    };
+  }
+
+  function collectFramesFromWindow(win) {
+    const cc =
+      safe(() => win.cc, null) ||
+      safe(() => win.legacyCC, null) ||
+      safe(() => win._cc, null);
+
+    const scene = safe(() => cc?.director?.getScene?.(), null);
+    const Sprite = safe(() => cc?.Sprite, null);
+    if (!scene || !Sprite) return [];
+
+    const unique = new Map();
+    const seenNodes = new WeakSet();
+
+    const visit = (node, depth = 0) => {
+      if (!node || depth > 28 || seenNodes.has(node)) return;
+      seenNodes.add(node);
+
+      const active = safe(() => node.activeInHierarchy, safe(() => node.active, true));
+      if (active !== false) {
+        let sprites = [];
+        try { sprites = node.getComponents?.(Sprite) || []; } catch (_) {}
+
+        for (const component of sprites) {
+          if (!component || safe(() => component.enabled, true) === false) continue;
+          const sf = safe(() => component.spriteFrame, null) || safe(() => component._spriteFrame, null);
+          const info = frameInfo(sf, node);
+          if (!info) continue;
+
+          const existing = unique.get(info.key);
+          if (existing) {
+            existing.count += 1;
+            existing.score = Math.max(existing.score, info.score);
+            if (info.path.length < existing.path.length) existing.path = info.path;
+          } else {
+            unique.set(info.key, info);
+          }
+        }
+      }
+
+      let children = [];
+      try { children = node.children || node._children || []; } catch (_) {}
+      for (const child of children) visit(child, depth + 1);
+    };
+
+    visit(scene, 0);
+    return [...unique.values()];
+  }
+
+  function scanFrames() {
+    const merged = new Map();
+
+    for (const win of collectSameOriginWindows()) {
+      for (const info of collectFramesFromWindow(win)) {
+        const existing = merged.get(info.key);
+        if (existing) {
+          existing.count += info.count;
+          existing.score = Math.max(existing.score, info.score);
+        } else {
+          merged.set(info.key, info);
+        }
+      }
+    }
+
+    return [...merged.values()]
+      .filter(item => item.score >= 0)
+      .sort((a, b) => b.score - a.score || b.count - a.count || a.name.localeCompare(b.name))
+      .slice(0, 30);
+  }
+
+  function ensureStyle() {
+    if (document.getElementById('xinyao-atg-sprite-probe-style-v01')) return;
+
+    const style = document.createElement('style');
+    style.id = 'xinyao-atg-sprite-probe-style-v01';
+    style.textContent = `
+      #${SECTION_ID}{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.10)}
+      #${SECTION_ID} .sp-head{display:flex;align-items:center;justify-content:space-between;gap:7px}
+      #${SECTION_ID} .sp-title{font-size:9px;font-weight:900;opacity:.85}
+      #${SECTION_ID} .sp-btn{border:1px solid rgba(115,223,255,.35);border-radius:8px;background:rgba(115,223,255,.08);color:#dff8ff;padding:4px 7px;font-size:8px;font-weight:850;cursor:pointer}
+      #${SECTION_ID} .sp-status{margin-top:5px;font-size:8px;opacity:.55}
+      #${SECTION_ID} .sp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:6px}
+      #${SECTION_ID} .sp-card{min-width:0;padding:4px 3px;border-radius:9px;background:rgba(255,255,255,.055);text-align:center}
+      #${SECTION_ID} canvas{display:block;width:42px;height:42px;max-width:100%;margin:0 auto}
+      #${SECTION_ID} .sp-name{margin-top:2px;font-size:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.78}
+      #${SECTION_ID} .sp-count{font-size:8px;font-weight:900;color:#73dfff}
+      @media (max-width:760px){
+        #${SECTION_ID} .sp-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+        #${SECTION_ID} canvas{width:36px;height:36px}
+      }
+    `;
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  function drawFrame(canvas, item) {
+    if (!canvas || !item?.source || !item?.rect) return false;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return false;
+
+    const source = item.source;
+    const { width: sw, height: sh } = sourceSize(source);
+    const rect = item.rect;
+    if (!sw || !sh || !rect.width || !rect.height) return false;
+
+    const outW = Math.max(1, Math.round(item.originalSize?.width || rect.width));
+    const outH = Math.max(1, Math.round(item.originalSize?.height || rect.height));
+    canvas.width = Math.min(160, outW);
+    canvas.height = Math.min(160, outH);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    try {
+      const sx = Math.max(0, rect.x);
+      const syBottom = Math.max(0, rect.y);
+      let sy = sh - syBottom - rect.height;
+      if (!(sy >= 0 && sy + rect.height <= sh)) sy = syBottom;
+
+      if (!item.rotated) {
+        ctx.drawImage(
+          source,
+          sx, sy, rect.width, rect.height,
+          0, 0, canvas.width, canvas.height
+        );
+      } else {
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.drawImage(
+          source,
+          sx, sy, rect.width, rect.height,
+          -canvas.height / 2, -canvas.width / 2, canvas.height, canvas.width
+        );
+        ctx.restore();
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function ensureSection() {
+    ensureStyle();
+
+    const host = document.getElementById(HOST_PANEL_ID);
+    const body = host?.querySelector('.bp-body');
+    if (!body) return null;
+
+    let section = body.querySelector(`#${SECTION_ID}`);
+    if (section) return section;
+
+    section = document.createElement('div');
+    section.id = SECTION_ID;
+    section.innerHTML = `
+      <div class="sp-head">
+        <div class="sp-title">🧩 遊戲原始圖示素材</div>
+        <button type="button" class="sp-btn">重新掃描</button>
+      </div>
+      <div class="sp-status">等待盤面完成後掃描 Cocos Sprite…</div>
+      <div class="sp-grid"></div>
+    `;
+
+    section.querySelector('.sp-btn')?.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      runScan();
+    });
+
+    body.appendChild(section);
+    return section;
+  }
+
+  function render() {
+    const section = ensureSection();
+    if (!section) return;
+
+    const status = section.querySelector('.sp-status');
+    const grid = section.querySelector('.sp-grid');
+    if (!status || !grid) return;
+
+    if (spriteState.scanning) {
+      status.textContent = '掃描遊戲 Sprite 中…';
+      return;
+    }
+
+    if (spriteState.error) {
+      status.textContent = spriteState.error;
+    } else if (!spriteState.frames.length) {
+      status.textContent = '尚未找到可顯示的 Sprite，請完成一局後再掃描。';
+    } else {
+      status.textContent = `找到 ${spriteState.frames.length} 組候選素材｜先看是否出現眼睛、戰斧、寶石等圖示`;
+    }
+
+    grid.innerHTML = '';
+
+    for (const item of spriteState.frames.slice(0, 16)) {
+      const card = document.createElement('div');
+      card.className = 'sp-card';
+      card.title = `${item.name}\n${item.path}`;
+
+      const canvas = document.createElement('canvas');
+      const ok = drawFrame(canvas, item);
+
+      const name = document.createElement('div');
+      name.className = 'sp-name';
+      name.textContent = item.name || '未命名';
+
+      const count = document.createElement('div');
+      count.className = 'sp-count';
+      count.textContent = `×${item.count}`;
+
+      if (ok) card.appendChild(canvas);
+      card.appendChild(name);
+      card.appendChild(count);
+      grid.appendChild(card);
+    }
+  }
+
+  function runScan() {
+    if (spriteState.scanning) return;
+    spriteState.scanning = true;
+    spriteState.error = '';
+    render();
+
+    setTimeout(() => {
+      try {
+        spriteState.frames = scanFrames();
+        spriteState.lastScanAt = Date.now();
+        if (!spriteState.frames.length) {
+          spriteState.error = '這局沒有掃到可用 Sprite；下一局完成後會再試一次。';
+        }
+      } catch (_) {
+        spriteState.frames = [];
+        spriteState.error = '圖示素材掃描失敗，下一局會再重試。';
+      } finally {
+        spriteState.scanning = false;
+        render();
+      }
+    }, 80);
+  }
+
+  window.addEventListener(EVENT_NAME, () => {
+    setTimeout(runScan, 420);
+  });
+
+  setInterval(() => {
+    if (document.getElementById(HOST_PANEL_ID)) render();
+  }, 900);
+})();
