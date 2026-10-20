@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.17
+// @version      4.0.0-test.18
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -6127,8 +6127,23 @@ setInterval(xinyaoCheckMaintenance, 10000);
     candidate: null,
     candidateCount: 0,
     status: '等待第一局完成資料…',
-    minimized: false
+    minimized: false,
+    signalScore: 0,
+    signalReason: '等待盤面資料',
+    signalTriggered: false,
+    signalArmed: true,
+    lastSignalSpinId: '',
+    autoStopEnabled: true,
+    autoStopStatus: '',
+    signalHistory: []
   };
+
+  const SIGNAL_THRESHOLD = 75;
+  const SIGNAL_REARM_THRESHOLD = 55;
+  const SIGNAL_AUTOSTOP_KEY = 'xinyao_atg_signal_autostop_v1';
+  try {
+    probe.autoStopEnabled = localStorage.getItem(SIGNAL_AUTOSTOP_KEY) !== '0';
+  } catch (_) {}
 
   const POSITIVE_PATH_RE = /(symbol|symbols|reel|reels|grid|matrix|board|screen|layout|cell|cells|tile|tiles|icon|icons|strip|view|result)/i;
   const STRONG_PATH_RE = /(symbol|symbols|reel|reels|grid|matrix|board|screen|layout|cell|cells|tile|tiles)/i;
@@ -6342,6 +6357,228 @@ setInterval(xinyaoCheckMaintenance, 10000);
     };
   }
 
+
+  function candidateCount(candidate, token) {
+    const key = String(token);
+    const item = candidate?.items?.find?.(entry => String(entry?.token) === key);
+    return Math.max(0, Number(item?.count) || 0);
+  }
+
+  function computeBoardSignal(candidate) {
+    if (!candidate) return { score:0, reason:'等待盤面資料', base:0 };
+
+    const eye = candidateCount(candidate, '1');
+    const snake = candidateCount(candidate, '2');
+    const bow = candidateCount(candidate, '3');
+    const axe = candidateCount(candidate, '4');
+    const multiplier = candidateCount(candidate, '13');
+    const premium = eye + snake + bow + axe;
+    let score = 0;
+    const reasons = [];
+
+    if (multiplier > 0) {
+      score += Math.min(46, 34 + (multiplier - 1) * 8);
+      reasons.push(`倍率符號 ×${multiplier}`);
+    }
+    if (eye >= 4) {
+      score += Math.min(20, 8 + (eye - 4) * 4);
+      reasons.push(`眼睛 ×${eye}`);
+    }
+    if (snake >= 4) {
+      score += Math.min(17, 7 + (snake - 4) * 3);
+      reasons.push(`蛇 ×${snake}`);
+    }
+    if (bow >= 4) {
+      score += Math.min(14, 6 + (bow - 4) * 3);
+      reasons.push(`弓箭 ×${bow}`);
+    }
+    if (axe >= 4) {
+      score += Math.min(14, 6 + (axe - 4) * 3);
+      reasons.push(`戰斧 ×${axe}`);
+    }
+    if (premium >= 12) {
+      score += 18;
+      reasons.push(`高階圖案共 ${premium} 格`);
+    } else if (premium >= 9) {
+      score += 11;
+      reasons.push(`高階圖案共 ${premium} 格`);
+    } else if (premium >= 7) {
+      score += 6;
+    }
+
+    const previous = probe.signalHistory.slice(-2);
+    if (previous.length === 2) {
+      const avg = previous.reduce((sum, item) => sum + (Number(item?.base) || 0), 0) / 2;
+      if (avg >= 58) {
+        score += 9;
+        reasons.push('近期盤面連續偏強');
+      } else if (avg >= 46) {
+        score += 5;
+      }
+    }
+
+    score = Math.max(0, Math.min(100, Math.round(score)));
+    return {
+      score,
+      base: score,
+      reason: reasons.slice(0, 3).join('・') || '目前盤面未達訊號條件'
+    };
+  }
+
+  function sameOriginSignalWindows(root = window) {
+    const out = [];
+    const seen = new Set();
+    const visit = win => {
+      if (!win || seen.has(win)) return;
+      seen.add(win);
+      out.push(win);
+      let frames = [];
+      try { frames = [...win.document.querySelectorAll('iframe')]; } catch (_) {}
+      for (const frame of frames) {
+        try {
+          const child = frame.contentWindow;
+          if (!child) continue;
+          void child.document;
+          visit(child);
+        } catch (_) {}
+      }
+    };
+    visit(root);
+    return out;
+  }
+
+  function explicitStopPattern(text) {
+    const value = String(text || '').replace(/\s+/g, ' ').trim();
+    return /停止(?:自動|連轉|旋轉)|(?:stop|cancel)[-_\s]*(?:auto|autoplay|autospin)|(?:auto|autoplay|autospin)[-_\s]*(?:stop|cancel)/i.test(value);
+  }
+
+  function emitSignalCocosClick(target, cocos) {
+    if (!target?.node) return false;
+    try {
+      const button = target;
+      const events = Array.isArray(button.clickEvents) ? button.clickEvents : [];
+      const EventHandler = cocos?.Component?.EventHandler || cocos?.EventHandler;
+      if (events.length && typeof EventHandler?.emitEvents === 'function') {
+        try {
+          EventHandler.emitEvents(events, button);
+          return true;
+        } catch (_) {}
+      }
+      for (const handler of events) {
+        try {
+          if (typeof handler?.emit === 'function') {
+            handler.emit([button]);
+            return true;
+          }
+          const targetNode = handler?.target;
+          const methodName = handler?.handler;
+          const componentName = handler?.component;
+          if (!targetNode || !methodName) continue;
+          let component = null;
+          try {
+            if (componentName && typeof targetNode.getComponent === 'function') component = targetNode.getComponent(componentName);
+          } catch (_) {}
+          const receiver = component || targetNode;
+          if (typeof receiver?.[methodName] === 'function') {
+            receiver[methodName].call(receiver, button, handler?.customEventData);
+            return true;
+          }
+        } catch (_) {}
+      }
+      try {
+        if (typeof target.node.emit === 'function') {
+          target.node.emit('click', button);
+          return true;
+        }
+      } catch (_) {}
+    } catch (_) {}
+    return false;
+  }
+
+  function tryStopAutoplay() {
+    // 只碰「明確寫著停止自動 / stop auto」的控制，避免把開始自動轉誤按成開啟。
+    for (const gameWindow of sameOriginSignalWindows()) {
+      try {
+        const doc = gameWindow.document;
+        const elements = [...doc.querySelectorAll('button,[role="button"],[data-action],.button,.btn')];
+        for (const el of elements) {
+          const text = [
+            el.textContent,
+            el.getAttribute?.('aria-label'),
+            el.getAttribute?.('title'),
+            el.getAttribute?.('data-action'),
+            el.id,
+            el.className
+          ].filter(Boolean).join(' ');
+          if (!explicitStopPattern(text)) continue;
+          try {
+            el.click();
+            return { ok:true, via:'DOM', detail:String(text).slice(0, 80) };
+          } catch (_) {}
+        }
+      } catch (_) {}
+
+      try {
+        const cocos = gameWindow.cc || gameWindow.legacyCC || gameWindow._cc;
+        const scene = cocos?.director?.getScene?.();
+        const Button = cocos?.Button;
+        if (!scene || !Button || typeof scene.getComponentsInChildren !== 'function') continue;
+        const buttons = scene.getComponentsInChildren(Button) || [];
+        for (const button of buttons) {
+          const node = button?.node;
+          if (!node) continue;
+          const names = [];
+          let cursor = node;
+          for (let depth = 0; cursor && depth < 8; depth += 1) {
+            names.push(String(cursor.name || ''));
+            cursor = cursor.parent || cursor._parent || null;
+          }
+          let labels = '';
+          try {
+            const Label = cocos?.Label;
+            if (Label && typeof node.getComponentsInChildren === 'function') {
+              labels = (node.getComponentsInChildren(Label) || [])
+                .map(label => String(label?.string || label?._string || ''))
+                .join(' ');
+            }
+          } catch (_) {}
+          const handlers = (Array.isArray(button.clickEvents) ? button.clickEvents : [])
+            .map(handler => [handler?.component, handler?.handler, handler?.customEventData].filter(Boolean).join(' '))
+            .join(' ');
+          const text = `${names.join(' ')} ${labels} ${handlers}`;
+          if (!explicitStopPattern(text)) continue;
+          if (emitSignalCocosClick(button, cocos)) {
+            return { ok:true, via:'Cocos', detail:text.slice(0, 80) };
+          }
+        }
+      } catch (_) {}
+    }
+    return { ok:false, via:'', detail:'' };
+  }
+
+  function showSignalToast(signal, stopResult) {
+    try {
+      let toast = document.getElementById('xinyao-atg-signal-toast-v1');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'xinyao-atg-signal-toast-v1';
+        toast.style.cssText = 'position:fixed;top:72px;left:50%;transform:translateX(-50%);z-index:2147483647;width:min(360px,calc(100vw - 24px));box-sizing:border-box;padding:12px 14px;border-radius:14px;border:1px solid rgba(255,184,212,.55);background:rgba(24,20,31,.96);color:#fff;box-shadow:0 12px 34px rgba(0,0,0,.42);font-family:-apple-system,BlinkMacSystemFont,"PingFang TC",sans-serif;text-align:center;pointer-events:none;';
+        (document.body || document.documentElement).appendChild(toast);
+      }
+      const stopText = probe.autoStopEnabled
+        ? (stopResult?.ok ? '⏹ 已送出停止自動轉指令' : '⚠️ 未找到明確停止鍵，請手動停止自動轉')
+        : 'ℹ️ 自動停轉目前關閉';
+      toast.innerHTML = `
+        <div style="font-size:15px;font-weight:950;color:#ffb8d4;">📡 盤面訊號達標 ${signal.score}%</div>
+        <div style="margin-top:5px;font-size:10px;opacity:.82;">${esc(signal.reason)}</div>
+        <div style="margin-top:6px;font-size:10px;font-weight:800;">${stopText}</div>
+      `;
+      try { navigator.vibrate?.([80, 50, 120]); } catch (_) {}
+      clearTimeout(showSignalToast._timer);
+      showSignalToast._timer = setTimeout(() => toast?.remove(), 5000);
+    } catch (_) {}
+  }
+
   function roomText() {
     const value = probe.roomNumber;
     if (value === null || value === undefined || value === '') return '—';
@@ -6386,6 +6623,16 @@ setInterval(xinyaoCheckMaintenance, 10000);
       #${PANEL_ID} .bp-title{font-size:12px;font-weight:900;letter-spacing:.05px}
       #${PANEL_ID} .bp-mini{display:flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:5px;background:rgba(255,255,255,.07);font-size:9px;opacity:.82}
       #${PANEL_ID} .bp-status{margin-top:6px;font-size:10px;color:#8deac1;font-weight:800}
+      #${PANEL_ID} .bp-signal{margin-top:7px;padding:7px 8px;border:1px solid rgba(255,255,255,.10);border-radius:9px;background:rgba(255,255,255,.035)}
+      #${PANEL_ID} .bp-signal.hot{border-color:rgba(255,95,158,.62);background:rgba(255,95,158,.10);box-shadow:0 0 0 1px rgba(255,95,158,.08) inset}
+      #${PANEL_ID} .bp-signal-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:9px}
+      #${PANEL_ID} .bp-signal-row b{font-size:10px;color:#ffb8d4}
+      #${PANEL_ID} .bp-signal-state{font-weight:850;opacity:.82}
+      #${PANEL_ID} .bp-signal-bar{height:4px;margin-top:5px;border-radius:999px;background:rgba(255,255,255,.09);overflow:hidden}
+      #${PANEL_ID} .bp-signal-bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#ff7bac,#ff3d8b);transition:width .2s ease}
+      #${PANEL_ID} .bp-signal-reason{margin-top:5px;font-size:7px;line-height:1.35;opacity:.62}
+      #${PANEL_ID} .bp-autostop{margin-top:5px;width:100%;border:1px solid rgba(255,184,212,.20);border-radius:6px;background:rgba(255,255,255,.04);color:#fff;padding:3px;font-size:7px;font-weight:850;cursor:pointer}
+      #${PANEL_ID} .bp-autostop.on{color:#ffcae0;border-color:rgba(255,95,158,.32)}
       #${PANEL_ID} .bp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:7px}
       #${PANEL_ID} .bp-item{padding:5px 3px 6px;border:1px solid rgba(255,255,255,.07);border-radius:8px;background:rgba(255,255,255,.045);text-align:center;min-width:0;overflow:visible}
       #${PANEL_ID} .bp-icon-shell{display:flex;width:42px;height:42px;margin:0 auto;align-items:center;justify-content:center;overflow:visible}
@@ -6474,6 +6721,19 @@ setInterval(xinyaoCheckMaintenance, 10000);
       return;
     }
 
+    const signalHot = probe.signalScore >= SIGNAL_THRESHOLD;
+    const signalMarkup = `
+      <div class="bp-signal ${signalHot ? 'hot' : ''}">
+        <div class="bp-signal-row">
+          <b>📡 盤面訊號 ${probe.signalScore}%</b>
+          <span class="bp-signal-state">${signalHot ? '條件達標' : '觀察中'}</span>
+        </div>
+        <div class="bp-signal-bar"><i style="width:${Math.max(0, Math.min(100, probe.signalScore))}%"></i></div>
+        <div class="bp-signal-reason">${esc(probe.signalReason)}｜僅依已完成盤面統計</div>
+        <button type="button" class="bp-autostop ${probe.autoStopEnabled ? 'on' : ''}">⏹ 自動停轉：${probe.autoStopEnabled ? '開' : '關'}</button>
+      </div>
+    `;
+
     const cards = candidate.items.slice(0, 12).map(item => {
       return `
         <div class="bp-item" title="${esc(symbolLabel(item.token))}｜ID ${esc(item.token)}">
@@ -6492,6 +6752,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
     body.innerHTML = `
       <div class="bp-status">● 已完成盤面偵測｜${esc(roomText())} 房</div>
+      ${signalMarkup}
       <div class="bp-grid">${cards}</div>
       <button type="button" class="bp-board-toggle">查看 30 格盤面</button>
       <div class="bp-board-wrap">
@@ -6502,6 +6763,17 @@ setInterval(xinyaoCheckMaintenance, 10000);
         </div>
       </div>
     `;
+
+    const autoStopButton = body.querySelector('.bp-autostop');
+    if (autoStopButton) {
+      autoStopButton.onclick = event => {
+        event.preventDefault();
+        event.stopPropagation();
+        probe.autoStopEnabled = !probe.autoStopEnabled;
+        try { localStorage.setItem(SIGNAL_AUTOSTOP_KEY, probe.autoStopEnabled ? '1' : '0'); } catch (_) {}
+        render();
+      };
+    }
 
     const boardToggle = body.querySelector('.bp-board-toggle');
     const boardWrap = body.querySelector('.bp-board-wrap');
@@ -6521,8 +6793,16 @@ setInterval(xinyaoCheckMaintenance, 10000);
     if (!spinId || spinId === probe.lastSpinId) return;
 
     probe.lastSpinId = spinId;
+    const previousRoom = probe.roomNumber;
     probe.roomNumber = detail.roomNumber ?? null;
     probe.updatedAt = Date.now();
+
+    if (String(previousRoom ?? '') !== String(probe.roomNumber ?? '')) {
+      probe.signalHistory = [];
+      probe.signalArmed = true;
+      probe.signalTriggered = false;
+      probe.autoStopStatus = '';
+    }
 
     const result = chooseCandidate(detail.finalState, detail.engine);
     probe.candidate = result.best;
@@ -6531,7 +6811,47 @@ setInterval(xinyaoCheckMaintenance, 10000);
       ? '已完成本局盤面候選分析'
       : '本局還找不到可靠的盤面陣列';
 
+    const signal = computeBoardSignal(probe.candidate);
+    probe.signalScore = signal.score;
+    probe.signalReason = signal.reason;
+    probe.signalHistory.push({ spinId, base:signal.base, score:signal.score, at:Date.now() });
+    if (probe.signalHistory.length > 12) probe.signalHistory.splice(0, probe.signalHistory.length - 12);
+
+    if (signal.score < SIGNAL_REARM_THRESHOLD) {
+      probe.signalArmed = true;
+      probe.signalTriggered = false;
+    }
+
+    let stopResult = null;
+    const shouldTrigger =
+      signal.score >= SIGNAL_THRESHOLD &&
+      probe.signalArmed &&
+      probe.lastSignalSpinId !== spinId;
+
+    if (shouldTrigger) {
+      probe.signalArmed = false;
+      probe.signalTriggered = true;
+      probe.lastSignalSpinId = spinId;
+      if (probe.autoStopEnabled) stopResult = tryStopAutoplay();
+      probe.autoStopStatus = probe.autoStopEnabled
+        ? (stopResult?.ok ? '已送出停止自動轉指令' : '未找到明確停止鍵')
+        : '自動停轉關閉';
+
+      try {
+        window.dispatchEvent(new CustomEvent('xinyao:board-signal', {
+          detail: {
+            spinId,
+            roomNumber: probe.roomNumber,
+            score: signal.score,
+            reason: signal.reason,
+            autoStop: probe.autoStopStatus
+          }
+        }));
+      } catch (_) {}
+    }
+
     render();
+    if (shouldTrigger) showSignalToast(signal, stopResult);
 
     try {
       window.__XIANYAO_ATG_BOARD_PROBE_STATE__ = {
@@ -6539,7 +6859,12 @@ setInterval(xinyaoCheckMaintenance, 10000);
         roomNumber: probe.roomNumber,
         updatedAt: probe.updatedAt,
         candidate: probe.candidate,
-        candidateCount: probe.candidateCount
+        candidateCount: probe.candidateCount,
+        signalScore: probe.signalScore,
+        signalReason: probe.signalReason,
+        signalTriggered: probe.signalTriggered,
+        autoStopEnabled: probe.autoStopEnabled,
+        autoStopStatus: probe.autoStopStatus
       };
     } catch (_) {}
   }
