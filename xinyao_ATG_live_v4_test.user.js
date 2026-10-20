@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.6
+// @version      4.0.0-test.7
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -6504,15 +6504,15 @@ setInterval(xinyaoCheckMaintenance, 10000);
   }
 })();
 
-/* ===== 芯瑤 ATG HUD Lab｜Cocos 圖示素材偵測 v0.1 ===== */
-(function xinyaoSpriteProbeModule() {
+/* ===== 芯瑤 ATG HUD Lab｜Cocos 圖示素材偵測 v0.2 ===== */
+(function xinyaoSpriteProbeModuleV02() {
   'use strict';
 
-  if (window.__XIANYAO_ATG_SPRITE_PROBE_V01__) return;
-  window.__XIANYAO_ATG_SPRITE_PROBE_V01__ = true;
+  if (window.__XIANYAO_ATG_SPRITE_PROBE_V02__) return;
+  window.__XIANYAO_ATG_SPRITE_PROBE_V02__ = true;
 
   const HOST_PANEL_ID = 'xinyao-atg-board-probe-v01';
-  const SECTION_ID = 'xinyao-atg-sprite-probe-v01';
+  const SECTION_ID = 'xinyao-atg-sprite-probe-v02';
   const EVENT_NAME = 'xinyao:spin-final-observed';
 
   const spriteState = {
@@ -6569,13 +6569,23 @@ setInterval(xinyaoCheckMaintenance, 10000);
   }
 
   function textureSource(texture) {
-    return (
-      safe(() => texture?.getHtmlElementObj?.(), null) ||
-      safe(() => texture?._image, null) ||
-      safe(() => texture?._nativeAsset, null) ||
-      safe(() => texture?.image, null) ||
-      null
-    );
+    const candidates = [
+      safe(() => texture?.getHtmlElementObj?.(), null),
+      safe(() => texture?._image, null),
+      safe(() => texture?._nativeAsset, null),
+      safe(() => texture?.image, null),
+      safe(() => texture?._nativeAsset?._image, null),
+      safe(() => texture?._nativeAsset?.image, null)
+    ];
+    return candidates.find(value =>
+      value && (
+        typeof HTMLImageElement !== 'undefined' && value instanceof HTMLImageElement ||
+        typeof HTMLCanvasElement !== 'undefined' && value instanceof HTMLCanvasElement ||
+        typeof ImageBitmap !== 'undefined' && value instanceof ImageBitmap ||
+        typeof OffscreenCanvas !== 'undefined' && value instanceof OffscreenCanvas ||
+        typeof HTMLVideoElement !== 'undefined' && value instanceof HTMLVideoElement
+      )
+    ) || null;
   }
 
   function sourceSize(source) {
@@ -6594,7 +6604,66 @@ setInterval(xinyaoCheckMaintenance, 10000);
     return { width, height };
   }
 
-  function frameInfo(spriteFrame, node) {
+  function textureSize(texture, source) {
+    const sourceDim = sourceSize(source);
+    return {
+      width: Number(
+        sourceDim.width ||
+        safe(() => texture?.width, 0) ||
+        safe(() => texture?._width, 0) ||
+        safe(() => texture?._image?.width, 0) ||
+        safe(() => texture?._nativeAsset?.width, 0) ||
+        0
+      ),
+      height: Number(
+        sourceDim.height ||
+        safe(() => texture?.height, 0) ||
+        safe(() => texture?._height, 0) ||
+        safe(() => texture?._image?.height, 0) ||
+        safe(() => texture?._nativeAsset?.height, 0) ||
+        0
+      )
+    };
+  }
+
+  function resolveAssetUrl(win, texture, spriteFrame, source) {
+    const rawCandidates = [
+      safe(() => source?.currentSrc, ''),
+      safe(() => source?.src, ''),
+      safe(() => texture?.nativeUrl, ''),
+      safe(() => texture?._nativeUrl, ''),
+      safe(() => texture?.url, ''),
+      safe(() => texture?._url, ''),
+      safe(() => texture?._native, ''),
+      safe(() => texture?._nativeAsset?.nativeUrl, ''),
+      safe(() => texture?._nativeAsset?._nativeUrl, ''),
+      safe(() => texture?._nativeAsset?.url, ''),
+      safe(() => texture?._nativeAsset?._url, ''),
+      safe(() => texture?._nativeAsset?.src, ''),
+      safe(() => spriteFrame?._atlas?.nativeUrl, ''),
+      safe(() => spriteFrame?._atlas?._nativeUrl, ''),
+      safe(() => spriteFrame?._atlas?.url, ''),
+      safe(() => spriteFrame?._atlas?._url, '')
+    ];
+
+    for (const rawValue of rawCandidates) {
+      const raw = String(rawValue || '').trim();
+      if (!raw || /^db:\/\//i.test(raw)) continue;
+      if (/^(data:|blob:|https?:)/i.test(raw)) return raw;
+      try {
+        return new URL(raw, String(win?.location?.href || location.href)).href;
+      } catch (_) {}
+    }
+
+    return '';
+  }
+
+  function symbolIdFromName(name) {
+    const match = String(name || '').match(/^symbol[_-]?0*(\d+)$/i);
+    return match ? String(Number(match[1])) : '';
+  }
+
+  function frameInfo(spriteFrame, node, win) {
     if (!spriteFrame) return null;
 
     const texture =
@@ -6613,7 +6682,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
       null;
 
     const source = textureSource(texture);
-    const size = sourceSize(source);
+    const texSize = textureSize(texture, source);
 
     const name = String(
       safe(() => spriteFrame.name, '') ||
@@ -6623,18 +6692,13 @@ setInterval(xinyaoCheckMaintenance, 10000);
       '未命名'
     );
 
-    const nativeUrl = String(
-      safe(() => texture?.nativeUrl, '') ||
-      safe(() => texture?._nativeUrl, '') ||
-      safe(() => source?.currentSrc, '') ||
-      safe(() => source?.src, '') ||
-      ''
-    );
-
+    const nativeUrl = resolveAssetUrl(win, texture, spriteFrame, source);
+    const symbolId = symbolIdFromName(name);
     const path = nodePath(node);
     const lower = `${path} ${name}`.toLowerCase();
 
     let score = 0;
+    if (symbolId) score += 100;
     if (/(symbol|reel|slot)/i.test(lower)) score += 30;
     if (/(item|cell|grid|icon)/i.test(lower)) score += 12;
     if (/(effect|glow|light|mask|frame|bg|background|particle)/i.test(lower)) score -= 16;
@@ -6645,16 +6709,18 @@ setInterval(xinyaoCheckMaintenance, 10000);
     if (rw >= 70 && rh >= 70) score += 5;
     if (rw > 600 || rh > 600) score -= 10;
 
-    if (!source || !size.width || !size.height || !rw || !rh) score -= 30;
+    if ((!source && !nativeUrl) || !rw || !rh) score -= 30;
 
     return {
       key: [name, nativeUrl, rect?.x, rect?.y, rw, rh, Boolean(safe(() => spriteFrame.isRotated?.(), false))].join('|'),
       name,
+      symbolId,
       path,
       nativeUrl,
       score,
       count: 1,
       source,
+      textureSize: texSize,
       rect: rect ? { x:Number(rect.x||0), y:Number(rect.y||0), width:rw, height:rh } : null,
       originalSize: originalSize ? { width:Number(originalSize.width||0), height:Number(originalSize.height||0) } : null,
       rotated: Boolean(safe(() => spriteFrame.isRotated?.(), false))
@@ -6686,7 +6752,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
         for (const component of sprites) {
           if (!component || safe(() => component.enabled, true) === false) continue;
           const sf = safe(() => component.spriteFrame, null) || safe(() => component._spriteFrame, null);
-          const info = frameInfo(sf, node);
+          const info = frameInfo(sf, node, win);
           if (!info) continue;
 
           const existing = unique.get(info.key);
@@ -6724,31 +6790,51 @@ setInterval(xinyaoCheckMaintenance, 10000);
       }
     }
 
-    return [...merged.values()]
+    const frames = [...merged.values()]
       .filter(item => item.score >= 0)
-      .sort((a, b) => b.score - a.score || b.count - a.count || a.name.localeCompare(b.name))
-      .slice(0, 30);
+      .sort((a, b) =>
+        Number(Boolean(b.symbolId)) - Number(Boolean(a.symbolId)) ||
+        b.score - a.score ||
+        b.count - a.count ||
+        a.name.localeCompare(b.name)
+      )
+      .slice(0, 40);
+
+    try {
+      const byId = {};
+      for (const item of frames) {
+        if (item.symbolId && !byId[item.symbolId]) byId[item.symbolId] = item;
+      }
+      window.__XIANYAO_ATG_SYMBOL_SPRITES__ = { frames, byId, updatedAt: Date.now() };
+    } catch (_) {}
+
+    return frames;
   }
 
   function ensureStyle() {
-    if (document.getElementById('xinyao-atg-sprite-probe-style-v01')) return;
+    if (document.getElementById('xinyao-atg-sprite-probe-style-v02')) return;
 
     const style = document.createElement('style');
-    style.id = 'xinyao-atg-sprite-probe-style-v01';
+    style.id = 'xinyao-atg-sprite-probe-style-v02';
     style.textContent = `
       #${SECTION_ID}{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.10)}
       #${SECTION_ID} .sp-head{display:flex;align-items:center;justify-content:space-between;gap:7px}
       #${SECTION_ID} .sp-title{font-size:9px;font-weight:900;opacity:.85}
       #${SECTION_ID} .sp-btn{border:1px solid rgba(115,223,255,.35);border-radius:8px;background:rgba(115,223,255,.08);color:#dff8ff;padding:4px 7px;font-size:8px;font-weight:850;cursor:pointer}
-      #${SECTION_ID} .sp-status{margin-top:5px;font-size:8px;opacity:.55}
+      #${SECTION_ID} .sp-status{margin-top:5px;font-size:8px;line-height:1.4;opacity:.62}
       #${SECTION_ID} .sp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:6px}
       #${SECTION_ID} .sp-card{min-width:0;padding:4px 3px;border-radius:9px;background:rgba(255,255,255,.055);text-align:center}
-      #${SECTION_ID} canvas{display:block;width:42px;height:42px;max-width:100%;margin:0 auto}
-      #${SECTION_ID} .sp-name{margin-top:2px;font-size:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.78}
+      #${SECTION_ID} .sp-preview{display:flex;align-items:center;justify-content:center;width:46px;height:46px;max-width:100%;margin:0 auto;overflow:hidden;border-radius:7px;background:rgba(255,255,255,.025)}
+      #${SECTION_ID} canvas{display:block;max-width:42px;max-height:42px}
+      #${SECTION_ID} .sp-atlas{background-repeat:no-repeat;flex:0 0 auto}
+      #${SECTION_ID} .sp-img{display:block;width:42px;height:42px;object-fit:contain}
+      #${SECTION_ID} .sp-name{margin-top:2px;font-size:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.82}
       #${SECTION_ID} .sp-count{font-size:8px;font-weight:900;color:#73dfff}
+      #${SECTION_ID} .sp-tech{font-size:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.35}
       @media (max-width:760px){
         #${SECTION_ID} .sp-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
-        #${SECTION_ID} canvas{width:36px;height:36px}
+        #${SECTION_ID} .sp-preview{width:40px;height:40px}
+        #${SECTION_ID} .sp-img{width:36px;height:36px}
       }
     `;
     (document.head || document.documentElement).appendChild(style);
@@ -6800,6 +6886,63 @@ setInterval(xinyaoCheckMaintenance, 10000);
     }
   }
 
+  function atlasPreview(item) {
+    if (!item?.nativeUrl || !item?.rect || item.rotated) return null;
+
+    const tw = Number(item.textureSize?.width || 0);
+    const th = Number(item.textureSize?.height || 0);
+    const rw = Number(item.rect.width || 0);
+    const rh = Number(item.rect.height || 0);
+    if (!tw || !th || !rw || !rh) return null;
+
+    const max = 42;
+    const scale = Math.min(max / rw, max / rh);
+    const topY = th - Number(item.rect.y || 0) - rh;
+
+    const crop = document.createElement('div');
+    crop.className = 'sp-atlas';
+    crop.style.width = `${Math.max(1, rw * scale)}px`;
+    crop.style.height = `${Math.max(1, rh * scale)}px`;
+    crop.style.backgroundImage = `url("${String(item.nativeUrl).replace(/"/g, '\\"')}")`;
+    crop.style.backgroundSize = `${tw * scale}px ${th * scale}px`;
+    crop.style.backgroundPosition = `${-Number(item.rect.x || 0) * scale}px ${-topY * scale}px`;
+    return crop;
+  }
+
+  function imagePreview(item) {
+    if (!item?.nativeUrl) return null;
+    const img = document.createElement('img');
+    img.className = 'sp-img';
+    img.alt = item.name || 'sprite';
+    img.src = item.nativeUrl;
+    return img;
+  }
+
+  function buildPreview(item) {
+    const wrap = document.createElement('div');
+    wrap.className = 'sp-preview';
+
+    const canvas = document.createElement('canvas');
+    if (drawFrame(canvas, item)) {
+      wrap.appendChild(canvas);
+      return { element: wrap, method: 'canvas' };
+    }
+
+    const atlas = atlasPreview(item);
+    if (atlas) {
+      wrap.appendChild(atlas);
+      return { element: wrap, method: 'atlas-url' };
+    }
+
+    const img = imagePreview(item);
+    if (img) {
+      wrap.appendChild(img);
+      return { element: wrap, method: 'image-url' };
+    }
+
+    return { element: wrap, method: 'no-preview' };
+  }
+
   function ensureSection() {
     ensureStyle();
 
@@ -6814,7 +6957,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     section.id = SECTION_ID;
     section.innerHTML = `
       <div class="sp-head">
-        <div class="sp-title">🧩 遊戲原始圖示素材</div>
+        <div class="sp-title">🧩 遊戲原始圖示素材 v2</div>
         <button type="button" class="sp-btn">重新掃描</button>
       </div>
       <div class="sp-status">等待盤面完成後掃描 Cocos Sprite…</div>
@@ -6840,39 +6983,47 @@ setInterval(xinyaoCheckMaintenance, 10000);
     if (!status || !grid) return;
 
     if (spriteState.scanning) {
-      status.textContent = '掃描遊戲 Sprite 中…';
+      status.textContent = '掃描遊戲 Sprite 與 Texture URL 中…';
       return;
     }
+
+    const symbolFrames = spriteState.frames.filter(item => item.symbolId);
 
     if (spriteState.error) {
       status.textContent = spriteState.error;
     } else if (!spriteState.frames.length) {
       status.textContent = '尚未找到可顯示的 Sprite，請完成一局後再掃描。';
     } else {
-      status.textContent = `找到 ${spriteState.frames.length} 組候選素材｜先看是否出現眼睛、戰斧、寶石等圖示`;
+      status.textContent = `找到 ${symbolFrames.length} 種盤面 symbol Sprite｜優先用原始 Texture/Atlas 顯示`;
     }
 
     grid.innerHTML = '';
 
-    for (const item of spriteState.frames.slice(0, 16)) {
+    const visible = symbolFrames.length ? symbolFrames.slice(0, 16) : spriteState.frames.slice(0, 16);
+
+    for (const item of visible) {
       const card = document.createElement('div');
       card.className = 'sp-card';
-      card.title = `${item.name}\n${item.path}`;
+      card.title = `${item.name}\n${item.path}\n${item.nativeUrl || '無 URL'}`;
 
-      const canvas = document.createElement('canvas');
-      const ok = drawFrame(canvas, item);
+      const preview = buildPreview(item);
+      card.appendChild(preview.element);
 
       const name = document.createElement('div');
       name.className = 'sp-name';
-      name.textContent = item.name || '未命名';
+      name.textContent = item.symbolId ? `ID ${item.symbolId}｜${item.name}` : (item.name || '未命名');
 
       const count = document.createElement('div');
       count.className = 'sp-count';
       count.textContent = `×${item.count}`;
 
-      if (ok) card.appendChild(canvas);
+      const tech = document.createElement('div');
+      tech.className = 'sp-tech';
+      tech.textContent = `${preview.method}${item.nativeUrl ? '｜URL✓' : '｜URL×'}｜${item.textureSize?.width || 0}×${item.textureSize?.height || 0}`;
+
       card.appendChild(name);
       card.appendChild(count);
+      card.appendChild(tech);
       grid.appendChild(card);
     }
   }
