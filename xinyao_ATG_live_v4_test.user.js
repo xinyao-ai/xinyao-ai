@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.11
+// @version      4.0.0-test.12
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -6156,7 +6156,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     return VERIFIED_SYMBOL_LABELS.get(key) || `ID ${key}`;
   }
 
-  const SETH_SYMBOL_SPRITE_URL = 'https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/78110a0f6ff354b031909c2d67a2e5c4d6ce6c22/assets/atg-seth/symbols.webp';
+  const SETH_SYMBOL_SPRITE_URL = 'https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/476a3132fae652d6ce3798b7aff9cf765c16c8d5/assets/atg-seth/symbols_padded.webp';
 
   function symbolIconHtml(token) {
     const key = String(token ?? '');
