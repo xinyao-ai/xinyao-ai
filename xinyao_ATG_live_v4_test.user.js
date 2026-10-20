@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.25
+// @version      4.0.0-test.26
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -6288,8 +6288,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     const src = SYMBOL_ICON_DATA.get(key);
 
     if (src) {
-      const extraClass = key === '15' ? ' bp-icon-scatter-clean' : '';
-      return `<span class="bp-icon-shell"><img class="bp-icon bp-icon-img${extraClass}" src="${src}" alt="${esc(symbolLabel(key))}" draggable="false"></span>`;
+      return `<span class="bp-icon-shell"><img class="bp-icon bp-icon-img bp-icon-clean" data-symbol-token="${esc(key)}" src="${src}" alt="${esc(symbolLabel(key))}" draggable="false"></span>`;
     }
 
     if (key === '10' || key === '13') {
@@ -6297,6 +6296,124 @@ setInterval(xinyaoCheckMaintenance, 10000);
     }
 
     return '<span class="bp-icon bp-unknown">?</span>';
+  }
+
+  const CLEAN_ICON_CACHE = new Map();
+
+  function transparentizeIconSource(src, token) {
+    const key = String(token ?? '');
+    if (!src || key === '15') return Promise.resolve(src);
+    if (CLEAN_ICON_CACHE.has(src)) return Promise.resolve(CLEAN_ICON_CACHE.get(src));
+
+    return new Promise(resolve => {
+      const image = new Image();
+      image.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = image.naturalWidth || image.width || 64;
+          canvas.height = image.naturalHeight || image.height || 64;
+          const ctx = canvas.getContext('2d', { willReadFrequently:true });
+          if (!ctx) return resolve(src);
+
+          ctx.clearRect(0,0,canvas.width,canvas.height);
+          ctx.drawImage(image,0,0,canvas.width,canvas.height);
+          const frame = ctx.getImageData(0,0,canvas.width,canvas.height);
+          const data = frame.data;
+          const w = canvas.width, h = canvas.height;
+          const visited = new Uint8Array(w*h);
+          const queue = new Int32Array(w*h);
+          let head=0, tail=0;
+
+          const sample = [];
+          const patch = Math.max(2, Math.min(6, Math.floor(Math.min(w,h)*0.08)));
+          const pushPatch=(sx,sy)=>{
+            for(let y=sy;y<Math.min(h,sy+patch);y++){
+              for(let x=sx;x<Math.min(w,sx+patch);x++){
+                const p=(y*w+x)*4;
+                sample.push([data[p],data[p+1],data[p+2]]);
+              }
+            }
+          };
+          pushPatch(0,0);
+          pushPatch(Math.max(0,w-patch),0);
+          pushPatch(0,Math.max(0,h-patch));
+          pushPatch(Math.max(0,w-patch),Math.max(0,h-patch));
+
+          sample.sort((a,b)=>(a[0]+a[1]+a[2])-(b[0]+b[1]+b[2]));
+          const mid=sample[Math.floor(sample.length/2)] || [17,27,42];
+          const br=mid[0], bg=mid[1], bb=mid[2];
+
+          const isBackground=(x,y)=>{
+            const p=(y*w+x)*4;
+            if(data[p+3]===0) return true;
+            const r=data[p], g=data[p+1], b=data[p+2];
+            const dist=Math.hypot(r-br,g-bg,b-bb);
+            const max=Math.max(r,g,b), min=Math.min(r,g,b);
+            const dark=max<105;
+            const subdued=(max-min)<75 && max<135;
+            return dist<78 || (dark && dist<118) || (subdued && dist<95);
+          };
+
+          const add=(x,y)=>{
+            if(x<0||y<0||x>=w||y>=h) return;
+            const idx=y*w+x;
+            if(visited[idx]||!isBackground(x,y)) return;
+            visited[idx]=1;
+            queue[tail++]=idx;
+          };
+
+          for(let x=0;x<w;x++){ add(x,0); add(x,h-1); }
+          for(let y=0;y<h;y++){ add(0,y); add(w-1,y); }
+
+          while(head<tail){
+            const idx=queue[head++];
+            const x=idx%w, y=(idx/w)|0;
+            const p=idx*4;
+            data[p+3]=0;
+            add(x-1,y); add(x+1,y); add(x,y-1); add(x,y+1);
+          }
+
+          // Feather only the immediate cleaned edge so the symbol does not keep a dark halo.
+          for(let y=1;y<h-1;y++){
+            for(let x=1;x<w-1;x++){
+              const idx=y*w+x, p=idx*4;
+              if(data[p+3]===0) continue;
+              const nearTransparent =
+                data[((y-1)*w+x)*4+3]===0 ||
+                data[((y+1)*w+x)*4+3]===0 ||
+                data[(y*w+x-1)*4+3]===0 ||
+                data[(y*w+x+1)*4+3]===0;
+              if(!nearTransparent) continue;
+              const r=data[p], g=data[p+1], b=data[p+2];
+              const dist=Math.hypot(r-br,g-bg,b-bb);
+              if(dist<110) data[p+3]=Math.min(data[p+3], Math.max(0, Math.round((dist-55)/55*255)));
+            }
+          }
+
+          ctx.putImageData(frame,0,0);
+          const cleaned=canvas.toDataURL('image/webp',0.96);
+          CLEAN_ICON_CACHE.set(src,cleaned);
+          resolve(cleaned);
+        } catch (_) {
+          resolve(src);
+        }
+      };
+      image.onerror=()=>resolve(src);
+      image.src=src;
+    });
+  }
+
+  function cleanRenderedIconCards(root) {
+    if (!root) return;
+    const images=[...root.querySelectorAll('img.bp-icon-clean[data-symbol-token]')];
+    for (const img of images) {
+      const token=String(img.dataset.symbolToken || '');
+      if (token === '15') continue;
+      const original=img.getAttribute('src') || '';
+      transparentizeIconSource(original,token).then(cleaned=>{
+        if(cleaned && img.isConnected) img.src=cleaned;
+      });
+    }
   }
 
   function safe(fn, fallback = null) {
@@ -6829,10 +6946,10 @@ setInterval(xinyaoCheckMaintenance, 10000);
       #${PANEL_ID} .bp-autostop.on{color:#ffcae0;border-color:rgba(255,95,158,.32)}
       #${PANEL_ID} .bp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:7px}
       #${PANEL_ID} .bp-item{padding:5px 3px 6px;border:1px solid rgba(255,255,255,.07);border-radius:8px;background:rgba(255,255,255,.045);text-align:center;min-width:0;overflow:visible}
-      #${PANEL_ID} .bp-icon-shell{display:flex;width:42px;height:42px;margin:0 auto;align-items:center;justify-content:center;overflow:visible}
-      #${PANEL_ID} .bp-icon{display:block;width:38px;height:38px;margin:0 auto;border-radius:8px;box-shadow:0 2px 7px rgba(0,0,0,.28)}
-      #${PANEL_ID} .bp-icon-img{object-fit:contain;object-position:center center;box-sizing:border-box;padding:2px;background:rgba(255,255,255,.035);overflow:visible}
-      #${PANEL_ID} .bp-icon-scatter-clean{background:transparent!important;padding:0!important;box-shadow:none!important;object-fit:contain!important;object-position:center center!important;border-radius:0!important}
+      #${PANEL_ID} .bp-icon-shell{display:flex;width:42px;height:42px;margin:0 auto;align-items:center;justify-content:center;overflow:visible;background:transparent!important}
+      #${PANEL_ID} .bp-icon{display:block;width:38px;height:38px;margin:0 auto;border-radius:0!important;box-shadow:none!important;background:transparent!important}
+      #${PANEL_ID} .bp-icon-img{object-fit:contain;object-position:center center;box-sizing:border-box;padding:0!important;background:transparent!important;overflow:visible;box-shadow:none!important;border-radius:0!important;filter:none!important}
+      #${PANEL_ID} .bp-icon-clean{background:transparent!important;padding:0!important;box-shadow:none!important;border-radius:0!important;object-fit:contain!important;object-position:center center!important;filter:none!important}
       #${PANEL_ID} .bp-multiplier{display:flex;align-items:center;justify-content:center;border-radius:50%;background:radial-gradient(circle at 35% 30%,#47d378,#15884d 70%);border:2px solid #e4b54b;color:#ffe16a;font-size:24px;font-weight:950;line-height:1}
       #${PANEL_ID} .bp-scatter{display:flex;align-items:center;justify-content:center;border-radius:9px;background:radial-gradient(circle at 35% 30%,#ffd26d,#b22f59 72%);border:1px solid rgba(255,221,128,.78);color:#fff4b8;font-size:18px;font-weight:950;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,.45)}
       #${PANEL_ID} .bp-unknown{display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);color:#9eb4c7;font-size:18px;font-weight:900}
@@ -6959,6 +7076,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
         </div>
       </div>
     `;
+
+    cleanRenderedIconCards(body);
 
     const boardToggle = body.querySelector('.bp-board-toggle');
     const boardWrap = body.querySelector('.bp-board-wrap');
