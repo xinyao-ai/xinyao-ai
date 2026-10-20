@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.14
+// @version      4.0.0-test.15
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -6364,45 +6364,45 @@ setInterval(xinyaoCheckMaintenance, 10000);
     style.textContent = `
       #${PANEL_ID}{
         position:fixed;
-        top:10px;
-        right:10px;
+        top:8px;
+        right:8px;
         z-index:2147483646;
         width:280px;
-        max-width:calc(100vw - 20px);
+        max-width:calc(100vw - 16px);
         box-sizing:border-box;
-        padding:10px 11px;
-        border:1px solid rgba(93,224,255,.44);
-        border-radius:15px;
-        background:rgba(10,20,29,.92);
+        padding:9px 11px;
+        border:1px solid rgba(255,255,255,.20);
+        border-radius:14px;
+        background:rgba(24,20,31,.92);
         color:#fff;
-        box-shadow:0 10px 28px rgba(0,0,0,.38);
-        backdrop-filter:blur(12px);
-        -webkit-backdrop-filter:blur(12px);
+        box-shadow:0 5px 20px rgba(0,0,0,.32);
+        backdrop-filter:blur(10px);
+        -webkit-backdrop-filter:blur(10px);
         font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif;
         user-select:none;
         -webkit-user-select:none;
       }
-      #${PANEL_ID} .bp-head{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer}
-      #${PANEL_ID} .bp-title{font-size:12px;font-weight:900}
-      #${PANEL_ID} .bp-mini{font-size:10px;opacity:.7}
-      #${PANEL_ID} .bp-status{margin-top:5px;font-size:10px;color:#8deac1}
+      #${PANEL_ID} .bp-head{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.14)}
+      #${PANEL_ID} .bp-title{font-size:12px;font-weight:900;letter-spacing:.1px}
+      #${PANEL_ID} .bp-mini{display:flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:6px;background:rgba(255,255,255,.08);font-size:10px;opacity:.82}
+      #${PANEL_ID} .bp-status{margin-top:6px;font-size:10px;color:#8deac1;font-weight:800}
       #${PANEL_ID} .bp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:8px}
-      #${PANEL_ID} .bp-item{padding:6px 3px 7px;border-radius:10px;background:rgba(255,255,255,.065);text-align:center;min-width:0;overflow:visible}
+      #${PANEL_ID} .bp-item{padding:6px 3px 7px;border:1px solid rgba(255,255,255,.08);border-radius:9px;background:rgba(255,255,255,.055);text-align:center;min-width:0;overflow:visible}
       #${PANEL_ID} .bp-icon-shell{display:flex;width:44px;height:44px;margin:0 auto;align-items:center;justify-content:center;overflow:visible}
       #${PANEL_ID} .bp-icon{display:block;width:40px;height:40px;margin:0 auto;border-radius:9px;box-shadow:0 2px 8px rgba(0,0,0,.30)}
-      #${PANEL_ID} .bp-icon-img{object-fit:contain;object-position:center center;box-sizing:border-box;padding:2px;background:#111b2a;overflow:visible}
+      #${PANEL_ID} .bp-icon-img{object-fit:contain;object-position:center center;box-sizing:border-box;padding:2px;background:rgba(255,255,255,.035);overflow:visible}
       #${PANEL_ID} .bp-multiplier{display:flex;align-items:center;justify-content:center;border-radius:50%;background:radial-gradient(circle at 35% 30%,#47d378,#15884d 70%);border:2px solid #e4b54b;color:#ffe16a;font-size:24px;font-weight:950;line-height:1}
       #${PANEL_ID} .bp-unknown{display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);color:#9eb4c7;font-size:18px;font-weight:900}
-      #${PANEL_ID} .bp-name{display:block;margin-top:3px;font-size:8px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.86}
+      #${PANEL_ID} .bp-name{display:block;margin-top:3px;font-size:8px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.82}
       #${PANEL_ID} .bp-seq-title{margin-top:8px;font-size:9px;font-weight:850;opacity:.78}
-      #${PANEL_ID} .bp-board-toggle{width:100%;margin-top:7px;border:1px solid rgba(115,223,255,.28);border-radius:8px;background:rgba(115,223,255,.07);color:#dff8ff;padding:5px;font-size:8px;font-weight:850;cursor:pointer}
+      #${PANEL_ID} .bp-board-toggle{width:100%;margin-top:7px;border:1px solid rgba(255,184,212,.30);border-radius:8px;background:rgba(255,95,158,.10);color:#ffd5e6;padding:5px;font-size:8px;font-weight:850;cursor:pointer}
       #${PANEL_ID} .bp-board-wrap{display:none}
       #${PANEL_ID} .bp-board-wrap.open{display:block}
       #${PANEL_ID} .bp-seq-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;margin-top:5px}
-      #${PANEL_ID} .bp-cell{position:relative;display:flex;align-items:center;justify-content:center;min-height:26px;padding:3px;border-radius:7px;background:rgba(115,223,255,.08);font-size:9px;font-weight:900}
+      #${PANEL_ID} .bp-cell{position:relative;display:flex;align-items:center;justify-content:center;min-height:26px;padding:3px;border-radius:7px;background:rgba(255,255,255,.06);font-size:9px;font-weight:900}
       #${PANEL_ID} .bp-cell i{position:absolute;top:1px;left:3px;font-size:6px;font-style:normal;opacity:.35}
-      #${PANEL_ID} .bp-count{display:block;margin-top:3px;color:#73dfff;font-size:12px;font-weight:950}
-      #${PANEL_ID} .bp-path{margin-top:8px;padding-top:7px;border-top:1px solid rgba(255,255,255,.10);font-size:8px;line-height:1.35;opacity:.5;word-break:break-all}
+      #${PANEL_ID} .bp-count{display:block;margin-top:3px;color:#ffb8d4;font-size:12px;font-weight:950}
+      #${PANEL_ID} .bp-path{margin-top:8px;padding-top:7px;border-top:1px solid rgba(255,255,255,.14);font-size:8px;line-height:1.35;opacity:.5;word-break:break-all}
       #${PANEL_ID}.min .bp-body{display:none}
       @media (max-width:760px){
         #${PANEL_ID}{
@@ -6432,7 +6432,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     panel.id = PANEL_ID;
     panel.innerHTML = `
       <div class="bp-head">
-        <div class="bp-title">🌸 芯瑤盤面監測</div>
+        <div class="bp-title">🌸 芯瑤 ATG 盤面監測</div>
         <div class="bp-mini">－</div>
       </div>
       <div class="bp-body"></div>
