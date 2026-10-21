@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.39
+// @version      4.0.0-test.40
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -9,6 +9,37 @@
 // @weight       999
 // @grant        none
 // ==/UserScript==
+
+// ===== test40：ATG Canvas 真實輸入監聽攔截 =====
+(() => {
+  if (window.__XIANYAO_CANVAS_INPUT_HOOK_V40__) return;
+  window.__XIANYAO_CANVAS_INPUT_HOOK_V40__ = true;
+  window.__XIANYAO_CANVAS_INPUT_LISTENERS__ = window.__XIANYAO_CANVAS_INPUT_LISTENERS__ || [];
+
+  const TRACKED = new Set([
+    'pointerdown','pointerup',
+    'mousedown','mouseup','click',
+    'touchstart','touchend'
+  ]);
+
+  try {
+    const originalAdd = EventTarget.prototype.addEventListener;
+    EventTarget.prototype.addEventListener = function(type, listener, options) {
+      try {
+        const isCanvas = String(this?.tagName || '').toUpperCase() === 'CANVAS';
+        if (isCanvas && TRACKED.has(String(type)) && listener) {
+          window.__XIANYAO_CANVAS_INPUT_LISTENERS__.push({
+            target: this,
+            type: String(type),
+            listener,
+            options
+          });
+        }
+      } catch (_) {}
+      return originalAdd.call(this, type, listener, options);
+    };
+  } catch (_) {}
+})();
 
 // ===== 芯瑤 ATG 全域維護控制 =====
 const XIANYAO_MAINTENANCE_ENDPOINT = 'https://xinyao-atg-live.love06130430.workers.dev/maintenance';
@@ -7667,19 +7698,191 @@ setInterval(xinyaoCheckMaintenance, 10000);
     }
   }
 
-  function tryStopAutoplay() {
-    // test39: replay the exact runtime handler captured from the user's real manual ■ stop tap.
-    const replayed = invokeLearnedStopReplay();
-    if (replayed?.ok) return replayed;
 
-    // If only the visual Button could be resolved, keep the older fallback below.
-    const learned = findLearnedStopButton();
-    if (learned?.button) {
-      if (emitSignalCocosClick(learned.button, learned.cocos)) {
-        probe.autoStopLastVia = 'learned visual Button fallback';
-        return { ok:true, via:probe.autoStopLastVia, detail:probe.stopLearnInfo?.path || '' };
-      }
+  function largestVisibleGameCanvas(gameWindow) {
+    try {
+      const canvases = [...gameWindow.document.querySelectorAll('canvas')]
+        .map(canvas => {
+          const rect = canvas.getBoundingClientRect();
+          return { canvas, rect, area:Math.max(0,rect.width) * Math.max(0,rect.height) };
+        })
+        .filter(item => item.rect.width > 220 && item.rect.height > 320 && item.area > 100000)
+        .sort((a,b) => b.area - a.area);
+      return canvases[0] || null;
+    } catch (_) {
+      return null;
     }
+  }
+
+  function fakeCanvasInputEvent(type, canvas, clientX, clientY) {
+    const touch = {
+      identifier: 1,
+      target: canvas,
+      clientX, clientY,
+      pageX: clientX + (window.scrollX || 0),
+      pageY: clientY + (window.scrollY || 0),
+      screenX: clientX,
+      screenY: clientY,
+      radiusX: 1,
+      radiusY: 1,
+      rotationAngle: 0,
+      force: 1
+    };
+
+    const isDown = /(down|start)$/.test(type);
+    return {
+      type,
+      target: canvas,
+      currentTarget: canvas,
+      srcElement: canvas,
+      isTrusted: true,
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      defaultPrevented: false,
+      timeStamp: performance.now(),
+      clientX, clientY,
+      pageX: touch.pageX,
+      pageY: touch.pageY,
+      screenX: clientX,
+      screenY: clientY,
+      offsetX: clientX - canvas.getBoundingClientRect().left,
+      offsetY: clientY - canvas.getBoundingClientRect().top,
+      x: clientX,
+      y: clientY,
+      button: 0,
+      buttons: isDown ? 1 : 0,
+      which: 1,
+      pointerId: 1,
+      pointerType: 'mouse',
+      isPrimary: true,
+      touches: type === 'touchstart' ? [touch] : [],
+      targetTouches: type === 'touchstart' ? [touch] : [],
+      changedTouches: [touch],
+      preventDefault(){ this.defaultPrevented = true; },
+      stopPropagation(){},
+      stopImmediatePropagation(){}
+    };
+  }
+
+  function callCapturedCanvasListeners(gameWindow, canvas, type, clientX, clientY) {
+    let count = 0;
+    let records = [];
+    try {
+      records = Array.isArray(gameWindow.__XIANYAO_CANVAS_INPUT_LISTENERS__)
+        ? gameWindow.__XIANYAO_CANVAS_INPUT_LISTENERS__
+        : [];
+    } catch (_) {}
+
+    const event = fakeCanvasInputEvent(type, canvas, clientX, clientY);
+
+    for (const record of records) {
+      if (record?.target !== canvas || record?.type !== type || !record.listener) continue;
+      try {
+        if (typeof record.listener === 'function') {
+          record.listener.call(canvas, event);
+          count += 1;
+        } else if (typeof record.listener?.handleEvent === 'function') {
+          record.listener.handleEvent(event);
+          count += 1;
+        }
+      } catch (_) {}
+    }
+    return count;
+  }
+
+  function dispatchNativeLikeCanvasEvent(gameWindow, canvas, type, clientX, clientY) {
+    try {
+      const common = {
+        bubbles:true,
+        cancelable:true,
+        composed:true,
+        clientX,
+        clientY,
+        screenX:clientX,
+        screenY:clientY,
+        button:0,
+        buttons:/(down|start)$/.test(type) ? 1 : 0
+      };
+
+      let event = null;
+      if (type.startsWith('pointer') && typeof gameWindow.PointerEvent === 'function') {
+        event = new gameWindow.PointerEvent(type, {
+          ...common,
+          pointerId:1,
+          pointerType:'mouse',
+          isPrimary:true
+        });
+      } else if (type.startsWith('mouse') || type === 'click') {
+        event = new gameWindow.MouseEvent(type, common);
+      }
+
+      if (event) return canvas.dispatchEvent(event);
+    } catch (_) {}
+    return false;
+  }
+
+  function fireKnownATGStopControl() {
+    // Calibrated from the actual ATG v1.15.8 layout shown in the user's tests.
+    // The ■ stop control stays at ~85.5% width / 90.0% height of the game canvas.
+    const NX = 0.855;
+    const NY = 0.900;
+
+    for (const gameWindow of sameOriginSignalWindows()) {
+      try {
+        const found = largestVisibleGameCanvas(gameWindow);
+        if (!found) continue;
+
+        const { canvas, rect } = found;
+        const clientX = rect.left + rect.width * NX;
+        const clientY = rect.top + rect.height * NY;
+
+        const records = Array.isArray(gameWindow.__XIANYAO_CANVAS_INPUT_LISTENERS__)
+          ? gameWindow.__XIANYAO_CANVAS_INPUT_LISTENERS__
+          : [];
+        const types = new Set(records.filter(r => r?.target === canvas).map(r => r.type));
+
+        let invoked = 0;
+
+        // Use ONE input family only, so a successful stop is not immediately toggled back on.
+        if (types.has('pointerdown') || types.has('pointerup')) {
+          invoked += callCapturedCanvasListeners(gameWindow, canvas, 'pointerdown', clientX, clientY);
+          invoked += callCapturedCanvasListeners(gameWindow, canvas, 'pointerup', clientX, clientY);
+          dispatchNativeLikeCanvasEvent(gameWindow, canvas, 'pointerdown', clientX, clientY);
+          dispatchNativeLikeCanvasEvent(gameWindow, canvas, 'pointerup', clientX, clientY);
+        } else if (types.has('touchstart') || types.has('touchend')) {
+          invoked += callCapturedCanvasListeners(gameWindow, canvas, 'touchstart', clientX, clientY);
+          invoked += callCapturedCanvasListeners(gameWindow, canvas, 'touchend', clientX, clientY);
+        } else {
+          invoked += callCapturedCanvasListeners(gameWindow, canvas, 'mousedown', clientX, clientY);
+          invoked += callCapturedCanvasListeners(gameWindow, canvas, 'mouseup', clientX, clientY);
+          if (types.has('click')) invoked += callCapturedCanvasListeners(gameWindow, canvas, 'click', clientX, clientY);
+          dispatchNativeLikeCanvasEvent(gameWindow, canvas, 'mousedown', clientX, clientY);
+          dispatchNativeLikeCanvasEvent(gameWindow, canvas, 'mouseup', clientX, clientY);
+        }
+
+        probe.autoStopLastVia = `ATG fixed stop control @ ${NX},${NY} | listeners ${invoked}`;
+        return { ok:true, via:probe.autoStopLastVia, detail:`${Math.round(clientX)},${Math.round(clientY)}` };
+      } catch (_) {}
+    }
+
+    return { ok:false, via:'', detail:'' };
+  }
+
+  function isAutoplayClearlyActive() {
+    for (const gameWindow of sameOriginSignalWindows()) {
+      try {
+        const active = findActiveAutoplaySpinButton(gameWindow);
+        if (active?.activeEvidence) return true;
+      } catch (_) {}
+    }
+    return false;
+  }
+
+  function tryStopAutoplay() {
+    // test40: zero-setup stop. Members do not need to learn/configure anything.
+    const direct = fireKnownATGStopControl();
+    if (direct?.ok) return direct;
 
 
     // 1) Actual ATG visible stop control: rightmost square button beside the active autoplay counter.
@@ -7761,23 +7964,31 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
   function scheduleAutoplayStopRetries(spinId) {
     const token = ++probe.autoStopRetryToken;
-    probe.autoStopRetryUntil = Date.now() + 8000;
+    probe.autoStopRetryUntil = Date.now() + 5000;
     probe.autoStopAttempts = 1;
 
-    const delays = [40, 90, 150, 230, 330, 460, 620, 850, 1150, 1500, 2100, 3000, 4300, 6000];
+    const delays = [350, 700, 1200, 1900, 2800, 4000];
     for (const delay of delays) {
       setTimeout(() => {
         if (probe.autoStopRetryToken !== token) return;
         if (probe.lastSignalSpinId !== spinId) return;
         if (Date.now() > probe.autoStopRetryUntil) return;
 
-        const result = tryStopAutoplay();
-        probe.autoStopAttempts += 1;
-
-        if (result?.ok) {
-          probe.autoStopStatus = `停止自動轉重試中（第 ${probe.autoStopAttempts} 次）`;
+        // Critical: once autoplay is no longer active, NEVER click the stop location again.
+        if (!isAutoplayClearlyActive()) {
+          probe.autoStopRetryToken += 1;
+          probe.autoStopRetryUntil = 0;
+          probe.autoStopStatus = '✅ 自動轉已停止';
           render();
+          return;
         }
+
+        const result = fireKnownATGStopControl();
+        probe.autoStopAttempts += 1;
+        probe.autoStopStatus = result?.ok
+          ? `⏹ 偵測仍在自動轉，再次停止（第 ${probe.autoStopAttempts} 次）`
+          : '⚠️ 無法送出停止操作';
+        render();
       }, delay);
     }
   }
@@ -7792,8 +8003,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
         (document.body || document.documentElement).appendChild(toast);
       }
       const stopText = stopResult?.ok
-        ? '⏹ 已執行真正停止事件，持續確認自動轉停止'
-        : '⚠️ 尚未取得真正停止事件，持續重試';
+        ? '⏹ 已直接按下自動轉停止鍵，確認停止中'
+        : '⚠️ 無法按下停止鍵，持續重試';
       toast.innerHTML = `
         <div style="font-size:15px;font-weight:950;color:#ffb8d4;">📡 盤面訊號達標 ${signal.score}%（80%以上自動停轉）</div>
         <div style="margin-top:5px;font-size:10px;opacity:.82;">${esc(signal.reason)}</div>
@@ -7874,6 +8085,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
       #${PANEL_ID} .bp-board-toggle{width:100%;margin-top:7px;border:1px solid rgba(255,184,212,.26);border-radius:7px;background:rgba(255,95,158,.08);color:#ffd5e6;padding:5px;font-size:8px;font-weight:850;cursor:pointer}
       #${PANEL_ID} .bp-stop-learn{width:100%;margin-top:5px;border:1px solid rgba(125,236,183,.34);border-radius:7px;background:rgba(63,191,126,.10);color:#c8f8dc;padding:5px;font-size:8px;font-weight:900;cursor:pointer}
       #${PANEL_ID} .bp-stop-test{width:100%;margin-top:4px;border:1px solid rgba(255,210,96,.34);border-radius:7px;background:rgba(255,196,64,.08);color:#ffe2a0;padding:5px;font-size:8px;font-weight:900;cursor:pointer}
+      #${PANEL_ID} .bp-stop-zero{width:100%;box-sizing:border-box;margin-top:4px;border:1px solid rgba(125,236,183,.28);border-radius:7px;background:rgba(63,191,126,.08);color:#c8f8dc;padding:5px;font-size:8px;font-weight:900;text-align:center}
       #${PANEL_ID} .bp-board-wrap{display:none}
       #${PANEL_ID} .bp-board-wrap.open{display:block}
       #${PANEL_ID} .bp-seq-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;margin-top:5px}
@@ -7962,8 +8174,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
         <div class="bp-signal-bar"><i style="width:${Math.max(0, Math.min(100, probe.signalScore))}%"></i></div>
         <div class="bp-signal-reason">${esc(probe.signalReason)}｜僅依已完成盤面統計</div>
         <div class="bp-autostop on">⏹ 自動停轉：固定開啟</div>
-        <button type="button" class="bp-stop-learn">${probe.stopLearnMode ? '🎯 等妳按 ■ 停止鍵…' : (probe.stopLearned ? '✅ 真正停止事件已學習｜重新學習' : '🎯 學習真正停止事件')}</button>
-        ${probe.stopLearned ? '<button type="button" class="bp-stop-test">🧪 立即測試停止</button>' : ''}
+        <div class="bp-stop-zero">⚡ 80%以上直接停止｜會員免設定</div>
       </div>
     `;
 
@@ -8009,24 +8220,6 @@ setInterval(xinyaoCheckMaintenance, 10000);
         event.stopPropagation();
         const open = boardWrap.classList.toggle('open');
         boardToggle.textContent = open ? '收起 30 格盤面' : '查看 30 格盤面';
-      };
-    }
-
-    const learnButton = body.querySelector('.bp-stop-learn');
-    if (learnButton) {
-      learnButton.onclick = event => {
-        event.preventDefault();
-        event.stopPropagation();
-        startStopButtonLearning();
-      };
-    }
-
-    const testButton = body.querySelector('.bp-stop-test');
-    if (testButton) {
-      testButton.onclick = event => {
-        event.preventDefault();
-        event.stopPropagation();
-        testLearnedStopNow();
       };
     }
   }
@@ -8134,8 +8327,6 @@ setInterval(xinyaoCheckMaintenance, 10000);
       };
     } catch (_) {}
   }
-
-  installStopLearningHooks();
 
   window.addEventListener(EVENT_NAME, handleSpinFinal);
 
