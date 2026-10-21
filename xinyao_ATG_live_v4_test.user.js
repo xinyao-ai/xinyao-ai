@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.33
+// @version      4.0.0-test.34
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -6593,8 +6593,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
     const snake = candidateCount(candidate, '2');
     const bow = candidateCount(candidate, '3');
     const axe = candidateCount(candidate, '4');
-    const multiplierOrb = candidateCount(candidate, '12');
-    const multiplier = candidateCount(candidate, '10') + candidateCount(candidate, '13');
+    const multiplierOrb = 0;
+    const multiplier = 0;
     const scatter = candidateCount(candidate, '15') + candidateCount(candidate, '16');
     const premium = eye + snake + bow + axe;
     let score = 0;
@@ -6603,15 +6603,6 @@ setInterval(xinyaoCheckMaintenance, 10000);
     if (scatter > 0) {
       score += scatter >= 3 ? 45 : (scatter === 2 ? 25 : 10);
       reasons.push(`SCATTER ×${scatter}`);
-    }
-    if (multiplierOrb > 0) {
-      score += Math.min(50, 34 + (multiplierOrb - 1) * 8);
-      reasons.push(`倍數球 ×${multiplierOrb}`);
-    }
-    if (multiplier > 0) {
-      score += Math.min(46, 34 + (multiplier - 1) * 8);
-      const liveMultipliers = Array.isArray(probe.multiplierValues) ? probe.multiplierValues.slice(0, multiplier) : [];
-      reasons.push(liveMultipliers.length ? `倍率符號 ${liveMultipliers.map(value => `${value}X`).join('、')}` : `倍率符號 ×${multiplier}`);
     }
     if (eye >= 4) {
       score += Math.min(20, 8 + (eye - 4) * 4);
@@ -7193,61 +7184,21 @@ setInterval(xinyaoCheckMaintenance, 10000);
       </div>
     `;
 
-    const sourceItems = candidate.items.slice(0, 12);
-    const totalMultiplierSymbols = sourceItems
-      .filter(item => ['10','13'].includes(String(item.token)))
-      .reduce((sum,item) => sum + (Number(item.count) || 0), 0);
+    const sourceItems = candidate.items
+      .filter(item => !['10','12','13'].includes(String(item.token)))
+      .slice(0, 12);
 
-    const liveMultiplierValues = Array.isArray(probe.multiplierValues)
-      ? probe.multiplierValues.slice(0, totalMultiplierSymbols)
-      : [];
-
-    let multiplierCardsInserted = false;
-    const cards = sourceItems.flatMap(item => {
-      const token = String(item.token);
-
-      if (['10','13'].includes(token) && liveMultiplierValues.length) {
-        if (multiplierCardsInserted) return [];
-        multiplierCardsInserted = true;
-
-        const grouped = new Map();
-        for (const value of liveMultiplierValues) {
-          grouped.set(value, (grouped.get(value) || 0) + 1);
-        }
-
-        const rendered = [...grouped.entries()].map(([value,count]) => `
-          <div class="bp-item" title="倍率符號 ${value}X">
-            ${multiplierValueIconHtml(value)}
-            <span class="bp-name">倍率 ${value}X</span>
-            <span class="bp-count">×${count}</span>
-          </div>
-        `);
-
-        const missing = Math.max(0, totalMultiplierSymbols - liveMultiplierValues.length);
-        if (missing > 0) {
-          rendered.push(`
-            <div class="bp-item" title="倍率符號">
-              ${symbolIconHtml(item.token)}
-              <span class="bp-name">倍率符號</span>
-              <span class="bp-count">×${missing}</span>
-            </div>
-          `);
-        }
-        return rendered;
-      }
-
-      return [`
-        <div class="bp-item" title="${esc(symbolLabel(item.token))}｜ID ${esc(item.token)}">
-          ${symbolIconHtml(item.token)}
-          <span class="bp-name">${esc(symbolLabel(item.token))}</span>
-          <span class="bp-count">×${item.count}</span>
-        </div>
-      `];
-    }).join('');
+    const cards = sourceItems.map(item => `
+      <div class="bp-item" title="${esc(symbolLabel(item.token))}｜ID ${esc(item.token)}">
+        ${symbolIconHtml(item.token)}
+        <span class="bp-name">${esc(symbolLabel(item.token))}</span>
+        <span class="bp-count">×${item.count}</span>
+      </div>
+    `).join('');
 
     const sequence = Array.isArray(candidate.tokens)
       ? candidate.tokens.slice(0, 30).map((token, index) => `
-          <div class="bp-cell" title="ID ${esc(token)}"><i>${index + 1}</i>${esc(symbolLabel(token))}</div>
+          <div class="bp-cell" title="ID ${esc(token)}"><i>${index + 1}</i>${['10','12','13'].includes(String(token)) ? '—' : esc(symbolLabel(token))}</div>
         `).join('')
       : '';
 
@@ -7303,7 +7254,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
       ? '已完成本局盤面候選分析'
       : '本局還找不到可靠的盤面陣列';
 
-    probe.multiplierValues = readVisibleMultiplierValues();
+    probe.multiplierValues = [];
 
     const signal = computeBoardSignal(probe.candidate);
     probe.signalScore = signal.score;
