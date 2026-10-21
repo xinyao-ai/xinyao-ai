@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.31
+// @version      4.0.0-test.32
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -6231,6 +6231,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     lastSignalSpinId: '',
     autoStopEnabled: true,
     autoStopStatus: '',
+    multiplierValues: [],
     signalHistory: []
   };
 
@@ -6609,7 +6610,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
     }
     if (multiplier > 0) {
       score += Math.min(46, 34 + (multiplier - 1) * 8);
-      reasons.push(`倍率符號 ×${multiplier}`);
+      const liveMultipliers = Array.isArray(probe.multiplierValues) ? probe.multiplierValues.slice(0, multiplier) : [];
+      reasons.push(liveMultipliers.length ? `倍率符號 ${liveMultipliers.map(value => `${value}X`).join('、')}` : `倍率符號 ×${multiplier}`);
     }
     if (eye >= 4) {
       score += Math.min(20, 8 + (eye - 4) * 4);
@@ -6676,6 +6678,146 @@ setInterval(xinyaoCheckMaintenance, 10000);
     };
     visit(root);
     return out;
+  }
+
+
+  function readVisibleMultiplierValues() {
+    const hits = [];
+    const seen = new Set();
+
+    const normalizeMultiplier = raw => {
+      const text = String(raw ?? '').trim().replace(/×/g, 'X').toUpperCase();
+      const match = text.match(/(?:^|[^0-9])(\d{1,3})\s*X(?:$|[^A-Z0-9])/);
+      if (!match) return null;
+      const value = Number(match[1]);
+      if (!Number.isFinite(value) || value < 2 || value > 999) return null;
+      return value;
+    };
+
+    const worldPoint = (node, cocos) => {
+      try {
+        const p = node?.worldPosition || node?._worldPosition;
+        if (Number.isFinite(Number(p?.x)) && Number.isFinite(Number(p?.y))) {
+          return { x:Number(p.x), y:Number(p.y) };
+        }
+      } catch (_) {}
+      try {
+        if (typeof node?.convertToWorldSpaceAR === 'function') {
+          const zero = typeof cocos?.v2 === 'function' ? cocos.v2(0,0) : { x:0, y:0 };
+          const p = node.convertToWorldSpaceAR(zero);
+          if (Number.isFinite(Number(p?.x)) && Number.isFinite(Number(p?.y))) {
+            return { x:Number(p.x), y:Number(p.y) };
+          }
+        }
+      } catch (_) {}
+      return null;
+    };
+
+    const addHit = (value, node, cocos, source) => {
+      if (!value || !node || node.activeInHierarchy === false) return;
+
+      const names = [];
+      let cursor = node;
+      for (let depth = 0; cursor && depth < 8; depth += 1) {
+        names.push(String(cursor.name || ''));
+        cursor = cursor.parent || cursor._parent || null;
+      }
+      const path = names.join('/').toLowerCase();
+
+      // Ignore obvious HUD/menu/autoplay labels. Reel/symbol paths get priority.
+      if (/(autoplay|autospin|speed|setting|menu|jackpot|grand|major|minor|mini|buy|stake|bet|linecount)/i.test(path)) return;
+
+      let score = 0;
+      if (/(symbol|reel|slot|grid|cell|item|icon|multiple|multiplier|mul|ball)/i.test(path)) score += 5;
+
+      let visible = { width:0, height:0 };
+      try {
+        const size = cocos?.view?.getVisibleSize?.();
+        visible = { width:Number(size?.width)||0, height:Number(size?.height)||0 };
+      } catch (_) {}
+
+      const point = worldPoint(node, cocos);
+      if (point && visible.width > 0 && visible.height > 0) {
+        const nx = point.x / visible.width;
+        const ny = point.y / visible.height;
+        // Main reel area; excludes the speed/autoplay controls and most bottom banners.
+        if (nx >= .08 && nx <= .92 && ny >= .25 && ny <= .88) score += 4;
+        else score -= 3;
+      }
+
+      // Exact Label text on an active node is already strong evidence.
+      if (source === 'label') score += 3;
+      if (score < 2) return;
+
+      const px = point ? Math.round(point.x / 6) : 0;
+      const py = point ? Math.round(point.y / 6) : 0;
+      const key = point ? `${value}:${px}:${py}` : `${value}:${path}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      hits.push({ value, x:point?.x ?? 0, y:point?.y ?? 0, score });
+    };
+
+    for (const gameWindow of sameOriginSignalWindows()) {
+      try {
+        const cocos = gameWindow?.cc || gameWindow?.legacyCC || gameWindow?._cc;
+        const scene = cocos?.director?.getScene?.();
+        if (!scene) continue;
+
+        const Label = cocos?.Label;
+        if (Label && typeof scene.getComponentsInChildren === 'function') {
+          for (const label of (scene.getComponentsInChildren(Label) || [])) {
+            const value = normalizeMultiplier(label?.string ?? label?._string);
+            if (value) addHit(value, label?.node, cocos, 'label');
+          }
+        }
+
+        const Component = cocos?.Component;
+        if (Component && typeof scene.getComponentsInChildren === 'function') {
+          for (const component of (scene.getComponentsInChildren(Component) || [])) {
+            const node = component?.node;
+            if (!node || node.activeInHierarchy === false) continue;
+            const raws = [
+              node?.name,
+              component?.string,
+              component?._string,
+              component?.text,
+              component?._text,
+              component?.value,
+              component?.spriteFrame?.name,
+              component?.spriteFrame?._name,
+              component?._spriteFrame?.name,
+              component?._spriteFrame?._name
+            ];
+            for (const raw of raws) {
+              const value = normalizeMultiplier(raw);
+              if (value) {
+                addHit(value, node, cocos, 'component');
+                break;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    hits.sort((a,b) => (b.y - a.y) || (a.x - b.x) || (a.value - b.value));
+
+    // Multiple components can point at the same symbol. Collapse near-identical hits.
+    const compact = [];
+    for (const hit of hits) {
+      const duplicate = compact.some(prev =>
+        prev.value === hit.value &&
+        Math.abs(prev.x - hit.x) < 18 &&
+        Math.abs(prev.y - hit.y) < 18
+      );
+      if (!duplicate) compact.push(hit);
+    }
+    return compact.map(hit => hit.value);
+  }
+
+  function multiplierValueIconHtml(value) {
+    const safeValue = Math.max(2, Math.min(999, Math.trunc(Number(value) || 2)));
+    return `<span class="bp-icon-shell"><span class="bp-icon bp-multiplier-live">${safeValue}X</span></span>`;
   }
 
   function explicitStopPattern(text) {
@@ -6954,6 +7096,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
       #${PANEL_ID} .bp-icon-img{object-fit:contain;object-position:center center;box-sizing:border-box;padding:0!important;background:transparent!important;overflow:visible;box-shadow:none!important;border-radius:0!important;filter:none!important}
       #${PANEL_ID} .bp-icon-clean{background:transparent!important;padding:0!important;box-shadow:none!important;border-radius:0!important;object-fit:contain!important;object-position:center center!important;filter:none!important}
       #${PANEL_ID} .bp-multiplier{display:flex;align-items:center;justify-content:center;border-radius:50%;background:radial-gradient(circle at 35% 30%,#47d378,#15884d 70%);border:2px solid #e4b54b;color:#ffe16a;font-size:24px;font-weight:950;line-height:1}
+      #${PANEL_ID} .bp-multiplier-live{display:flex!important;align-items:center!important;justify-content:center!important;border-radius:50%!important;background:radial-gradient(circle at 35% 30%,#65e58c 0%,#199f55 46%,#087039 78%)!important;border:3px solid #e6b74f!important;outline:1px solid rgba(255,232,132,.55)!important;color:#ffe86b!important;font-size:13px!important;font-weight:950!important;line-height:1!important;text-shadow:0 1px 2px rgba(0,0,0,.85)!important;box-shadow:none!important;}
       #${PANEL_ID} .bp-scatter{display:flex;align-items:center;justify-content:center;border-radius:9px;background:radial-gradient(circle at 35% 30%,#ffd26d,#b22f59 72%);border:1px solid rgba(255,221,128,.78);color:#fff4b8;font-size:18px;font-weight:950;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,.45)}
       #${PANEL_ID} .bp-unknown{display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);color:#9eb4c7;font-size:18px;font-weight:900}
       #${PANEL_ID} .bp-name{display:block;margin-top:2px;font-size:8px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.80}
@@ -7050,14 +7193,56 @@ setInterval(xinyaoCheckMaintenance, 10000);
       </div>
     `;
 
-    const cards = candidate.items.slice(0, 12).map(item => {
-      return `
+    const sourceItems = candidate.items.slice(0, 12);
+    const totalMultiplierSymbols = sourceItems
+      .filter(item => ['10','13'].includes(String(item.token)))
+      .reduce((sum,item) => sum + (Number(item.count) || 0), 0);
+
+    const liveMultiplierValues = Array.isArray(probe.multiplierValues)
+      ? probe.multiplierValues.slice(0, totalMultiplierSymbols)
+      : [];
+
+    let multiplierCardsInserted = false;
+    const cards = sourceItems.flatMap(item => {
+      const token = String(item.token);
+
+      if (['10','13'].includes(token) && liveMultiplierValues.length) {
+        if (multiplierCardsInserted) return [];
+        multiplierCardsInserted = true;
+
+        const grouped = new Map();
+        for (const value of liveMultiplierValues) {
+          grouped.set(value, (grouped.get(value) || 0) + 1);
+        }
+
+        const rendered = [...grouped.entries()].map(([value,count]) => `
+          <div class="bp-item" title="倍率符號 ${value}X">
+            ${multiplierValueIconHtml(value)}
+            <span class="bp-name">倍率 ${value}X</span>
+            <span class="bp-count">×${count}</span>
+          </div>
+        `);
+
+        const missing = Math.max(0, totalMultiplierSymbols - liveMultiplierValues.length);
+        if (missing > 0) {
+          rendered.push(`
+            <div class="bp-item" title="倍率符號">
+              ${symbolIconHtml(item.token)}
+              <span class="bp-name">倍率符號</span>
+              <span class="bp-count">×${missing}</span>
+            </div>
+          `);
+        }
+        return rendered;
+      }
+
+      return [`
         <div class="bp-item" title="${esc(symbolLabel(item.token))}｜ID ${esc(item.token)}">
           ${symbolIconHtml(item.token)}
           <span class="bp-name">${esc(symbolLabel(item.token))}</span>
           <span class="bp-count">×${item.count}</span>
         </div>
-      `;
+      `];
     }).join('');
 
     const sequence = Array.isArray(candidate.tokens)
@@ -7117,6 +7302,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
     probe.status = result.best
       ? '已完成本局盤面候選分析'
       : '本局還找不到可靠的盤面陣列';
+
+    probe.multiplierValues = readVisibleMultiplierValues();
 
     const signal = computeBoardSignal(probe.candidate);
     probe.signalScore = signal.score;
