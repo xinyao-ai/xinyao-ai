@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.34
+// @version      4.0.0-test.35
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -6231,6 +6231,9 @@ setInterval(xinyaoCheckMaintenance, 10000);
     lastSignalSpinId: '',
     autoStopEnabled: true,
     autoStopStatus: '',
+    autoStopRetryToken: 0,
+    autoStopRetryUntil: 0,
+    autoStopAttempts: 0,
     multiplierValues: [],
     signalHistory: []
   };
@@ -6818,16 +6821,36 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
   function emitSignalCocosClick(target, cocos) {
     if (!target?.node) return false;
+    const button = target;
+
+    // Cocos Creator Button has an internal emitter that performs the same action as a real tap.
+    // Prefer it over only emitting a raw node event, because raw 'click' can be accepted but ignored.
     try {
-      const button = target;
+      if (button.interactable === false || button.enabledInHierarchy === false) return false;
+    } catch (_) {}
+
+    try {
+      if (typeof button._emitButtonEvent === 'function') {
+        button._emitButtonEvent();
+        return true;
+      }
+    } catch (_) {}
+
+    try {
+      if (typeof button._emitClickEvent === 'function') {
+        button._emitClickEvent();
+        return true;
+      }
+    } catch (_) {}
+
+    try {
       const events = Array.isArray(button.clickEvents) ? button.clickEvents : [];
       const EventHandler = cocos?.Component?.EventHandler || cocos?.EventHandler;
       if (events.length && typeof EventHandler?.emitEvents === 'function') {
-        try {
-          EventHandler.emitEvents(events, button);
-          return true;
-        } catch (_) {}
+        EventHandler.emitEvents(events, button);
+        return true;
       }
+
       for (const handler of events) {
         try {
           if (typeof handler?.emit === 'function') {
@@ -6849,16 +6872,67 @@ setInterval(xinyaoCheckMaintenance, 10000);
           }
         } catch (_) {}
       }
-      try {
-        if (typeof target.node.emit === 'function') {
-          target.node.emit('click', button);
-          return true;
-        }
-      } catch (_) {}
     } catch (_) {}
+
+    try {
+      const clickType = cocos?.Button?.EventType?.CLICK || 'click';
+      if (typeof button.node.emit === 'function') {
+        button.node.emit(clickType, button);
+        return true;
+      }
+    } catch (_) {}
+
     return false;
   }
 
+  function invokeExplicitAutoplayStopMethod(gameWindow) {
+    try {
+      const cocos = gameWindow?.cc || gameWindow?.legacyCC || gameWindow?._cc;
+      const scene = cocos?.director?.getScene?.();
+      const Component = cocos?.Component;
+      if (!scene || !Component || typeof scene.getComponentsInChildren !== 'function') return null;
+
+      const methodPattern = /^(?:(?:stop|cancel|end|close|disable).*(?:auto|autoplay|autospin)|(?:auto|autoplay|autospin).*(?:stop|cancel|end|close|disable))$/i;
+      const components = scene.getComponentsInChildren(Component) || [];
+
+      for (const component of components) {
+        const node = component?.node;
+        if (!component || !node || node.activeInHierarchy === false) continue;
+
+        const names = [];
+        let cursor = node;
+        for (let depth = 0; cursor && depth < 8; depth += 1) {
+          names.push(String(cursor.name || ''));
+          cursor = cursor.parent || cursor._parent || null;
+        }
+        const componentName = String(component?.constructor?.name || component?.__classname__ || '');
+        const context = `${componentName} ${names.join(' ')}`;
+
+        // Only inspect likely game/control components.
+        if (!/(spin|auto|play|game|slot|control|button|round)/i.test(context)) continue;
+
+        const methodNames = new Set();
+        let proto = component;
+        for (let depth = 0; proto && depth < 4; depth += 1) {
+          try {
+            Object.getOwnPropertyNames(proto).forEach(name => methodNames.add(name));
+          } catch (_) {}
+          try { proto = Object.getPrototypeOf(proto); } catch (_) { proto = null; }
+        }
+
+        for (const methodName of methodNames) {
+          if (!methodPattern.test(methodName)) continue;
+          const fn = component?.[methodName];
+          if (typeof fn !== 'function') continue;
+          try {
+            fn.call(component);
+            return { ok:true, via:'Cocos stop method', detail:`${componentName}.${methodName}` };
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
 
   function numericLabelText(node, cocos) {
     try {
@@ -6874,7 +6948,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
   function autoplayStateScore(button, cocos) {
     const node = button?.node;
-    if (!node) return { score:0, text:'' };
+    if (!node) return { score:0, text:'', activeEvidence:false };
 
     const names = [];
     let cursor = node;
@@ -6888,23 +6962,44 @@ setInterval(xinyaoCheckMaintenance, 10000);
       .join(' ');
 
     const labels = numericLabelText(node, cocos);
-    const text = `${names.join(' ')} ${handlers} ${labels.join(' ')}`;
+
+    const visualNames = [];
+    try {
+      const Sprite = cocos?.Sprite;
+      if (Sprite && typeof node.getComponentsInChildren === 'function') {
+        for (const sprite of (node.getComponentsInChildren(Sprite) || [])) {
+          const sf = sprite?.spriteFrame || sprite?._spriteFrame;
+          const n = String(sf?.name || sf?._name || '');
+          if (n) visualNames.push(n);
+        }
+      }
+    } catch (_) {}
+
+    const text = `${names.join(' ')} ${handlers} ${labels.join(' ')} ${visualNames.join(' ')}`;
     if (/(buy|feature|free|table|machine|room|menu|sound|speed|minus|plus|bet|stake)/i.test(text)) {
-      return { score:0, text };
+      return { score:0, text, activeEvidence:false, numericLabels:[] };
     }
 
-    let score = 0;
-    if (/(spin|roll|rotate)/i.test(text)) score += 45;
-    if (/(auto|autoplay|autospin|continuous|times|count)/i.test(text)) score += 35;
+    const hasSpin = /(spin|roll|rotate)/i.test(text);
+    const hasAuto = /(auto|autoplay|autospin|continuous|times|count)/i.test(text);
+    const hasStopVisual = /(stop|pause|cancel|square|stopping)/i.test(text);
 
     const numericLabels = labels
       .map(value => Number(value))
       .filter(value => Number.isFinite(value) && value >= 1 && value <= 999);
-    if (numericLabels.length) score += 45;
 
-    // ATG portrait mode often displays the remaining autoplay count in the center spin button.
-    // A spin-like control with a positive integer label is strong evidence autoplay is currently running.
-    return { score, text, numericLabels };
+    let score = 0;
+    if (hasSpin) score += 35;
+    if (hasAuto) score += 45;
+    if (hasStopVisual) score += 55;
+    if (numericLabels.length) score += 35;
+
+    const activeEvidence =
+      hasStopVisual ||
+      (hasAuto && numericLabels.length > 0) ||
+      (hasSpin && hasAuto);
+
+    return { score, text, numericLabels, activeEvidence };
   }
 
   function findActiveAutoplaySpinButton(gameWindow) {
@@ -6917,7 +7012,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
       const candidates = [];
       for (const button of (scene.getComponentsInChildren(Button) || [])) {
         const info = autoplayStateScore(button, cocos);
-        if (info.score >= 70) candidates.push({ button, cocos, ...info });
+        if (info.activeEvidence && info.score >= 70) candidates.push({ button, cocos, ...info });
       }
       candidates.sort((a,b) => b.score - a.score);
       return candidates[0] || null;
@@ -6927,6 +7022,11 @@ setInterval(xinyaoCheckMaintenance, 10000);
   }
 
   function tryStopAutoplay() {
+    // First try the game's own explicit stop-auto method when it exists.
+    for (const gameWindow of sameOriginSignalWindows()) {
+      const direct = invokeExplicitAutoplayStopMethod(gameWindow);
+      if (direct?.ok) return direct;
+    }
     // 只碰「明確寫著停止自動 / stop auto」的控制，避免把開始自動轉誤按成開啟。
     for (const gameWindow of sameOriginSignalWindows()) {
       try {
@@ -7003,6 +7103,29 @@ setInterval(xinyaoCheckMaintenance, 10000);
     return { ok:false, via:'', detail:'' };
   }
 
+  function scheduleAutoplayStopRetries(spinId) {
+    const token = ++probe.autoStopRetryToken;
+    probe.autoStopRetryUntil = Date.now() + 4200;
+    probe.autoStopAttempts = 1;
+
+    const delays = [140, 320, 620, 1050, 1700, 2600];
+    for (const delay of delays) {
+      setTimeout(() => {
+        if (probe.autoStopRetryToken !== token) return;
+        if (probe.lastSignalSpinId !== spinId) return;
+        if (Date.now() > probe.autoStopRetryUntil) return;
+
+        const result = tryStopAutoplay();
+        probe.autoStopAttempts += 1;
+
+        if (result?.ok) {
+          probe.autoStopStatus = `停止自動轉重試中（第 ${probe.autoStopAttempts} 次）`;
+          render();
+        }
+      }, delay);
+    }
+  }
+
   function showSignalToast(signal, stopResult) {
     try {
       let toast = document.getElementById('xinyao-atg-signal-toast-v1');
@@ -7013,8 +7136,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
         (document.body || document.documentElement).appendChild(toast);
       }
       const stopText = stopResult?.ok
-        ? '⏹ 已送出停止自動轉指令'
-        : '⚠️ 尚未抓到自動轉停止控制，請先手動停止';
+        ? '⏹ 正在停止自動轉（會自動重試）'
+        : '⚠️ 正在等待可停止的自動轉控制';
       toast.innerHTML = `
         <div style="font-size:15px;font-weight:950;color:#ffb8d4;">📡 盤面訊號達標 ${signal.score}%</div>
         <div style="margin-top:5px;font-size:10px;opacity:.82;">${esc(signal.reason)}</div>
@@ -7236,6 +7359,15 @@ setInterval(xinyaoCheckMaintenance, 10000);
     if (!spinId || spinId === probe.lastSpinId) return;
 
     probe.lastSpinId = spinId;
+
+    if (probe.autoStopRetryUntil > Date.now() && probe.lastSignalSpinId && probe.lastSignalSpinId !== spinId) {
+      const retryResult = tryStopAutoplay();
+      if (retryResult?.ok) {
+        probe.autoStopAttempts += 1;
+        probe.autoStopStatus = `偵測到仍在自動轉，已再次停止（第 ${probe.autoStopAttempts} 次）`;
+      }
+    }
+
     const previousRoom = probe.roomNumber;
     probe.roomNumber = detail.roomNumber ?? null;
     probe.updatedAt = Date.now();
@@ -7245,6 +7377,9 @@ setInterval(xinyaoCheckMaintenance, 10000);
       probe.signalArmed = true;
       probe.signalTriggered = false;
       probe.autoStopStatus = '';
+      probe.autoStopRetryToken += 1;
+      probe.autoStopRetryUntil = 0;
+      probe.autoStopAttempts = 0;
     }
 
     const result = chooseCandidate(detail.finalState, detail.engine);
@@ -7279,8 +7414,9 @@ setInterval(xinyaoCheckMaintenance, 10000);
       probe.lastSignalSpinId = spinId;
       stopResult = tryStopAutoplay();
       probe.autoStopStatus = stopResult?.ok
-        ? '已送出停止自動轉指令'
-        : '未找到自動轉停止控制';
+        ? '正在停止自動轉（自動重試）'
+        : '等待自動轉停止控制';
+      scheduleAutoplayStopRetries(spinId);
 
       try {
         window.dispatchEvent(new CustomEvent('xinyao:board-signal', {
