@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.38
+// @version      4.0.0-test.39
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -6240,6 +6240,14 @@ setInterval(xinyaoCheckMaintenance, 10000);
     stopLearnInfo: null,
     learnedStopButtonRef: null,
     stopLearnHooksInstalled: false,
+    stopReplayRefs: null,
+    stopReplayParams: null,
+    stopReplayEmitter: null,
+    stopReplayNodeRef: null,
+    stopReplayNodeEvent: null,
+    stopReplayNodeArgs: null,
+    stopReplayInfo: null,
+    stopCaptureAt: 0,
     multiplierValues: [],
     signalHistory: []
   };
@@ -6250,7 +6258,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
   probe.autoStopEnabled = true;
   try { localStorage.setItem(SIGNAL_AUTOSTOP_KEY, '1'); } catch (_) {}
 
-  const STOP_LEARN_KEY = 'xinyao_atg_stop_learn_v1';
+  const STOP_LEARN_KEY = 'xinyao_atg_stop_learn_v2';
   try {
     const saved = JSON.parse(localStorage.getItem(STOP_LEARN_KEY) || 'null');
     if (saved && typeof saved === 'object') {
@@ -6833,7 +6841,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
   function stopNodePath(node) {
     const parts = [];
     let cursor = node;
-    for (let depth = 0; cursor && depth < 10; depth += 1) {
+    for (let depth = 0; cursor && depth < 12; depth += 1) {
       let index = -1;
       try {
         const parent = cursor.parent || cursor._parent;
@@ -6846,42 +6854,177 @@ setInterval(xinyaoCheckMaintenance, 10000);
     return parts.join('/');
   }
 
-  function saveLearnedStopButton(button, cocos, meta = {}) {
-    if (!button?.node) return false;
+  function resolveNodeByLearnPath(gameWindow, wantedPath) {
+    if (!wantedPath) return null;
+    try {
+      const cocos = gameWindow?.cc || gameWindow?.legacyCC || gameWindow?._cc;
+      const scene = cocos?.director?.getScene?.();
+      if (!scene) return null;
 
-    const node = button.node;
+      const stack = [scene];
+      while (stack.length) {
+        const node = stack.pop();
+        if (!node) continue;
+        try {
+          if (stopNodePath(node) === wantedPath) return { node, cocos };
+        } catch (_) {}
+        const children = node.children || node._children || [];
+        for (const child of children) stack.push(child);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function serialiseStopHandlers(events) {
+    const out = [];
+    for (const handler of (Array.isArray(events) ? events : [])) {
+      try {
+        out.push({
+          targetPath: stopNodePath(handler?.target),
+          component: String(handler?.component || ''),
+          handler: String(handler?.handler || ''),
+          customEventData: handler?.customEventData == null ? '' : String(handler.customEventData)
+        });
+      } catch (_) {}
+    }
+    return out.filter(item => item.handler || item.component || item.targetPath);
+  }
+
+  function showStopLearnToast(html, ms = 3000) {
+    try {
+      let toast = document.getElementById('xinyao-atg-stop-learn-toast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'xinyao-atg-stop-learn-toast';
+        toast.style.cssText = 'position:fixed;top:74px;left:50%;transform:translateX(-50%);z-index:2147483647;width:min(410px,calc(100vw - 24px));box-sizing:border-box;padding:12px 14px;border-radius:14px;background:rgba(24,20,31,.97);border:1px solid rgba(255,184,212,.55);color:#fff;font:800 12px -apple-system,BlinkMacSystemFont,"PingFang TC",sans-serif;text-align:center;pointer-events:none;';
+        (document.body || document.documentElement).appendChild(toast);
+      }
+      toast.innerHTML = html;
+      clearTimeout(showStopLearnToast._timer);
+      showStopLearnToast._timer = setTimeout(() => toast?.remove(), ms);
+    } catch (_) {}
+  }
+
+  function finishStopLearning(button, cocos, meta = {}) {
+    const buttonNode = button?.node || probe.stopReplayNodeRef?.node || null;
+    const handlerInfo = probe.stopReplayInfo?.handlers || [];
+    const nodeEvent = probe.stopReplayNodeEvent || '';
+
     const info = {
-      path: stopNodePath(node),
-      descriptor: signalButtonDescriptor(button, cocos),
+      version: 2,
+      path: buttonNode ? stopNodePath(buttonNode) : '',
+      descriptor: button ? signalButtonDescriptor(button, cocos) : '',
       learnedAt: Date.now(),
-      nx: Number(meta.nx) || null,
-      ny: Number(meta.ny) || null
+      nx: Number(meta.nx) || probe.stopReplayInfo?.nx || null,
+      ny: Number(meta.ny) || probe.stopReplayInfo?.ny || null,
+      handlers: handlerInfo,
+      nodePath: probe.stopReplayNodeRef?.node ? stopNodePath(probe.stopReplayNodeRef.node) : '',
+      nodeEvent
     };
 
-    probe.learnedStopButtonRef = { button, cocos };
+    // We only declare success when we captured the real runtime action,
+    // not merely a nearby visual Button.
+    const hasRealReplay =
+      (Array.isArray(probe.stopReplayRefs) && probe.stopReplayRefs.length > 0) ||
+      Boolean(probe.stopReplayNodeRef?.node && probe.stopReplayNodeEvent) ||
+      handlerInfo.length > 0;
+
+    if (!hasRealReplay) {
+      probe.stopLearned = false;
+      probe.stopLearnMode = false;
+      probe.autoStopStatus = '⚠️ 沒抓到真正停止事件，請重新學習';
+      render();
+      showStopLearnToast('⚠️ 這次只抓到畫面按鈕，沒有抓到真正停止事件。請再按一次「學習停止鍵」。', 3600);
+      return false;
+    }
+
+    if (button?.node) probe.learnedStopButtonRef = { button, cocos };
     probe.stopLearnInfo = info;
     probe.stopLearned = true;
     probe.stopLearnMode = false;
 
     try { localStorage.setItem(STOP_LEARN_KEY, JSON.stringify(info)); } catch (_) {}
 
-    probe.autoStopStatus = '✅ 已學習真正的方形停止鍵';
+    probe.autoStopStatus = `✅ 已抓到停止事件（${handlerInfo.length ? 'Handler' : 'Node Event'}）`;
     render();
 
-    try {
-      let toast = document.getElementById('xinyao-atg-stop-learn-toast');
-      if (!toast) {
-        toast = document.createElement('div');
-        toast.id = 'xinyao-atg-stop-learn-toast';
-        toast.style.cssText = 'position:fixed;top:74px;left:50%;transform:translateX(-50%);z-index:2147483647;padding:10px 14px;border-radius:12px;background:rgba(24,20,31,.97);border:1px solid rgba(125,236,183,.55);color:#b9f7d3;font:800 12px -apple-system,BlinkMacSystemFont,"PingFang TC",sans-serif;pointer-events:none;';
-        (document.body || document.documentElement).appendChild(toast);
+    showStopLearnToast(
+      '<b style="color:#9ff0be">✅ 已抓到真正的停止事件</b><br><span style="font-size:11px;font-weight:700">先按右側「立即測試停止」確認；測試成功後，80% 以上就會用同一個事件停轉。</span>',
+      4500
+    );
+    return true;
+  }
+
+  function invokeResolvedHandlerInfo(info) {
+    const records = Array.isArray(info?.handlers) ? info.handlers : [];
+    if (!records.length) return false;
+
+    let invoked = false;
+    for (const record of records) {
+      for (const gameWindow of sameOriginSignalWindows()) {
+        try {
+          const resolved = resolveNodeByLearnPath(gameWindow, record.targetPath);
+          const target = resolved?.node;
+          if (!target) continue;
+
+          let receiver = target;
+          if (record.component && typeof target.getComponent === 'function') {
+            try {
+              receiver = target.getComponent(record.component) || receiver;
+            } catch (_) {}
+          }
+
+          const fn = receiver?.[record.handler];
+          if (typeof fn === 'function') {
+            fn.call(receiver, null, record.customEventData);
+            invoked = true;
+            break;
+          }
+        } catch (_) {}
       }
-      toast.textContent = '✅ 已記住真正的 ■ 停止鍵；之後 80% 以上會直接叫用這顆';
-      clearTimeout(saveLearnedStopButton._timer);
-      saveLearnedStopButton._timer = setTimeout(() => toast?.remove(), 2800);
+    }
+    return invoked;
+  }
+
+  function invokeLearnedStopReplay() {
+    // Best case: exact live EventHandler objects + the exact params that were used
+    // when the user manually pressed the real ■ button.
+    try {
+      if (
+        probe.stopReplayEmitter &&
+        Array.isArray(probe.stopReplayRefs) &&
+        probe.stopReplayRefs.length &&
+        typeof probe.stopReplayEmitter.emitEvents === 'function'
+      ) {
+        probe.stopReplayEmitter.emitEvents(
+          probe.stopReplayRefs,
+          ...(Array.isArray(probe.stopReplayParams) ? probe.stopReplayParams : [])
+        );
+        probe.autoStopLastVia = 'REPLAY exact EventHandler.emitEvents';
+        return { ok:true, via:probe.autoStopLastVia, detail:`${probe.stopReplayRefs.length} handler(s)` };
+      }
     } catch (_) {}
 
-    return true;
+    // Some ATG controls are wired directly to Node touch/click events rather than Button.clickEvents.
+    try {
+      const nodeRef = probe.stopReplayNodeRef?.node;
+      const type = probe.stopReplayNodeEvent;
+      if (nodeRef && type && typeof nodeRef.emit === 'function') {
+        nodeRef.emit(type, ...(Array.isArray(probe.stopReplayNodeArgs) ? probe.stopReplayNodeArgs : []));
+        probe.autoStopLastVia = `REPLAY exact Node event: ${String(type)}`;
+        return { ok:true, via:probe.autoStopLastVia, detail:stopNodePath(nodeRef) };
+      }
+    } catch (_) {}
+
+    // After refresh/re-entering a room, rebuild the saved click handler by component+method path.
+    try {
+      if (invokeResolvedHandlerInfo(probe.stopLearnInfo)) {
+        probe.autoStopLastVia = 'REPLAY resolved saved handler';
+        return { ok:true, via:probe.autoStopLastVia, detail:'saved handler metadata' };
+      }
+    } catch (_) {}
+
+    return { ok:false, via:'', detail:'' };
   }
 
   function findButtonByLearnInfo(gameWindow) {
@@ -6896,45 +7039,16 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
       const buttons = scene.getComponentsInChildren(Button) || [];
       let best = null;
-
-      let canvas = null, rect = null, visibleWidth = 0, visibleHeight = 0;
-      try {
-        canvas = gameWindow.document?.querySelector('canvas#GameCanvas') || gameWindow.document?.querySelector('canvas') || cocos?.game?.canvas || cocos?.game?._canvas;
-        rect = canvas?.getBoundingClientRect?.() || null;
-        const size = cocos?.view?.getVisibleSize?.();
-        visibleWidth = Number(size?.width) || 0;
-        visibleHeight = Number(size?.height) || 0;
-      } catch (_) {}
-
       for (const button of buttons) {
         if (!button?.node || button.node.activeInHierarchy === false) continue;
-
         const path = stopNodePath(button.node);
         const descriptor = signalButtonDescriptor(button, cocos);
         let score = 0;
-
         if (info.path && path === info.path) score += 1000;
-        if (info.descriptor && descriptor === info.descriptor) score += 500;
-        else if (info.descriptor && descriptor && (
-          descriptor.includes(info.descriptor) || info.descriptor.includes(descriptor)
-        )) score += 180;
-
-        if (info.nx != null && info.ny != null && rect && visibleWidth > 0 && visibleHeight > 0) {
-          const p = signalNodeWorldPoint(button.node, cocos);
-          if (p) {
-            const cx = rect.left + (p.x / visibleWidth) * rect.width;
-            const cy = rect.top + (1 - (p.y / visibleHeight)) * rect.height;
-            const nx = (cx - rect.left) / rect.width;
-            const ny = (cy - rect.top) / rect.height;
-            const dist = Math.hypot(nx - info.nx, ny - info.ny);
-            score += Math.max(0, 420 - dist * 3200);
-          }
-        }
-
-        if (!best || score > best.score) best = { button, cocos, score, path, descriptor };
+        if (info.descriptor && descriptor === info.descriptor) score += 400;
+        if (!best || score > best.score) best = { button, cocos, score };
       }
-
-      return best && best.score >= 120 ? best : null;
+      return best && best.score >= 300 ? best : null;
     } catch (_) {
       return null;
     }
@@ -6965,61 +7079,105 @@ setInterval(xinyaoCheckMaintenance, 10000);
         try {
           const cocos = gameWindow?.cc || gameWindow?.legacyCC || gameWindow?._cc;
           const scene = cocos?.director?.getScene?.();
-          const Button = cocos?.Button;
-          if (!scene || !Button || typeof scene.getComponentsInChildren !== 'function') continue;
+          if (!scene) continue;
 
-          const clickType = cocos?.Button?.EventType?.CLICK || 'click';
-          for (const button of (scene.getComponentsInChildren(Button) || [])) {
-            const node = button?.node;
-            if (!node || node.__XIANYAO_STOP_LEARN_HOOK__) continue;
-            node.__XIANYAO_STOP_LEARN_HOOK__ = true;
-
-            try {
-              node.on(clickType, () => {
-                if (!probe.stopLearnMode) return;
-                saveLearnedStopButton(button, cocos);
-              });
-            } catch (_) {}
+          // Capture the exact Cocos EventHandler list fired by a real manual press.
+          const EventHandler = cocos?.Component?.EventHandler || cocos?.EventHandler;
+          if (EventHandler && typeof EventHandler.emitEvents === 'function' && !EventHandler.emitEvents.__XIANYAO_STOP_TRACE__) {
+            const originalEmitEvents = EventHandler.emitEvents;
+            const wrappedEmitEvents = function(events, ...params) {
+              if (probe.stopLearnMode && Array.isArray(events) && events.length) {
+                const serial = serialiseStopHandlers(events);
+                if (serial.length) {
+                  probe.stopReplayRefs = events.slice();
+                  probe.stopReplayParams = params.slice();
+                  probe.stopReplayEmitter = EventHandler;
+                  probe.stopReplayInfo = {
+                    ...(probe.stopReplayInfo || {}),
+                    handlers: serial,
+                    capturedAt: Date.now()
+                  };
+                }
+              }
+              return originalEmitEvents.call(this, events, ...params);
+            };
+            wrappedEmitEvents.__XIANYAO_STOP_TRACE__ = true;
+            wrappedEmitEvents.__XIANYAO_STOP_ORIGINAL__ = originalEmitEvents;
+            EventHandler.emitEvents = wrappedEmitEvents;
           }
 
+          // Capture direct Node click / touch-end dispatches too.
+          const NodeProto = cocos?.Node?.prototype;
+          if (NodeProto && typeof NodeProto.emit === 'function' && !NodeProto.emit.__XIANYAO_STOP_TRACE__) {
+            const originalNodeEmit = NodeProto.emit;
+            const wrappedNodeEmit = function(type, ...args) {
+              if (
+                probe.stopLearnMode &&
+                /(click|touch[-_]?end|mouseup|pointerup)/i.test(String(type || ''))
+              ) {
+                probe.stopReplayNodeRef = { node:this, cocos };
+                probe.stopReplayNodeEvent = type;
+                probe.stopReplayNodeArgs = args.slice();
+                probe.stopReplayInfo = {
+                  ...(probe.stopReplayInfo || {}),
+                  nodePath: stopNodePath(this),
+                  nodeEvent: String(type || ''),
+                  capturedAt: Date.now()
+                };
+              }
+              return originalNodeEmit.call(this, type, ...args);
+            };
+            wrappedNodeEmit.__XIANYAO_STOP_TRACE__ = true;
+            wrappedNodeEmit.__XIANYAO_STOP_ORIGINAL__ = originalNodeEmit;
+            NodeProto.emit = wrappedNodeEmit;
+          }
+
+          const Button = cocos?.Button;
+          if (Button && typeof scene.getComponentsInChildren === 'function') {
+            const clickType = Button?.EventType?.CLICK || 'click';
+            for (const button of (scene.getComponentsInChildren(Button) || [])) {
+              const node = button?.node;
+              if (!node || node.__XIANYAO_STOP_LEARN_HOOK_V2__) continue;
+              node.__XIANYAO_STOP_LEARN_HOOK_V2__ = true;
+              try {
+                node.on(clickType, () => {
+                  if (!probe.stopLearnMode) return;
+                  // Allow the game's own handler to finish, then freeze the captured replay data.
+                  setTimeout(() => {
+                    if (probe.stopLearnMode) finishStopLearning(button, cocos);
+                  }, 80);
+                });
+              } catch (_) {}
+            }
+          }
+
+          // Trusted pointer coordinate is saved only as extra metadata; it is no longer used
+          // as the primary way to guess the stop button.
           const canvas =
             gameWindow.document?.querySelector('canvas#GameCanvas') ||
             gameWindow.document?.querySelector('canvas') ||
             cocos?.game?.canvas ||
             cocos?.game?._canvas;
 
-          if (canvas && !canvas.__XIANYAO_STOP_POINTER_LEARN__) {
-            canvas.__XIANYAO_STOP_POINTER_LEARN__ = true;
+          if (canvas && !canvas.__XIANYAO_STOP_POINTER_LEARN_V2__) {
+            canvas.__XIANYAO_STOP_POINTER_LEARN_V2__ = true;
             canvas.addEventListener('pointerdown', event => {
               if (!probe.stopLearnMode || event.isTrusted === false) return;
               try {
                 const rect = canvas.getBoundingClientRect();
                 const nx = (event.clientX - rect.left) / rect.width;
                 const ny = (event.clientY - rect.top) / rect.height;
+                probe.stopCaptureAt = Date.now();
+                probe.stopReplayInfo = {
+                  ...(probe.stopReplayInfo || {}),
+                  nx, ny, pointerAt:Date.now()
+                };
 
-                let best = null;
-                const size = cocos?.view?.getVisibleSize?.();
-                const vw = Number(size?.width) || 0;
-                const vh = Number(size?.height) || 0;
-
-                if (vw > 0 && vh > 0) {
-                  for (const button of (scene.getComponentsInChildren(Button) || [])) {
-                    if (!button?.node || button.node.activeInHierarchy === false) continue;
-                    const p = signalNodeWorldPoint(button.node, cocos);
-                    if (!p) continue;
-                    const cx = rect.left + (p.x / vw) * rect.width;
-                    const cy = rect.top + (1 - (p.y / vh)) * rect.height;
-                    const dist = Math.hypot(cx - event.clientX, cy - event.clientY);
-                    if (!best || dist < best.dist) best = { button, cocos, dist };
-                  }
-                }
-
-                // Pointer fallback only learns a nearby Cocos Button.
-                if (best && best.dist <= Math.max(70, rect.width * .08)) {
-                  setTimeout(() => {
-                    if (probe.stopLearnMode) saveLearnedStopButton(best.button, best.cocos, { nx, ny });
-                  }, 120);
-                }
+                // Fallback finalizer for non-Button controls:
+                // wait for Node/EventHandler tracing generated by this real tap.
+                setTimeout(() => {
+                  if (probe.stopLearnMode) finishStopLearning(null, cocos, { nx, ny });
+                }, 260);
               } catch (_) {}
             }, true);
           }
@@ -7028,33 +7186,52 @@ setInterval(xinyaoCheckMaintenance, 10000);
     };
 
     attach();
-    setInterval(attach, 900);
+    setInterval(attach, 700);
   }
 
   function startStopButtonLearning() {
     probe.stopLearnMode = true;
-    probe.autoStopStatus = '🎯 學習中：請手動按一次右下角 ■ 停止鍵';
+    probe.stopLearned = false;
+    probe.learnedStopButtonRef = null;
+    probe.stopReplayRefs = null;
+    probe.stopReplayParams = null;
+    probe.stopReplayEmitter = null;
+    probe.stopReplayNodeRef = null;
+    probe.stopReplayNodeEvent = null;
+    probe.stopReplayNodeArgs = null;
+    probe.stopReplayInfo = null;
+    probe.stopCaptureAt = 0;
+    probe.autoStopStatus = '🎯 請手動按一次真正的 ■ 停止鍵';
+    try { localStorage.removeItem(STOP_LEARN_KEY); } catch (_) {}
     render();
 
-    try {
-      let toast = document.getElementById('xinyao-atg-stop-learn-toast');
-      if (!toast) {
-        toast = document.createElement('div');
-        toast.id = 'xinyao-atg-stop-learn-toast';
-        toast.style.cssText = 'position:fixed;top:74px;left:50%;transform:translateX(-50%);z-index:2147483647;width:min(390px,calc(100vw - 24px));box-sizing:border-box;padding:12px 14px;border-radius:14px;background:rgba(24,20,31,.97);border:1px solid rgba(255,184,212,.55);color:#fff;font:800 12px -apple-system,BlinkMacSystemFont,"PingFang TC",sans-serif;text-align:center;pointer-events:none;';
-        (document.body || document.documentElement).appendChild(toast);
+    showStopLearnToast(
+      '<b style="color:#ffb8d4">🎯 test39 重新學習停止事件</b><br><span style="font-size:11px;font-weight:700">請先開著自動轉，然後手動按一次遊戲右下角真正的 ■。這版會直接記錄那次按下去所執行的 EventHandler，不再猜按鈕。</span>',
+      15000
+    );
+
+    clearTimeout(startStopButtonLearning._timer);
+    startStopButtonLearning._timer = setTimeout(() => {
+      if (probe.stopLearnMode) {
+        probe.stopLearnMode = false;
+        probe.autoStopStatus = '⚠️ 學習逾時，請重新學習';
+        render();
       }
-      toast.innerHTML = '<b style="color:#ffb8d4">🎯 學習真正的停止鍵</b><br><span style="font-size:11px;font-weight:700">現在請妳手動按一次遊戲右下角的 ■ 停止鍵。只要一次，之後就會記住。</span>';
-      clearTimeout(startStopButtonLearning._timer);
-      startStopButtonLearning._timer = setTimeout(() => {
-        if (probe.stopLearnMode) {
-          probe.stopLearnMode = false;
-          probe.autoStopStatus = '⚠️ 尚未學到停止鍵，請再按一次「學習停止鍵」';
-          render();
-        }
-        toast?.remove();
-      }, 15000);
-    } catch (_) {}
+    }, 15000);
+  }
+
+  function testLearnedStopNow() {
+    const result = invokeLearnedStopReplay();
+    probe.autoStopStatus = result?.ok
+      ? `🧪 已執行停止事件：${result.via}`
+      : '⚠️ 沒有可重播的真正停止事件';
+    render();
+    showStopLearnToast(
+      result?.ok
+        ? '<b style="color:#9ff0be">🧪 已直接重播妳剛才手動停止的同一個事件</b><br><span style="font-size:11px">如果自動轉現在真的停住，80% 觸發也會走同一條路。</span>'
+        : '⚠️ 尚未抓到可以重播的停止事件，請重新學習。',
+      3600
+    );
   }
 
   function explicitStopPattern(text) {
@@ -7491,14 +7668,19 @@ setInterval(xinyaoCheckMaintenance, 10000);
   }
 
   function tryStopAutoplay() {
-    // test38: exact learned button from a real user tap is always first priority.
+    // test39: replay the exact runtime handler captured from the user's real manual ■ stop tap.
+    const replayed = invokeLearnedStopReplay();
+    if (replayed?.ok) return replayed;
+
+    // If only the visual Button could be resolved, keep the older fallback below.
     const learned = findLearnedStopButton();
     if (learned?.button) {
       if (emitSignalCocosClick(learned.button, learned.cocos)) {
-        probe.autoStopLastVia = 'LEARNED exact stop button';
+        probe.autoStopLastVia = 'learned visual Button fallback';
         return { ok:true, via:probe.autoStopLastVia, detail:probe.stopLearnInfo?.path || '' };
       }
     }
+
 
     // 1) Actual ATG visible stop control: rightmost square button beside the active autoplay counter.
     for (const gameWindow of sameOriginSignalWindows()) {
@@ -7610,8 +7792,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
         (document.body || document.documentElement).appendChild(toast);
       }
       const stopText = stopResult?.ok
-        ? '⏹ 已鎖定方形停止鍵，持續確認自動轉停止'
-        : '⚠️ 尚未鎖定方形停止鍵，持續重試';
+        ? '⏹ 已執行真正停止事件，持續確認自動轉停止'
+        : '⚠️ 尚未取得真正停止事件，持續重試';
       toast.innerHTML = `
         <div style="font-size:15px;font-weight:950;color:#ffb8d4;">📡 盤面訊號達標 ${signal.score}%（80%以上自動停轉）</div>
         <div style="margin-top:5px;font-size:10px;opacity:.82;">${esc(signal.reason)}</div>
@@ -7691,6 +7873,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
       #${PANEL_ID} .bp-seq-title{margin-top:8px;font-size:9px;font-weight:850;opacity:.78}
       #${PANEL_ID} .bp-board-toggle{width:100%;margin-top:7px;border:1px solid rgba(255,184,212,.26);border-radius:7px;background:rgba(255,95,158,.08);color:#ffd5e6;padding:5px;font-size:8px;font-weight:850;cursor:pointer}
       #${PANEL_ID} .bp-stop-learn{width:100%;margin-top:5px;border:1px solid rgba(125,236,183,.34);border-radius:7px;background:rgba(63,191,126,.10);color:#c8f8dc;padding:5px;font-size:8px;font-weight:900;cursor:pointer}
+      #${PANEL_ID} .bp-stop-test{width:100%;margin-top:4px;border:1px solid rgba(255,210,96,.34);border-radius:7px;background:rgba(255,196,64,.08);color:#ffe2a0;padding:5px;font-size:8px;font-weight:900;cursor:pointer}
       #${PANEL_ID} .bp-board-wrap{display:none}
       #${PANEL_ID} .bp-board-wrap.open{display:block}
       #${PANEL_ID} .bp-seq-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;margin-top:5px}
@@ -7779,7 +7962,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
         <div class="bp-signal-bar"><i style="width:${Math.max(0, Math.min(100, probe.signalScore))}%"></i></div>
         <div class="bp-signal-reason">${esc(probe.signalReason)}｜僅依已完成盤面統計</div>
         <div class="bp-autostop on">⏹ 自動停轉：固定開啟</div>
-        <button type="button" class="bp-stop-learn">${probe.stopLearnMode ? '🎯 等妳按 ■ 停止鍵…' : (probe.stopLearned ? '✅ 停止鍵已學習｜重新學習' : '🎯 學習停止鍵')}</button>
+        <button type="button" class="bp-stop-learn">${probe.stopLearnMode ? '🎯 等妳按 ■ 停止鍵…' : (probe.stopLearned ? '✅ 真正停止事件已學習｜重新學習' : '🎯 學習真正停止事件')}</button>
+        ${probe.stopLearned ? '<button type="button" class="bp-stop-test">🧪 立即測試停止</button>' : ''}
       </div>
     `;
 
@@ -7834,6 +8018,15 @@ setInterval(xinyaoCheckMaintenance, 10000);
         event.preventDefault();
         event.stopPropagation();
         startStopButtonLearning();
+      };
+    }
+
+    const testButton = body.querySelector('.bp-stop-test');
+    if (testButton) {
+      testButton.onclick = event => {
+        event.preventDefault();
+        event.stopPropagation();
+        testLearnedStopNow();
       };
     }
   }
@@ -7935,7 +8128,9 @@ setInterval(xinyaoCheckMaintenance, 10000);
         autoStopLastVia: probe.autoStopLastVia,
         autoStopAttempts: probe.autoStopAttempts,
         stopLearned: probe.stopLearned,
-        stopLearnInfo: probe.stopLearnInfo
+        stopLearnInfo: probe.stopLearnInfo,
+        stopReplayHandlerCount: Array.isArray(probe.stopReplayRefs) ? probe.stopReplayRefs.length : 0,
+        stopReplayNodeEvent: probe.stopReplayNodeEvent
       };
     } catch (_) {}
   }
