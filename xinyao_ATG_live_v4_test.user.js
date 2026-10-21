@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.35
+// @version      4.0.0-test.36
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -6238,8 +6238,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
     signalHistory: []
   };
 
-  const SIGNAL_THRESHOLD = 75;
-  const SIGNAL_REARM_THRESHOLD = 55;
+  const SIGNAL_THRESHOLD = 80;
+  const SIGNAL_REARM_THRESHOLD = 60;
   const SIGNAL_AUTOSTOP_KEY = 'xinyao_atg_signal_autostop_v1';
   probe.autoStopEnabled = true;
   try { localStorage.setItem(SIGNAL_AUTOSTOP_KEY, '1'); } catch (_) {}
@@ -7021,13 +7021,171 @@ setInterval(xinyaoCheckMaintenance, 10000);
     }
   }
 
-  function tryStopAutoplay() {
-    // First try the game's own explicit stop-auto method when it exists.
-    for (const gameWindow of sameOriginSignalWindows()) {
-      const direct = invokeExplicitAutoplayStopMethod(gameWindow);
-      if (direct?.ok) return direct;
+  function signalNodeWorldPoint(node, cocos) {
+    try {
+      const p = node?.worldPosition || node?._worldPosition;
+      if (Number.isFinite(Number(p?.x)) && Number.isFinite(Number(p?.y))) {
+        return { x:Number(p.x), y:Number(p.y) };
+      }
+    } catch (_) {}
+    try {
+      if (typeof node?.convertToWorldSpaceAR === 'function') {
+        const zero = typeof cocos?.v2 === 'function' ? cocos.v2(0,0) : { x:0, y:0 };
+        const p = node.convertToWorldSpaceAR(zero);
+        if (Number.isFinite(Number(p?.x)) && Number.isFinite(Number(p?.y))) {
+          return { x:Number(p.x), y:Number(p.y) };
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function signalButtonDescriptor(button, cocos) {
+    const node = button?.node;
+    if (!node) return '';
+
+    const parts = [];
+    let cursor = node;
+    for (let depth = 0; cursor && depth < 8; depth += 1) {
+      parts.push(String(cursor.name || ''));
+      cursor = cursor.parent || cursor._parent || null;
     }
-    // 只碰「明確寫著停止自動 / stop auto」的控制，避免把開始自動轉誤按成開啟。
+
+    try {
+      const Label = cocos?.Label;
+      if (Label && typeof node.getComponentsInChildren === 'function') {
+        for (const label of (node.getComponentsInChildren(Label) || [])) {
+          parts.push(String(label?.string ?? label?._string ?? ''));
+        }
+      }
+    } catch (_) {}
+
+    try {
+      const Sprite = cocos?.Sprite;
+      if (Sprite && typeof node.getComponentsInChildren === 'function') {
+        for (const sprite of (node.getComponentsInChildren(Sprite) || [])) {
+          const sf = sprite?.spriteFrame || sprite?._spriteFrame;
+          parts.push(String(sf?.name || sf?._name || ''));
+        }
+      }
+    } catch (_) {}
+
+    try {
+      for (const handler of (Array.isArray(button.clickEvents) ? button.clickEvents : [])) {
+        parts.push(String(handler?.component || ''));
+        parts.push(String(handler?.handler || ''));
+        parts.push(String(handler?.customEventData || ''));
+      }
+    } catch (_) {}
+
+    return parts.filter(Boolean).join(' ');
+  }
+
+  function findAutoplaySquareStopButton(gameWindow) {
+    try {
+      const cocos = gameWindow?.cc || gameWindow?.legacyCC || gameWindow?._cc;
+      const scene = cocos?.director?.getScene?.();
+      const Button = cocos?.Button;
+      if (!scene || !Button || typeof scene.getComponentsInChildren !== 'function') return null;
+
+      const active = findActiveAutoplaySpinButton(gameWindow);
+      if (!active?.button?.node) return null;
+
+      const activePoint = signalNodeWorldPoint(active.button.node, cocos);
+      if (!activePoint) return null;
+
+      let visibleWidth = 0;
+      let visibleHeight = 0;
+      try {
+        const size = cocos?.view?.getVisibleSize?.();
+        visibleWidth = Number(size?.width) || 0;
+        visibleHeight = Number(size?.height) || 0;
+      } catch (_) {}
+
+      const candidates = [];
+      for (const button of (scene.getComponentsInChildren(Button) || [])) {
+        if (!button?.node || button === active.button || button.node.activeInHierarchy === false) continue;
+        try {
+          if (button.interactable === false || button.enabledInHierarchy === false) continue;
+        } catch (_) {}
+
+        const point = signalNodeWorldPoint(button.node, cocos);
+        if (!point) continue;
+
+        const dx = point.x - activePoint.x;
+        const dy = Math.abs(point.y - activePoint.y);
+
+        // ATG auto-play stop is the small square button on the same bottom control row,
+        // to the RIGHT of the big spin/count button (as shown in the user's screenshot).
+        if (!(dx > 0)) continue;
+        if (visibleWidth > 0 && dx > visibleWidth * 0.32) continue;
+        if (visibleHeight > 0 && dy > visibleHeight * 0.11) continue;
+
+        const text = signalButtonDescriptor(button, cocos);
+        const lower = text.toLowerCase();
+
+        // Do not accidentally hit + / buy / menu / speed / room / bet controls.
+        if (/(buy|feature|free|menu|setting|sound|speed|room|table|machine|bet|stake|plus|add|increase|minus|decrease)/i.test(lower)) continue;
+        if (/^s*[+]?s*$/.test(text)) continue;
+
+        let score = 0;
+        if (/(stop|pause|square|cancel|endauto|stopauto|autostop)/i.test(lower)) score += 120;
+
+        // Same-row positional evidence.
+        if (visibleHeight > 0) {
+          const ndy = dy / visibleHeight;
+          if (ndy < 0.025) score += 45;
+          else if (ndy < 0.055) score += 25;
+        } else if (dy < 80) {
+          score += 30;
+        }
+
+        if (visibleWidth > 0) {
+          const ndx = dx / visibleWidth;
+          // On ATG the stop square is usually the second control to the right of the spin button.
+          if (ndx >= 0.08 && ndx <= 0.24) score += 45;
+          else if (ndx > 0 && ndx <= 0.30) score += 20;
+        } else if (dx > 50 && dx < 300) {
+          score += 25;
+        }
+
+        // Square-ish UI node is additional evidence.
+        try {
+          const ui = button.node._uiProps?.uiTransformComp || button.node.getComponent?.(cocos?.UITransform);
+          const w = Number(ui?.width ?? ui?.contentSize?.width ?? 0);
+          const h = Number(ui?.height ?? ui?.contentSize?.height ?? 0);
+          if (w > 0 && h > 0 && Math.abs(w-h) / Math.max(w,h) < 0.28) score += 25;
+        } catch (_) {}
+
+        candidates.push({ button, cocos, text, point, score, dx, dy });
+      }
+
+      candidates.sort((a,b) => b.score - a.score || a.dx - b.dx);
+      const best = candidates[0];
+      if (!best || best.score < 45) return null;
+      return best;
+    } catch (_) {
+      return null;
+    }
+  }
+
+
+  function tryStopAutoplay() {
+    // 1) First priority: the visible square STOP button next to the active autoplay spin counter.
+    // This is the actual control visible in the user's ATG build (e.g. count 29 + square stop button).
+    for (const gameWindow of sameOriginSignalWindows()) {
+      const stop = findAutoplaySquareStopButton(gameWindow);
+      if (!stop) continue;
+      if (emitSignalCocosClick(stop.button, stop.cocos)) {
+        return {
+          ok:true,
+          via:'ATG square stop button',
+          detail:String(stop.text || '').slice(0, 100)
+        };
+      }
+    }
+
+    // 2) Explicit DOM stop controls, when the game exposes them.
     for (const gameWindow of sameOriginSignalWindows()) {
       try {
         const doc = gameWindow.document;
@@ -7044,57 +7202,44 @@ setInterval(xinyaoCheckMaintenance, 10000);
           if (!explicitStopPattern(text)) continue;
           try {
             el.click();
-            return { ok:true, via:'DOM', detail:String(text).slice(0, 80) };
+            return { ok:true, via:'DOM stop control', detail:String(text).slice(0, 80) };
           } catch (_) {}
         }
       } catch (_) {}
+    }
 
+    // 3) Explicit Cocos stop-labelled controls.
+    for (const gameWindow of sameOriginSignalWindows()) {
       try {
         const cocos = gameWindow.cc || gameWindow.legacyCC || gameWindow._cc;
         const scene = cocos?.director?.getScene?.();
         const Button = cocos?.Button;
         if (!scene || !Button || typeof scene.getComponentsInChildren !== 'function') continue;
-        const buttons = scene.getComponentsInChildren(Button) || [];
-        for (const button of buttons) {
-          const node = button?.node;
-          if (!node) continue;
-          const names = [];
-          let cursor = node;
-          for (let depth = 0; cursor && depth < 8; depth += 1) {
-            names.push(String(cursor.name || ''));
-            cursor = cursor.parent || cursor._parent || null;
-          }
-          let labels = '';
-          try {
-            const Label = cocos?.Label;
-            if (Label && typeof node.getComponentsInChildren === 'function') {
-              labels = (node.getComponentsInChildren(Label) || [])
-                .map(label => String(label?.string || label?._string || ''))
-                .join(' ');
-            }
-          } catch (_) {}
-          const handlers = (Array.isArray(button.clickEvents) ? button.clickEvents : [])
-            .map(handler => [handler?.component, handler?.handler, handler?.customEventData].filter(Boolean).join(' '))
-            .join(' ');
-          const text = `${names.join(' ')} ${labels} ${handlers}`;
+
+        for (const button of (scene.getComponentsInChildren(Button) || [])) {
+          const text = signalButtonDescriptor(button, cocos);
           if (!explicitStopPattern(text)) continue;
           if (emitSignalCocosClick(button, cocos)) {
-            return { ok:true, via:'Cocos', detail:text.slice(0, 80) };
+            return { ok:true, via:'Cocos stop control', detail:text.slice(0, 80) };
           }
         }
       } catch (_) {}
     }
 
-    // Fallback for ATG portrait/desktop builds where the stop control is the SAME center spin button.
-    // Only click it when the button itself shows active-autoplay evidence (e.g. remaining count "2"),
-    // so we don't accidentally start a new spin.
+    // 4) Game component method fallback.
+    for (const gameWindow of sameOriginSignalWindows()) {
+      const direct = invokeExplicitAutoplayStopMethod(gameWindow);
+      if (direct?.ok) return direct;
+    }
+
+    // 5) Last fallback: same center spin button, but ONLY when active-autoplay evidence is strong.
     for (const gameWindow of sameOriginSignalWindows()) {
       const active = findActiveAutoplaySpinButton(gameWindow);
-      if (!active) continue;
+      if (!active?.activeEvidence) continue;
       if (emitSignalCocosClick(active.button, active.cocos)) {
         return {
           ok:true,
-          via:'Cocos active spin button',
+          via:'Cocos active spin fallback',
           detail:String(active.text || '').slice(0, 100)
         };
       }
@@ -7105,10 +7250,10 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
   function scheduleAutoplayStopRetries(spinId) {
     const token = ++probe.autoStopRetryToken;
-    probe.autoStopRetryUntil = Date.now() + 4200;
+    probe.autoStopRetryUntil = Date.now() + 6500;
     probe.autoStopAttempts = 1;
 
-    const delays = [140, 320, 620, 1050, 1700, 2600];
+    const delays = [80, 180, 320, 520, 800, 1200, 1800, 2600, 3600, 5000];
     for (const delay of delays) {
       setTimeout(() => {
         if (probe.autoStopRetryToken !== token) return;
@@ -7139,7 +7284,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
         ? '⏹ 正在停止自動轉（會自動重試）'
         : '⚠️ 正在等待可停止的自動轉控制';
       toast.innerHTML = `
-        <div style="font-size:15px;font-weight:950;color:#ffb8d4;">📡 盤面訊號達標 ${signal.score}%</div>
+        <div style="font-size:15px;font-weight:950;color:#ffb8d4;">📡 盤面訊號達標 ${signal.score}%（80%以上自動停轉）</div>
         <div style="margin-top:5px;font-size:10px;opacity:.82;">${esc(signal.reason)}</div>
         <div style="margin-top:6px;font-size:10px;font-weight:800;">${stopText}</div>
       `;
