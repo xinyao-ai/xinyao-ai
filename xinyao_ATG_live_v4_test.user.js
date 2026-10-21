@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.36
+// @version      4.0.0-test.37
 // @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -6234,6 +6234,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     autoStopRetryToken: 0,
     autoStopRetryUntil: 0,
     autoStopAttempts: 0,
+    autoStopLastVia: '',
     multiplierValues: [],
     signalHistory: []
   };
@@ -7089,7 +7090,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
       if (!scene || !Button || typeof scene.getComponentsInChildren !== 'function') return null;
 
       const active = findActiveAutoplaySpinButton(gameWindow);
-      if (!active?.button?.node) return null;
+      if (!active?.button?.node || !active?.activeEvidence) return null;
 
       const activePoint = signalNodeWorldPoint(active.button.node, cocos);
       if (!activePoint) return null;
@@ -7115,77 +7116,162 @@ setInterval(xinyaoCheckMaintenance, 10000);
         const dx = point.x - activePoint.x;
         const dy = Math.abs(point.y - activePoint.y);
 
-        // ATG auto-play stop is the small square button on the same bottom control row,
-        // to the RIGHT of the big spin/count button (as shown in the user's screenshot).
-        if (!(dx > 0)) continue;
-        if (visibleWidth > 0 && dx > visibleWidth * 0.32) continue;
-        if (visibleHeight > 0 && dy > visibleHeight * 0.11) continue;
+        // Must be on the SAME bottom control row and to the RIGHT of the active spin/count button.
+        if (dx <= 0) continue;
+        if (visibleHeight > 0 && dy > visibleHeight * 0.085) continue;
+        if (visibleWidth > 0 && dx > visibleWidth * 0.38) continue;
 
         const text = signalButtonDescriptor(button, cocos);
         const lower = text.toLowerCase();
 
-        // Do not accidentally hit + / buy / menu / speed / room / bet controls.
-        if (/(buy|feature|free|menu|setting|sound|speed|room|table|machine|bet|stake|plus|add|increase|minus|decrease)/i.test(lower)) continue;
-        if (/^s*[+]?s*$/.test(text)) continue;
+        // Never hit known unrelated controls.
+        if (/(buy|feature|free|menu|setting|sound|speed|room|table|machine|bet|stake|minus|decrease)/i.test(lower)) continue;
+
+        const explicitStop = /(stop|pause|square|cancel|endauto|stopauto|autostop)/i.test(lower);
+        const explicitPlus = /(?:^|[^a-z])(plus|add|increase)(?:[^a-z]|$)/i.test(lower);
 
         let score = 0;
-        if (/(stop|pause|square|cancel|endauto|stopauto|autostop)/i.test(lower)) score += 120;
+        if (explicitStop) score += 500;
+        if (explicitPlus) score -= 500;
 
-        // Same-row positional evidence.
-        if (visibleHeight > 0) {
-          const ndy = dy / visibleHeight;
-          if (ndy < 0.025) score += 45;
-          else if (ndy < 0.055) score += 25;
-        } else if (dy < 80) {
-          score += 30;
-        }
-
+        // Position is the key in this ATG build:
+        // the + button is closer to spin, while the ■ stop button is the RIGHTMOST same-row control.
         if (visibleWidth > 0) {
           const ndx = dx / visibleWidth;
-          // On ATG the stop square is usually the second control to the right of the spin button.
-          if (ndx >= 0.08 && ndx <= 0.24) score += 45;
-          else if (ndx > 0 && ndx <= 0.30) score += 20;
-        } else if (dx > 50 && dx < 300) {
-          score += 25;
+          if (ndx >= 0.14 && ndx <= 0.36) score += 180;
+          else if (ndx >= 0.08 && ndx < 0.14) score += 35;
+          else if (ndx > 0 && ndx < 0.08) score -= 40;
         }
 
-        // Square-ish UI node is additional evidence.
+        if (visibleHeight > 0) {
+          const ndy = dy / visibleHeight;
+          if (ndy < 0.018) score += 90;
+          else if (ndy < 0.04) score += 55;
+          else if (ndy < 0.085) score += 20;
+        }
+
+        // Square-ish button gets extra weight.
         try {
-          const ui = button.node._uiProps?.uiTransformComp || button.node.getComponent?.(cocos?.UITransform);
+          const UITransform = cocos?.UITransform;
+          let ui = null;
+          if (UITransform && typeof button.node.getComponent === 'function') ui = button.node.getComponent(UITransform);
+          ui = ui || button.node._uiProps?.uiTransformComp;
           const w = Number(ui?.width ?? ui?.contentSize?.width ?? 0);
           const h = Number(ui?.height ?? ui?.contentSize?.height ?? 0);
-          if (w > 0 && h > 0 && Math.abs(w-h) / Math.max(w,h) < 0.28) score += 25;
+          if (w > 0 && h > 0 && Math.abs(w-h) / Math.max(w,h) < 0.30) score += 35;
         } catch (_) {}
 
-        candidates.push({ button, cocos, text, point, score, dx, dy });
+        candidates.push({
+          button, cocos, text, point, score, dx, dy,
+          explicitStop, explicitPlus
+        });
       }
 
-      candidates.sort((a,b) => b.score - a.score || a.dx - b.dx);
-      const best = candidates[0];
-      if (!best || best.score < 45) return null;
-      return best;
+      if (!candidates.length) return null;
+
+      // Explicit stop name wins. Otherwise choose the RIGHTMOST eligible control,
+      // which matches the visible ATG layout: spin/count -> plus -> square stop.
+      const explicit = candidates
+        .filter(item => item.explicitStop && !item.explicitPlus)
+        .sort((a,b) => b.score - a.score || b.dx - a.dx)[0];
+      if (explicit) return explicit;
+
+      const positional = candidates
+        .filter(item => !item.explicitPlus && item.score >= 35)
+        .sort((a,b) => b.dx - a.dx || b.score - a.score)[0];
+
+      return positional || null;
     } catch (_) {
       return null;
     }
   }
 
+  function dispatchCanvasTapAtWorld(gameWindow, point, cocos) {
+    try {
+      if (!point) return false;
+      const doc = gameWindow?.document;
+      if (!doc) return false;
+
+      const canvas =
+        doc.querySelector('canvas#GameCanvas') ||
+        doc.querySelector('canvas') ||
+        cocos?.game?.canvas ||
+        cocos?.game?._canvas;
+      if (!canvas || typeof canvas.getBoundingClientRect !== 'function') return false;
+
+      const rect = canvas.getBoundingClientRect();
+      let visibleWidth = 0;
+      let visibleHeight = 0;
+      try {
+        const size = cocos?.view?.getVisibleSize?.();
+        visibleWidth = Number(size?.width) || Number(canvas.width) || 0;
+        visibleHeight = Number(size?.height) || Number(canvas.height) || 0;
+      } catch (_) {}
+
+      if (!(visibleWidth > 0) || !(visibleHeight > 0) || !(rect.width > 0) || !(rect.height > 0)) return false;
+
+      const clientX = rect.left + (point.x / visibleWidth) * rect.width;
+      const clientY = rect.top + (1 - (point.y / visibleHeight)) * rect.height;
+
+      try { canvas.focus?.(); } catch (_) {}
+
+      const common = {
+        bubbles:true,
+        cancelable:true,
+        clientX,
+        clientY,
+        screenX:clientX,
+        screenY:clientY,
+        button:0,
+        buttons:1
+      };
+
+      let sent = false;
+      try {
+        if (typeof gameWindow.PointerEvent === 'function') {
+          canvas.dispatchEvent(new gameWindow.PointerEvent('pointerdown', { ...common, pointerId:1, pointerType:'mouse', isPrimary:true }));
+          canvas.dispatchEvent(new gameWindow.PointerEvent('pointerup', { ...common, pointerId:1, pointerType:'mouse', isPrimary:true, buttons:0 }));
+          sent = true;
+        }
+      } catch (_) {}
+
+      try {
+        canvas.dispatchEvent(new gameWindow.MouseEvent('mousedown', common));
+        canvas.dispatchEvent(new gameWindow.MouseEvent('mouseup', { ...common, buttons:0 }));
+        canvas.dispatchEvent(new gameWindow.MouseEvent('click', { ...common, buttons:0 }));
+        sent = true;
+      } catch (_) {}
+
+      return sent;
+    } catch (_) {
+      return false;
+    }
+  }
 
   function tryStopAutoplay() {
-    // 1) First priority: the visible square STOP button next to the active autoplay spin counter.
-    // This is the actual control visible in the user's ATG build (e.g. count 29 + square stop button).
+    // 1) Actual ATG visible stop control: rightmost square button beside the active autoplay counter.
     for (const gameWindow of sameOriginSignalWindows()) {
       const stop = findAutoplaySquareStopButton(gameWindow);
       if (!stop) continue;
-      if (emitSignalCocosClick(stop.button, stop.cocos)) {
+
+      const cocosSent = emitSignalCocosClick(stop.button, stop.cocos);
+      const canvasSent = dispatchCanvasTapAtWorld(gameWindow, stop.point, stop.cocos);
+
+      if (cocosSent || canvasSent) {
+        const via = [
+          cocosSent ? 'Cocos button' : '',
+          canvasSent ? 'canvas tap' : ''
+        ].filter(Boolean).join(' + ');
+        probe.autoStopLastVia = `ATG square stop: ${via}`;
         return {
           ok:true,
-          via:'ATG square stop button',
-          detail:String(stop.text || '').slice(0, 100)
+          via:probe.autoStopLastVia,
+          detail:`dx=${Math.round(stop.dx)} dy=${Math.round(stop.dy)} ${String(stop.text || '').slice(0,80)}`
         };
       }
     }
 
-    // 2) Explicit DOM stop controls, when the game exposes them.
+    // 2) Explicit DOM stop controls.
     for (const gameWindow of sameOriginSignalWindows()) {
       try {
         const doc = gameWindow.document;
@@ -7202,7 +7288,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
           if (!explicitStopPattern(text)) continue;
           try {
             el.click();
-            return { ok:true, via:'DOM stop control', detail:String(text).slice(0, 80) };
+            probe.autoStopLastVia = 'DOM stop control';
+            return { ok:true, via:probe.autoStopLastVia, detail:String(text).slice(0,80) };
           } catch (_) {}
         }
       } catch (_) {}
@@ -7220,28 +7307,19 @@ setInterval(xinyaoCheckMaintenance, 10000);
           const text = signalButtonDescriptor(button, cocos);
           if (!explicitStopPattern(text)) continue;
           if (emitSignalCocosClick(button, cocos)) {
-            return { ok:true, via:'Cocos stop control', detail:text.slice(0, 80) };
+            probe.autoStopLastVia = 'Cocos stop-labelled control';
+            return { ok:true, via:probe.autoStopLastVia, detail:text.slice(0,80) };
           }
         }
       } catch (_) {}
     }
 
-    // 4) Game component method fallback.
+    // 4) Game component stop method.
     for (const gameWindow of sameOriginSignalWindows()) {
       const direct = invokeExplicitAutoplayStopMethod(gameWindow);
-      if (direct?.ok) return direct;
-    }
-
-    // 5) Last fallback: same center spin button, but ONLY when active-autoplay evidence is strong.
-    for (const gameWindow of sameOriginSignalWindows()) {
-      const active = findActiveAutoplaySpinButton(gameWindow);
-      if (!active?.activeEvidence) continue;
-      if (emitSignalCocosClick(active.button, active.cocos)) {
-        return {
-          ok:true,
-          via:'Cocos active spin fallback',
-          detail:String(active.text || '').slice(0, 100)
-        };
+      if (direct?.ok) {
+        probe.autoStopLastVia = direct.via || 'Cocos stop method';
+        return direct;
       }
     }
 
@@ -7250,10 +7328,10 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
   function scheduleAutoplayStopRetries(spinId) {
     const token = ++probe.autoStopRetryToken;
-    probe.autoStopRetryUntil = Date.now() + 6500;
+    probe.autoStopRetryUntil = Date.now() + 8000;
     probe.autoStopAttempts = 1;
 
-    const delays = [80, 180, 320, 520, 800, 1200, 1800, 2600, 3600, 5000];
+    const delays = [40, 90, 150, 230, 330, 460, 620, 850, 1150, 1500, 2100, 3000, 4300, 6000];
     for (const delay of delays) {
       setTimeout(() => {
         if (probe.autoStopRetryToken !== token) return;
@@ -7281,8 +7359,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
         (document.body || document.documentElement).appendChild(toast);
       }
       const stopText = stopResult?.ok
-        ? '⏹ 正在停止自動轉（會自動重試）'
-        : '⚠️ 正在等待可停止的自動轉控制';
+        ? '⏹ 已鎖定方形停止鍵，持續確認自動轉停止'
+        : '⚠️ 尚未鎖定方形停止鍵，持續重試';
       toast.innerHTML = `
         <div style="font-size:15px;font-weight:950;color:#ffb8d4;">📡 盤面訊號達標 ${signal.score}%（80%以上自動停轉）</div>
         <div style="margin-top:5px;font-size:10px;opacity:.82;">${esc(signal.reason)}</div>
@@ -7559,8 +7637,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
       probe.lastSignalSpinId = spinId;
       stopResult = tryStopAutoplay();
       probe.autoStopStatus = stopResult?.ok
-        ? '正在停止自動轉（自動重試）'
-        : '等待自動轉停止控制';
+        ? '已鎖定方形停止鍵，確認停止中'
+        : '尋找方形停止鍵中';
       scheduleAutoplayStopRetries(spinId);
 
       try {
@@ -7590,7 +7668,9 @@ setInterval(xinyaoCheckMaintenance, 10000);
         signalReason: probe.signalReason,
         signalTriggered: probe.signalTriggered,
         autoStopEnabled: probe.autoStopEnabled,
-        autoStopStatus: probe.autoStopStatus
+        autoStopStatus: probe.autoStopStatus,
+        autoStopLastVia: probe.autoStopLastVia,
+        autoStopAttempts: probe.autoStopAttempts
       };
     } catch (_) {}
   }
