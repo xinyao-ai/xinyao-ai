@@ -2,21 +2,13 @@
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
 // @version      4.0.0-test.110
-// @description  v4 HUD 測試版：電腦與全裝置統一使用同一套超小懸浮工具；完整即時助手只在點擊詳細資料時展開，盤面監測預設收合。請勿與正式版同時啟用。
+// @description  test110：目標頁確認後改用 tables 順序對應 spinContent 機台卡順序，直接點第 N 張卡；不再依賴房號 Label 或卡片命名。
 // @match        https://play.godeebxp.com/*
-// @match        https://*.godeebxp.com/*
-// @match        https://gameweb2.rsgaming955.com/*
-// @match        https://*.rsgaming955.com/*
 // @run-at       document-start
 // @inject-into  page
 // @weight       999
 // @grant        none
 // ==/UserScript==
-
-try {
-  window.__XIANYAO_ATG_TEST110_HOST__ = location.hostname;
-  window.__XIANYAO_ATG_TEST110_URL__ = location.href;
-} catch (_) {}
 
 // ===== 芯瑤 ATG 全域維護控制 =====
 const XIANYAO_MAINTENANCE_ENDPOINT = 'https://xinyao-atg-live.love06130430.workers.dev/maintenance';
@@ -2670,6 +2662,16 @@ try {
             try {
               const eventHint = typeof args[0] === 'string' ? args[0] : '';
               applyOutboundRoomFromTransport(args, eventHint);
+
+              // 保存 ATG 真正的選房 Socket 與完整參數模板。
+              // token / callback 都沿用 ATG 自己當下有效的資料；之後只替換 roomId。
+              if (/^getSlotTableDetail$/i.test(eventHint)) {
+                window.__XIANYAO_ATG_DIRECT_ROOM__ = {
+                  socket: this,
+                  args: args.slice(),
+                  capturedAt: Date.now()
+                };
+              }
             } catch (_) {}
             return nativeEmit.apply(this, args);
           };
@@ -3758,7 +3760,9 @@ try {
     autoTimer: null,
     renderTimer: null,
     // v3.2.4：全裝置滑動全房分析時暫停重建 DOM，避免手指滑動被即時刷新打斷。
-    panelInteractingUntil: 0
+    panelInteractingUntil: 0,
+    enterRoomBusy: false,
+    enterRoomStatus: ''
   };
 
   function clearStoredFullScanSession() {
@@ -5230,7 +5234,7 @@ try {
             // 點到鄰近頁時，不換裝置模板；直接依真實落頁修正 X。
             xRatio = clamp(xRatio + (page - landed) * step, 0.025, 0.965);
             state.pageIntent = null;
-            await delay(100);
+            await roomWait(100);
             continue;
           }
 
@@ -5339,7 +5343,7 @@ try {
         return { ok: true, changed: false };
       }
 
-      await delay(180);
+      await roomWait(180);
     }
 
     state.pageIntent = null;
@@ -5773,17 +5777,874 @@ try {
     setTimeout(() => { if (el) el.textContent = old; }, 1500);
   }
 
+  const roomWait = ms => new Promise(resolve => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+
+  function sameOriginRoomWindows() {
+    const out = [];
+    const seen = new Set();
+    const visit = w => {
+      if (!w || seen.has(w)) return;
+      seen.add(w);
+      try {
+        void w.location.href;
+        out.push(w);
+        for (let i = 0; i < w.frames.length; i += 1) visit(w.frames[i]);
+      } catch (_) {}
+    };
+    visit(window);
+    return out;
+  }
+
+  function cocosButtonText(button, cocos) {
+    try {
+      const node = button?.node;
+      const Label = cocos?.Label;
+      if (!node || !Label || typeof node.getComponentsInChildren !== 'function') return '';
+      return (node.getComponentsInChildren(Label) || [])
+        .map(label => String(label?.string ?? label?._string ?? '').trim())
+        .filter(Boolean)
+        .join(' | ');
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function cocosNodePath(node) {
+    const parts = [];
+    let cur = node;
+    for (let i = 0; cur && i < 10; i += 1) {
+      const name = String(cur?.name || '').trim();
+      if (name) parts.push(name);
+      cur = cur.parent || cur._parent || null;
+    }
+    return parts.reverse().join('/');
+  }
+
+  function emitRoomCocosButton(button, cocos) {
+    if (!button?.node) return false;
+    try {
+      if (button.interactable === false || button.enabledInHierarchy === false) return false;
+    } catch (_) {}
+
+    try {
+      if (typeof button._emitButtonEvent === 'function') {
+        button._emitButtonEvent();
+        return true;
+      }
+    } catch (_) {}
+    try {
+      if (typeof button._emitClickEvent === 'function') {
+        button._emitClickEvent();
+        return true;
+      }
+    } catch (_) {}
+    try {
+      const events = Array.isArray(button.clickEvents) ? button.clickEvents : [];
+      const EventHandler = cocos?.Component?.EventHandler || cocos?.EventHandler;
+      if (events.length && typeof EventHandler?.emitEvents === 'function') {
+        EventHandler.emitEvents(events, button);
+        return true;
+      }
+    } catch (_) {}
+    try {
+      const type = cocos?.Button?.EventType?.CLICK || 'click';
+      button.node.emit?.(type, button);
+      return true;
+    } catch (_) {}
+    return false;
+  }
+
+  function findRoomCocosButton(matchFn) {
+    for (const w of sameOriginRoomWindows()) {
+      try {
+        const cocos = w.cc || w.legacyCC || w._cc;
+        const scene = cocos?.director?.getScene?.();
+        const Button = cocos?.Button;
+        if (!scene || !Button || typeof scene.getComponentsInChildren !== 'function') continue;
+        const buttons = scene.getComponentsInChildren(Button) || [];
+        for (const button of buttons) {
+          const node = button?.node;
+          if (!node || node.activeInHierarchy === false) continue;
+          const text = cocosButtonText(button, cocos);
+          const path = cocosNodePath(node);
+          if (matchFn({ button, cocos, text, path, window:w })) {
+            return { button, cocos, text, path, window:w };
+          }
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  function currentRoomNumberForOpenButton() {
+    const id = finiteNumber(state.currentSelectedRoomId);
+    if (id !== null) {
+      const mapped = roomNumberByRoomIdFromScanner(id);
+      if (mapped !== null) return mapped;
+    }
+    try {
+      const n = finiteNumber(window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.roomNumber);
+      if (n !== null) return n;
+    } catch (_) {}
+    return null;
+  }
+
+  function machineSelectionLooksOpen() {
+    // ATG 不同版型文字不一致：有些顯示「顯示全部/顯示空桌」，
+    // 有些只有頁碼列 + 房號格 +「選取」。
+    // 因此改成多證據判斷，不再只靠標題文字。
+    for (const w of sameOriginRoomWindows()) {
+      try {
+        const cocos = w.cc || w.legacyCC || w._cc;
+        const scene = cocos?.director?.getScene?.();
+        const Button = cocos?.Button;
+        if (!scene || !Button || typeof scene.getComponentsInChildren !== 'function') continue;
+
+        const buttons = scene.getComponentsInChildren(Button) || [];
+        let pageButtonCount = 0;
+        let roomNumberButtonCount = 0;
+        let hasSelectionControl = false;
+
+        for (const button of buttons) {
+          const node = button?.node;
+          if (!node || node.activeInHierarchy === false) continue;
+          const text = cocosButtonText(button, cocos);
+          const labels = String(text || '').split('|').map(v => v.trim()).filter(Boolean);
+          const path = cocosNodePath(node);
+
+          if (labels.some(v => /^(?:[1-9])$/.test(v))) pageButtonCount += 1;
+          if (labels.some(v => /^\d{3,4}$/.test(v))) roomNumberButtonCount += 1;
+          if (
+            labels.some(v => /^(?:選取|选择|選擇|確定|确认|確認)$/.test(v)) ||
+            /(顯示全部|顯示空桌|選擇機台|选择机台)/.test(text) ||
+            /(?:Select|Choose).*(?:Table|Room|Machine)/i.test(path)
+          ) {
+            hasSelectionControl = true;
+          }
+        }
+
+        if (hasSelectionControl && (pageButtonCount >= 2 || roomNumberButtonCount >= 4)) return true;
+        if (pageButtonCount >= 4 && roomNumberButtonCount >= 6) return true;
+      } catch (_) {}
+    }
+    return false;
+  }
+
+  async function openMachineSelectionForAutoEnter() {
+    if (machineSelectionLooksOpen()) return true;
+
+    const currentRoom = currentRoomNumberForOpenButton();
+    let found = null;
+
+    if (currentRoom !== null) {
+      const exact = String(Math.trunc(currentRoom));
+      found = findRoomCocosButton(({text,path}) => {
+        const labels = String(text || '').split('|').map(v => v.trim());
+        const hasExact = labels.some(v => v === exact);
+        return hasExact && /(table|room|machine|select|change|switch|button|spinbar)/i.test(path);
+      });
+    }
+
+    if (!found) {
+      found = findRoomCocosButton(({text,path}) =>
+        /(選擇機台|換房|換桌|機台)/.test(text) ||
+        /(?:table|room|machine).*(?:select|switch|change)/i.test(path)
+      );
+    }
+
+    if (found && emitRoomCocosButton(found.button, found.cocos)) {
+      // 已經送出開啟事件，下面統一等待。
+    } else {
+      // ATG 實機已知目前房按鈕常為 slotTable2Btn > num。
+      let semanticCurrent = null;
+      const currentRoom = currentRoomNumberForOpenButton();
+      if (currentRoom !== null) {
+        const exact = String(Math.trunc(currentRoom));
+        for (const gameWindow of collectSameOriginWindows()) {
+          try {
+            const cocos = gameWindow.cc || gameWindow.legacyCC || gameWindow._cc;
+            const scene = cocos?.director?.getScene?.();
+            const Label = cocos?.Label;
+            if (!scene || !Label || typeof scene.getComponentsInChildren !== 'function') continue;
+            for (const label of (scene.getComponentsInChildren(Label) || [])) {
+              const text = String(label?.string ?? label?._string ?? '').trim();
+              if (text !== exact) continue;
+              const path = roomLabelPath(label);
+              if (/spincontent/.test(path)) continue;
+              if (!/(slottable.*btn|buttons|control|bottom|spinbar)/i.test(path)) continue;
+              const target = cocosClickableForLabel({ label, cocos, gameWindow });
+              if (target?.node) {
+                semanticCurrent = target;
+                break;
+              }
+            }
+          } catch (_) {}
+          if (semanticCurrent) break;
+        }
+      }
+      if (!semanticCurrent || !emitCocosClick(semanticCurrent)) return false;
+    }
+
+    const started = Date.now();
+    while (Date.now() - started < 2600) {
+      if (machineSelectionLooksOpen()) return true;
+      await roomWait(100);
+    }
+    return machineSelectionLooksOpen();
+  }
+
+  function roomLabelPath(label) {
+    const names = [];
+    let node = label?.node || null;
+    for (let depth = 0; node && depth < 12; depth += 1) {
+      names.push(String(node.name || '').toLowerCase());
+      node = node.parent || node._parent || null;
+    }
+    return names.join('/');
+  }
+
+  function scannerNodeWorldPoint(node, cocos) {
+    try {
+      const p = node?.worldPosition || node?._worldPosition;
+      if (Number.isFinite(Number(p?.x)) && Number.isFinite(Number(p?.y))) {
+        return { x:Number(p.x), y:Number(p.y) };
+      }
+    } catch (_) {}
+    try {
+      if (typeof node?.convertToWorldSpaceAR === 'function') {
+        const zero = typeof cocos?.v2 === 'function' ? cocos.v2(0,0) : { x:0, y:0 };
+        const p = node.convertToWorldSpaceAR(zero);
+        if (Number.isFinite(Number(p?.x)) && Number.isFinite(Number(p?.y))) {
+          return { x:Number(p.x), y:Number(p.y) };
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function findSelectionSpinContent() {
+    for (const gameWindow of collectSameOriginWindows()) {
+      try {
+        const cocos = gameWindow.cc || gameWindow.legacyCC || gameWindow._cc;
+        const scene = cocos?.director?.getScene?.();
+        if (!scene) continue;
+
+        const stack = [scene];
+        const candidates = [];
+        while (stack.length) {
+          const node = stack.pop();
+          if (!node) continue;
+          const children = node.children || node._children || [];
+          for (const child of children) stack.push(child);
+
+          if (node.activeInHierarchy === false) continue;
+          const name = String(node.name || '').toLowerCase();
+          if (!name.includes('spincontent')) continue;
+
+          const childCount = Array.isArray(children) ? children.filter(Boolean).length : 0;
+          candidates.push({ node, cocos, gameWindow, childCount });
+        }
+
+        if (candidates.length) {
+          candidates.sort((a,b) => b.childCount - a.childCount);
+          return candidates[0];
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  function findButtonInsideNode(root, cocos) {
+    if (!root) return null;
+    const Button = cocos?.Button;
+    if (!Button) return null;
+
+    try {
+      const direct = root.getComponent?.(Button);
+      if (direct) return direct;
+    } catch (_) {}
+
+    try {
+      const list = root.getComponentsInChildren?.(Button) || [];
+      const usable = list.filter(button => {
+        const node = button?.node;
+        if (!node || node.activeInHierarchy === false) return false;
+        try {
+          if (button.enabledInHierarchy === false || button.interactable === false) return false;
+        } catch (_) {}
+        return true;
+      });
+      if (!usable.length) return null;
+
+      usable.sort((a,b) => {
+        const ap = cocosNodePath(a?.node).toLowerCase();
+        const bp = cocosNodePath(b?.node).toLowerCase();
+        const score = path => {
+          let s = 0;
+          if (/slot.*table.*btn/.test(path) && !/slot.*table.*2.*btn/.test(path)) s += 100;
+          if (/(button|btn)$/.test(path)) s += 20;
+          return s;
+        };
+        return score(bp) - score(ap);
+      });
+      return usable[0] || null;
+    } catch (_) {}
+
+    return null;
+  }
+
+  function indexedRoomCardTarget(index, expectedCount = 0) {
+    const wantedIndex = Math.trunc(finiteNumber(index) ?? -1);
+    if (wantedIndex < 0) return null;
+
+    const spin = findSelectionSpinContent();
+    if (!spin?.node) return null;
+
+    const rawChildren = (spin.node.children || spin.node._children || [])
+      .filter(node => node && node.activeInHierarchy !== false);
+
+    const cards = [];
+    for (const child of rawChildren) {
+      const button = findButtonInsideNode(child, spin.cocos);
+      if (!button?.node) continue;
+
+      const path = cocosNodePath(button.node).toLowerCase();
+      // 排除頁碼、篩選、底部選取等控制；spinContent 內通常只剩機台卡，
+      // 但保留這層防呆避免版型更新後混入其他控制。
+      const text = cocosButtonText(button, spin.cocos).replace(/\s+/g,'').trim();
+      if (/^(?:[1-9]|選取|选择|選擇|確定|确认|確認|顯示全部|顯示空桌)$/.test(text)) continue;
+      if (/slot.*table.*2.*btn/.test(path)) continue;
+
+      const point = scannerNodeWorldPoint(child, spin.cocos) || scannerNodeWorldPoint(button.node, spin.cocos);
+      cards.push({
+        root:child,
+        button,
+        node:button.node,
+        cocos:spin.cocos,
+        gameWindow:spin.gameWindow,
+        point,
+        path,
+        text
+      });
+    }
+
+    // 正常 direct children 順序就與 tables 一致；若引擎重排 children，
+    // 則用畫面位置恢復「由上到下、由左到右」的格子順序。
+    if (cards.length && cards.every(card => card.point && Number.isFinite(card.point.x) && Number.isFinite(card.point.y))) {
+      cards.sort((a,b) => {
+        const dy = b.point.y - a.point.y;
+        if (Math.abs(dy) > 8) return dy;
+        return a.point.x - b.point.x;
+      });
+    }
+
+    if (expectedCount > 0 && cards.length < expectedCount) {
+      return {
+        error:'not-enough-card-targets',
+        count:cards.length,
+        expected:expectedCount,
+        all:cards
+      };
+    }
+
+    return cards[wantedIndex] || {
+      error:'card-index-out-of-range',
+      count:cards.length,
+      expected:expectedCount,
+      index:wantedIndex,
+      all:cards
+    };
+  }
+
+  function findVisibleRoomSemanticTarget(roomNumber) {
+    const wanted = Math.trunc(finiteNumber(roomNumber) || 0);
+    if (!wanted) return null;
+
+    for (const gameWindow of collectSameOriginWindows()) {
+      try {
+        const cocos = gameWindow.cc || gameWindow.legacyCC || gameWindow._cc;
+        const scene = cocos?.director?.getScene?.();
+        const Label = cocos?.Label;
+        if (!scene || !Label || typeof scene.getComponentsInChildren !== 'function') continue;
+
+        const labels = scene.getComponentsInChildren(Label) || [];
+        for (const label of labels) {
+          const node = label?.node;
+          if (!node || node.activeInHierarchy === false) continue;
+
+          const text = String(label?.string ?? label?._string ?? '').trim();
+          if (!/^\d{1,4}$/.test(text)) continue;
+          const visibleNumber = Number(text);
+          if (!Number.isFinite(visibleNumber) || visibleNumber !== wanted) continue;
+
+          // 真正的候選機台卡已知結構為 slotTableBtn > ... > num。
+          // slotTable2Btn 是遊戲底部目前房號，必須排除。
+          let cursor = node;
+          let slotNode = null;
+          const names = [];
+          for (let depth = 0; cursor && depth < 24; depth += 1) {
+            const name = String(cursor.name || '').toLowerCase();
+            names.push(name);
+            if (name === 'slottable2btn' || /slottable2btn/.test(name)) {
+              slotNode = null;
+              break;
+            }
+            if (name === 'slottablebtn' || (/slot.*table.*btn/.test(name) && !/slot.*table.*2.*btn/.test(name))) {
+              slotNode = cursor;
+              break;
+            }
+            cursor = cursor.parent || cursor._parent || null;
+          }
+
+          if (!slotNode) continue;
+
+          let target = cocosClickableForLabel({ label, cocos, gameWindow });
+          if (!target?.node || /slottable2btn/i.test(cocosNodePath(target.node))) {
+            target = { node:slotNode, button:null, label, cocos, gameWindow };
+          }
+
+          return {
+            ...target,
+            roomNumber:wanted,
+            visibleText:text,
+            path:names.join('/')
+          };
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  function currentPageDataHasRoom(roomNumber) {
+    const wanted = Math.trunc(finiteNumber(roomNumber) || 0);
+    if (!wanted) return false;
+    return (Array.isArray(state.latestTableNumbers) ? state.latestTableNumbers : [])
+      .some(value => Math.trunc(finiteNumber(value) || 0) === wanted);
+  }
+
+  async function waitForCurrentPageDataRoom(roomNumber, timeout = 1800) {
+    const started = Date.now();
+    while (Date.now() - started < timeout) {
+      if (currentPageDataHasRoom(roomNumber)) return true;
+      await roomWait(80);
+    }
+    return currentPageDataHasRoom(roomNumber);
+  }
+
+  async function waitForVisibleRoomTarget(roomNumber, timeout = 1400) {
+    const started = Date.now();
+    while (Date.now() - started < timeout) {
+      const target = findVisibleRoomSemanticTarget(roomNumber);
+      if (target) return target;
+      await roomWait(80);
+    }
+    return null;
+  }
+
+  async function forceSemanticPageForEnter(page, totalPages) {
+    const targetSet = findSemanticPagerTargets(totalPages);
+    if (!targetSet) return false;
+
+    setPageIntent(page);
+    const sent = activateSemanticPagerTarget(targetSet, page);
+    if (!sent) {
+      state.pageIntent = null;
+      return false;
+    }
+
+    // 這裡不使用「已掃過/已快取」判斷，因為我們要的是畫面真的切頁。
+    await roomWait(260);
+
+    const started = Date.now();
+    while (Date.now() - started < 1500) {
+      const inferred = finiteNumber(state.latestInferredPage) ?? finiteNumber(state.currentPage);
+      if (inferred === page) {
+        state.pageIntent = null;
+        return true;
+      }
+      await roomWait(80);
+    }
+
+    state.pageIntent = null;
+    // 即使 metadata 沒更新，Cocos 畫面通常已經切頁；允許後續直接用 Label 檢查。
+    return true;
+  }
+
+  async function locateAndSelectRoomByVisibleNumber(roomNumber) {
+    const number = Math.trunc(finiteNumber(roomNumber) || 0);
+    if (!number) return { ok:false, reason:'invalid-room-number' };
+
+    const totalPages = Math.max(1, Math.trunc(finiteNumber(state.totalPages) || 9));
+
+    for (let page = 1; page <= totalPages; page += 1) {
+      state.enterRoomStatus = `🔎 尋找 ${String(number).padStart(4,'0')} 房｜第 ${page}/${totalPages} 頁`;
+      scheduleRender();
+
+      const beforeSeq = state.pageLoadSeq;
+      const moved = await forceSemanticPageForEnter(page, totalPages);
+      if (!moved) continue;
+
+      // 關鍵：跟全房掃描完全相同，直接看這一頁 ATG 回傳的 tables 房號。
+      const dataStarted = Date.now();
+      while (Date.now() - dataStarted < 2200) {
+        if (state.pageLoadSeq > beforeSeq || finiteNumber(state.currentPage) === page) {
+          if (currentPageDataHasRoom(number)) break;
+        }
+        await roomWait(80);
+      }
+
+      const pageHasTarget = currentPageDataHasRoom(number);
+      if (!pageHasTarget) continue;
+
+      const pageNumbers = (Array.isArray(state.latestTableNumbers) ? state.latestTableNumbers : [])
+        .map(value => Math.trunc(finiteNumber(value) || 0));
+      const targetIndex = pageNumbers.findIndex(value => value === number);
+      if (targetIndex < 0) {
+        return { ok:false, reason:`page-data-index-missing-page-${page}` };
+      }
+
+      state.enterRoomStatus = `✅ 第 ${page} 頁確認 ${String(number).padStart(4,'0')} 是第 ${targetIndex + 1} 張｜定位卡片…`;
+      scheduleRender();
+
+      const target = indexedRoomCardTarget(targetIndex, pageNumbers.length);
+      if (!target || target.error) {
+        return {
+          ok:false,
+          reason:`indexed-card-failed-page-${page}-index-${targetIndex + 1}-${target?.error || 'unknown'}-${target?.count ?? 0}of${pageNumbers.length}`
+        };
+      }
+
+      state.enterRoomStatus = `🎯 點第 ${targetIndex + 1} 張機台卡（${String(number).padStart(4,'0')}）…`;
+      scheduleRender();
+
+      const beforeCapture = Number(window.__XIANYAO_ATG_DIRECT_ROOM__?.capturedAt || 0);
+      if (!emitCocosClick(target)) {
+        return { ok:false, reason:`indexed-card-click-failed-page-${page}-index-${targetIndex + 1}` };
+      }
+
+      const started = Date.now();
+      while (Date.now() - started < 2600) {
+        const cap = window.__XIANYAO_ATG_DIRECT_ROOM__;
+        if (Number(cap?.capturedAt || 0) > beforeCapture) {
+          return { ok:true, page, capture:cap };
+        }
+        await roomWait(80);
+      }
+
+      return { ok:false, reason:`card-click-no-getSlotTableDetail-page-${page}` };
+    }
+
+    return { ok:false, reason:'room-number-not-found-in-page-data' };
+  }
+
+  function cloneWithTargetRoomId(value, targetRoomId, depth = 0, seen = new WeakMap()) {
+    if (depth > 12 || value == null) return value;
+    if (typeof value !== 'object') return value;
+    if (typeof value === 'function') return value;
+    if (seen.has(value)) return seen.get(value);
+
+    if (Array.isArray(value)) {
+      const out = [];
+      seen.set(value, out);
+      for (const item of value) out.push(cloneWithTargetRoomId(item, targetRoomId, depth + 1, seen));
+      return out;
+    }
+
+    const out = {};
+    seen.set(value, out);
+    for (const [key, raw] of Object.entries(value)) {
+      const normalized = String(key).replace(/[^a-z0-9]/gi, '').toLowerCase();
+      if (normalized === 'roomid') out[key] = targetRoomId;
+      else out[key] = cloneWithTargetRoomId(raw, targetRoomId, depth + 1, seen);
+    }
+    return out;
+  }
+
+  function directRoomSelectorSnapshot() {
+    const info = window.__XIANYAO_ATG_DIRECT_ROOM__;
+    if (!info?.socket || !Array.isArray(info.args) || !/^getSlotTableDetail$/i.test(String(info.args[0] || ''))) {
+      return null;
+    }
+    try {
+      if (info.socket.disconnected === true || info.socket.connected === false) return null;
+    } catch (_) {}
+    return info;
+  }
+
+  function emitDirectRoomSelection(roomId) {
+    const id = finiteNumber(roomId);
+    if (id === null) return { ok:false, reason:'invalid-room-id' };
+
+    const info = directRoomSelectorSnapshot();
+    if (!info) return { ok:false, reason:'selector-not-captured' };
+
+    const nextArgs = info.args.map((arg, index) => {
+      if (index === 0) return arg;
+      if (typeof arg === 'function') return arg;
+      return cloneWithTargetRoomId(arg, id);
+    });
+
+    // 防呆：如果模板中完全沒有 roomId，就不要亂送。
+    let hasRoomId = false;
+    const inspect = (value, depth = 0, seen = new WeakSet()) => {
+      if (hasRoomId || depth > 12 || !value || typeof value !== 'object' || seen.has(value)) return;
+      seen.add(value);
+      for (const [key, raw] of Object.entries(value)) {
+        if (String(key).replace(/[^a-z0-9]/gi,'').toLowerCase() === 'roomid' && finiteNumber(raw) === id) {
+          hasRoomId = true;
+          return;
+        }
+        if (raw && typeof raw === 'object') inspect(raw, depth + 1, seen);
+      }
+    };
+    nextArgs.slice(1).forEach(arg => inspect(arg));
+    if (!hasRoomId) return { ok:false, reason:'template-has-no-roomId' };
+
+    try {
+      info.socket.emit(...nextArgs);
+      return { ok:true, capturedAt:info.capturedAt };
+    } catch (error) {
+      return { ok:false, reason:String(error?.message || error) };
+    }
+  }
+
+  function findTargetRoomButton(roomNumber) {
+    const exact = String(Math.trunc(roomNumber));
+
+    // 先鎖定「房號文字本身」，再往父層找最近的 cc.Button。
+    // 這可避免 Button 的子孫文字包含其他房號，誤點到目前已選中的舊房。
+    for (const w of sameOriginRoomWindows()) {
+      try {
+        const cocos = w.cc || w.legacyCC || w._cc;
+        const scene = cocos?.director?.getScene?.();
+        const Button = cocos?.Button;
+        const Label = cocos?.Label;
+        if (!scene || !Button || !Label || typeof scene.getComponentsInChildren !== 'function') continue;
+
+        const labels = scene.getComponentsInChildren(Label) || [];
+        for (const label of labels) {
+          const value = String(label?.string ?? label?._string ?? '').trim();
+          if (value !== exact) continue;
+
+          let node = label?.node || null;
+          for (let depth = 0; node && depth < 8; depth += 1) {
+            let button = null;
+            try { button = node.getComponent?.(Button) || null; } catch (_) {}
+            if (!button) {
+              try {
+                const list = node.getComponents?.(Button) || [];
+                button = list[0] || null;
+              } catch (_) {}
+            }
+
+            if (button?.node && button.node.activeInHierarchy !== false) {
+              const path = cocosNodePath(button.node);
+
+              // 排除底部目前房號/HUD，只接受選機台視窗內的卡片/項目。
+              if (!/(spinbar|hud|bottom|footer|current)/i.test(path)) {
+                return {
+                  button,
+                  cocos,
+                  text: cocosButtonText(button, cocos),
+                  path,
+                  window: w,
+                  labelNode: label.node
+                };
+              }
+            }
+
+            node = node.parent || node._parent || null;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Label→父層 Button 找不到時才退回舊方法。
+    return findRoomCocosButton(({text,path}) => {
+      const labels = String(text || '').split('|').map(v => v.trim());
+      if (!labels.some(v => v === exact)) return false;
+      return /(table|room|machine|item|cell|card|grid|list|choose|select)/i.test(path) &&
+        !/(spinbar|hud|bottom|footer|current)/i.test(path);
+    });
+  }
+
+  function findConfirmRoomButton() {
+    return findRoomCocosButton(({text,path}) => {
+      const t = String(text || '').replace(/\s+/g,'').trim();
+      if (['確定','确认','確認','選取','选择','選擇','進入','进入'].includes(t)) return true;
+      return /(?:confirm|select|choose|enter).*(?:table|room|machine)/i.test(path);
+    });
+  }
+
+  function selectedRoomNumberFromState() {
+    const id = finiteNumber(state.currentSelectedRoomId);
+    if (id !== null) {
+      const mapped = roomNumberByRoomIdFromScanner(id);
+      if (mapped !== null) return mapped;
+    }
+    return null;
+  }
+
+  async function navigateToPageForEnter(targetPage) {
+    const page = Math.trunc(finiteNumber(targetPage) || 0);
+    if (page < 1 || page > Math.max(1, Math.trunc(finiteNumber(state.totalPages) || 9))) return false;
+
+    const current = finiteNumber(state.latestInferredPage) ?? finiteNumber(state.currentPage);
+    if (current === page) return true;
+
+    // 1) 優先直接點 Cocos「選擇機台」上方頁碼，避免掃描資料已快取時被誤判成不用翻頁。
+    const pageText = String(page);
+    const direct = findRoomCocosButton(({text,path}) => {
+      const labels = String(text || '').split('|').map(v => v.trim());
+      const exact = labels.some(v => v === pageText);
+      if (!exact) return false;
+      return /(page|pager|pagination|tab|button|table|machine|select)/i.test(path);
+    });
+
+    if (direct) {
+      const beforeSeq = state.pageLoadSeq;
+      const beforePage = finiteNumber(state.latestInferredPage) ?? finiteNumber(state.currentPage);
+      setPageIntent(page);
+      if (emitRoomCocosButton(direct.button, direct.cocos)) {
+        const landed = await waitForPagerLanding(beforeSeq, beforePage, page, 2200);
+        const after = finiteNumber(landed?.landedPage) ?? finiteNumber(state.latestInferredPage) ?? finiteNumber(state.currentPage);
+        if (after === page) {
+          state.pageIntent = null;
+          return true;
+        }
+      }
+      state.pageIntent = null;
+    }
+
+    // 2) Cocos 節點抓不到時，使用全房掃描已驗證的自適應頁碼座標。
+    const profile = fixedPagerProfile();
+    if (!profile) return false;
+
+    const calibration = activePagerCalibration(profile);
+    const hypotheses = calibration
+      ? [{ id:'learned', x0:calibration.startX, step:calibration.stepX, y:calibration.y }]
+      : (profile.hypotheses?.length ? profile.hypotheses : [profile]);
+
+    const yCandidates = buildPagerYProbeList(profile, state.learnedPagerY);
+    for (const hypothesis of hypotheses) {
+      const xRatio = calibration
+        ? pagePoint(calibration, page)?.x
+        : finiteNumber(hypothesis.x0) + (page - 1) * finiteNumber(hypothesis.step);
+      if (!Number.isFinite(xRatio)) continue;
+
+      for (const yRatio of yCandidates) {
+        const point = pointForFixedProfile(profile, page, hypothesis, xRatio, yRatio);
+        if (!point) continue;
+
+        const beforeSeq = state.pageLoadSeq;
+        const beforePage = finiteNumber(state.latestInferredPage) ?? finiteNumber(state.currentPage);
+        setPageIntent(page);
+
+        const sent = dispatchClientPoint(point.x, point.y, profile.target || null);
+        if (!sent) {
+          state.pageIntent = null;
+          continue;
+        }
+
+        const landed = await waitForPagerLanding(beforeSeq, beforePage, page, 1800);
+        const after = finiteNumber(landed?.landedPage) ?? finiteNumber(state.latestInferredPage) ?? finiteNumber(state.currentPage);
+        state.pageIntent = null;
+
+        if (after === page) {
+          rememberPagerSample(profile, page, point.xRatio, point.yRatio);
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  async function enterRoomFromRanking(roomNumber, roomId) {
+    const number = finiteNumber(roomNumber);
+    const id = finiteNumber(roomId);
+    if (number === null || state.enterRoomBusy) return;
+
+    state.enterRoomBusy = true;
+    state.enterRoomStatus = `🚪 準備進入 ${Math.trunc(number)} 房…`;
+    scheduleRender();
+
+    try {
+      state.enterRoomStatus = `🚪 正在確認「選擇機台」畫面…`;
+      scheduleRender();
+
+      const opened = await openMachineSelectionForAutoEnter();
+      if (!opened) throw new Error('無法辨識「選擇機台」畫面');
+
+      state.enterRoomStatus = `✅ 已開啟選擇機台｜準備定位 ${Math.trunc(number)} 房`;
+      scheduleRender();
+
+      state.enterRoomStatus = `🔎 開始逐頁尋找 ${Math.trunc(number)} 房…`;
+      scheduleRender();
+
+      const located = await locateAndSelectRoomByVisibleNumber(number);
+      if (!located.ok) {
+        if (located.reason === 'room-number-not-found-in-page-data') {
+          throw new Error(`ATG 1～${Math.max(1, Math.trunc(finiteNumber(state.totalPages) || 9))} 頁回傳資料都沒有 ${String(Math.trunc(number)).padStart(4,'0')} 房`);
+        }
+        if (/^indexed-card-failed-page-/.test(located.reason)) {
+          throw new Error(`ATG 已找到目標房，但機台格子數量／順序無法對應：${located.reason}`);
+        }
+        throw new Error(`選房失敗：${located.reason}`);
+      }
+
+      state.enterRoomStatus = `✅ 已在第 ${located.page ?? '目前'} 頁實際點到 ${Math.trunc(number)} 房｜準備按「選取」`;
+      scheduleRender();
+
+      await roomWait(220);
+      let confirm = findConfirmRoomButton();
+      if (!confirm) {
+        await roomWait(300);
+        confirm = findConfirmRoomButton();
+      }
+      if (!confirm) throw new Error('找不到「選取／確定」按鈕');
+
+      state.enterRoomStatus = `🚪 ${Math.trunc(number)} 房已選取，正在確認…`;
+      scheduleRender();
+
+      if (!emitRoomCocosButton(confirm.button, confirm.cocos)) {
+        throw new Error('選取／確定按鈕無法點擊');
+      }
+
+      state.enterRoomStatus = `✅ 已送出進入 ${Math.trunc(number)} 房`;
+      scheduleRender();
+      setTimeout(() => {
+        if (state.enterRoomStatus.startsWith('✅')) {
+          state.enterRoomStatus = '';
+          scheduleRender();
+        }
+      }, 3500);
+    } catch (error) {
+      state.enterRoomStatus = `⚠️ 進房失敗：${String(error?.message || error)}`;
+      scheduleRender();
+    } finally {
+      state.enterRoomBusy = false;
+    }
+  }
+
   function topRowsHtml() {
     const rows = topRooms();
     if (!rows.length) return `<div style="opacity:.65;padding:8px 0;">尚無可排行的空房資料。</div>`;
     return rows.map((r, i) => {
       const m = r.metrics;
-      return `<div style="display:grid;grid-template-columns:34px 58px 1fr 1fr 58px;gap:5px;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.07);font-size:11px;">
+      return `<div style="display:grid;grid-template-columns:30px 52px 1fr 1fr 48px 72px;gap:5px;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.07);font-size:11px;">
         <b>#${i + 1}</b>
         <b>${String(r.number).padStart(4, '0')}</b>
         <span>今日 ${formatPct(m.todayRate)}</span>
         <span>累計 ${formatPct(m.totalRate)}</span>
         <span style="text-align:right;">${m.observationScore === null ? '—' : m.observationScore.toFixed(1)}</span>
+        <button type="button"
+          class="xinyao-enter-room"
+          data-room-number="${Math.trunc(r.number)}"
+          data-room-id="${Math.trunc(r.roomId)}"
+          style="border:1px solid rgba(255,190,215,.5);border-radius:7px;background:rgba(255,95,158,.14);color:#ffd3e4;padding:5px 4px;font-size:9px;font-weight:900;cursor:pointer;">
+          進入此房
+        </button>
       </div>`;
     }).join('');
   }
@@ -5858,8 +6719,9 @@ try {
               <option value="todayBet" ${ui.rankMode === 'todayBet' ? 'selected' : ''}>今日投注量</option>
             </select>
           </div>
-          <div style="display:grid;grid-template-columns:34px 58px 1fr 1fr 58px;gap:5px;font-size:10px;opacity:.7;padding-bottom:3px;"><span>名次</span><span>房號</span><span>今日率</span><span>累計率</span><span>分數</span></div>
+          <div style="display:grid;grid-template-columns:30px 52px 1fr 1fr 48px 72px;gap:5px;font-size:10px;opacity:.7;padding-bottom:3px;"><span>名次</span><span>房號</span><span>今日率</span><span>累計率</span><span>分數</span><span>操作</span></div>
           ${topRowsHtml()}
+          ${state.enterRoomStatus ? `<div style="margin-top:6px;padding:6px 7px;border:1px solid rgba(255,184,212,.18);border-radius:7px;background:rgba(255,255,255,.04);font-size:9.5px;color:#ffd2e4;">${escapeHtml(state.enterRoomStatus)}</div>` : ''}
           <div style="font-size:9.5px;opacity:.6;line-height:1.5;margin-top:6px;">觀察分數只整理已發生的統計資料，並以投注量做簡單權重修正，不代表下一局結果。</div>
         </div>
 
@@ -6068,6 +6930,19 @@ try {
         return;
       }
 
+      const enterRoomButton = event.target?.closest?.('.xinyao-enter-room[data-room-number][data-room-id]');
+      if (enterRoomButton && panel.contains(enterRoomButton)) {
+        event.preventDefault();
+        event.stopPropagation();
+        holdPanelInteraction(120);
+        const roomNumber = Number(enterRoomButton.dataset.roomNumber);
+        const roomId = Number(enterRoomButton.dataset.roomId);
+        state.enterRoomStatus = `🖱️ 已點擊 ${Number.isFinite(roomNumber) ? Math.trunc(roomNumber) : '—'} 房，準備執行…`;
+        render();
+        enterRoomFromRanking(roomNumber, roomId);
+        return;
+      }
+
       const button = event.target?.closest?.('button[id]');
       if (!button || !panel.contains(button)) return;
       const action = resolvePanelAction(button.id);
@@ -6096,6 +6971,24 @@ try {
         scheduleRender();
       } else if (action === 'sync') {
         // 同步按鈕已改為真正連結；由 click 事件準備握手資料，不在此攔截。
+      }
+    }, true);
+
+    // 部分 ATG/Cocos 裝置會吃掉 pointerdown 的後續流程；再加 click capture 當備援。
+    panel.addEventListener('click', event => {
+      const enterRoomButton = event.target?.closest?.('.xinyao-enter-room[data-room-number][data-room-id]');
+      if (!enterRoomButton || !panel.contains(enterRoomButton)) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const roomNumber = Number(enterRoomButton.dataset.roomNumber);
+      const roomId = Number(enterRoomButton.dataset.roomId);
+
+      // pointerdown 已經啟動時不要重複執行；只有沒有 busy 才由 click 補上。
+      if (!state.enterRoomBusy) {
+        state.enterRoomStatus = `🖱️ 已點擊 ${Number.isFinite(roomNumber) ? Math.trunc(roomNumber) : '—'} 房，準備執行…`;
+        render();
+        enterRoomFromRanking(roomNumber, roomId);
       }
     }, true);
 
@@ -6583,8 +7476,64 @@ try {
     stopCaptureAt: 0,
     multiplierValues: [],
     signalHistory: [],
-    gameProfile: 'seth'
+    gameProfile: 'tiger'
   };
+
+  // test100：遊戲類別集中在同一份清單。
+  // 之後新增遊戲，只要新增一筆選項＋對應圖示辨識資料，不需要再改版面。
+  const MANUAL_GAME_PROFILE_KEY = 'xinyao_atg_board_manual_profile_v1';
+  const GAME_PROFILE_OPTIONS = Object.freeze([
+    { id:'seth', label:'戰神賽特2', shortLabel:'賽特2', icon:'👁️' },
+    { id:'tiger', label:'虎小妹', shortLabel:'虎小妹', icon:'🐯' }
+  ]);
+
+  function validManualGameProfile(profile) {
+    return GAME_PROFILE_OPTIONS.some(item => item.id === String(profile || ''));
+  }
+
+  function gameProfileOption(profile = probe.gameProfile) {
+    return GAME_PROFILE_OPTIONS.find(item => item.id === String(profile || ''))
+      || GAME_PROFILE_OPTIONS[0];
+  }
+
+  function loadManualGameProfile() {
+    try {
+      const saved = String(localStorage.getItem(MANUAL_GAME_PROFILE_KEY) || '').toLowerCase();
+      if (validManualGameProfile(saved)) return saved;
+    } catch (_) {}
+    return 'tiger';
+  }
+
+  function setManualGameProfile(profile) {
+    profile = String(profile || '');
+    if (!validManualGameProfile(profile)) return;
+    if (probe.gameProfile === profile) return;
+
+    probe.gameProfile = profile;
+    try { localStorage.setItem(MANUAL_GAME_PROFILE_KEY, profile); } catch (_) {}
+
+    // 換遊戲組時清掉上一款的盤面自適應暫存狀態，避免名稱/權重混用。
+    probe.signalHistory = [];
+    probe.signalArmed = true;
+    probe.signalTriggered = false;
+    probe.signalScore = 0;
+    probe.signalReason = '已切換圖示組，下一局重新分析';
+    probe.autoStopStatus = '';
+    probe.autoStopRetryToken += 1;
+    probe.autoStopRetryUntil = 0;
+    probe.autoStopAttempts = 0;
+    probe.learnedStopButtonRef = null;
+
+    try {
+      window.__XIANYAO_ATG_GAME_PROFILE_HINT__ = profile;
+      window.__XIANYAO_ATG_GAME_PROFILE_PAYLOAD_HINT__ = '';
+      window.__XIANYAO_ATG_MANUAL_GAME_PROFILE__ = profile;
+    } catch (_) {}
+
+    render();
+  }
+
+  probe.gameProfile = loadManualGameProfile();
 
   const SIGNAL_THRESHOLD = 80;
   const SIGNAL_REARM_THRESHOLD = 60;
@@ -6866,111 +7815,469 @@ try {
   const TIGER_GAME_RE = /(虎小妹|tiger[\s_\-]*(?:girl|sister)|tigergirl|hu[\s_\-]*xiao[\s_\-]*mei|xiaohu|tiger[_\-]?slot)/i;
   const SETH_GAME_RE = /(戰神賽特|战神赛特|storm[\s_\-]*of[\s_\-]*seth|seth2|seth[\s_\-]*2|seth|awaken|覺醒之力|觉醒之力)/i;
 
-  const BOARD_PROFILE_MODE_KEY = 'xinyao_atg_board_profile_mode_v3';
+  const SELECTED_GAME_PROFILE_KEY = 'xinyao_atg_selected_game_profile_v2';
+  const SELECTED_GAME_PROFILE_TTL = 6 * 60 * 60 * 1000;
+  const GAME_SELECTION_TRACKED_WINDOWS = new WeakSet();
 
-  // 之後新增遊戲只要往這裡塞一筆，不需要增加版面按鈕。
-  const GAME_CATEGORY_OPTIONS = [
-    { id:'tiger', label:'虎小妹', icon:'🐯' },
-    { id:'seth', label:'戰神賽特2', icon:'👁️' }
-  ];
+  function profileFromSelectionText(value) {
+    const s = String(value ?? '').replace(/\s+/g, ' ').trim();
+    if (!s) return '';
+    if (/(虎小妹|tigergirl|tiger\s*(?:girl|sister)|tiger[_-]?slot)/i.test(s)) return 'tiger';
+    if (/(戰神賽特|战神赛特|賽特2|赛特2|seth\s*2|seth2|storm\s*of\s*seth|覺醒之力|觉醒之力)/i.test(s)) return 'seth';
+    return '';
+  }
 
-  function boardProfileMode() {
+  function rememberSelectedGameProfile(profile, source = 'selection') {
+    if (profile !== 'tiger' && profile !== 'seth') return '';
+    const payload = { profile, source:String(source || ''), at:Date.now() };
+    try { localStorage.setItem(SELECTED_GAME_PROFILE_KEY, JSON.stringify(payload)); } catch (_) {}
     try {
-      const saved = String(localStorage.getItem(BOARD_PROFILE_MODE_KEY) || '').toLowerCase();
-      if (GAME_CATEGORY_OPTIONS.some(item => item.id === saved)) return saved;
+      window.__XIANYAO_ATG_SELECTED_GAME_PROFILE__ = payload;
+      window.__XIANYAO_ATG_GAME_PROFILE_HINT__ = profile;
+      window.__XIANYAO_ATG_GAME_PROFILE_PAYLOAD_HINT__ = '';
     } catch (_) {}
-    return 'tiger';
+    return profile;
   }
 
-  function selectedGameCategory() {
-    const id = boardProfileMode();
-    return GAME_CATEGORY_OPTIONS.find(item => item.id === id) || GAME_CATEGORY_OPTIONS[0];
-  }
-
-  try {
-    // 清掉前面測試版 auto / 手動殘留，第一次使用 test108 先以虎小妹為預設。
-    if (!localStorage.getItem(BOARD_PROFILE_MODE_KEY)) {
-      localStorage.setItem(BOARD_PROFILE_MODE_KEY, 'tiger');
+  function recentSelectedGameProfile() {
+    let payload = null;
+    try { payload = window.__XIANYAO_ATG_SELECTED_GAME_PROFILE__ || null; } catch (_) {}
+    if (!payload) {
+      try { payload = JSON.parse(localStorage.getItem(SELECTED_GAME_PROFILE_KEY) || 'null'); } catch (_) {}
     }
-    localStorage.removeItem('xinyao_atg_board_profile_mode_v1');
-    localStorage.removeItem('xinyao_atg_board_profile_mode_v2');
-    window.__XIANYAO_ATG_GAME_PROFILE_OVERRIDE__ = boardProfileMode();
-    window.__XIANYAO_ATG_GAME_PROFILE_HINT__ = boardProfileMode();
-  } catch (_) {}
+    if (!payload || (payload.profile !== 'tiger' && payload.profile !== 'seth')) return '';
+    const age = Date.now() - Number(payload.at || 0);
+    if (!Number.isFinite(age) || age < 0 || age > SELECTED_GAME_PROFILE_TTL) return '';
+    return payload.profile;
+  }
 
-  function setBoardProfileMode(mode) {
-    const next = GAME_CATEGORY_OPTIONS.some(item => item.id === String(mode))
-      ? String(mode)
-      : boardProfileMode();
-
-    try { localStorage.setItem(BOARD_PROFILE_MODE_KEY, next); } catch (_) {}
+  function selectionTextFromEvent(event) {
+    const chunks = [];
     try {
-      window.__XIANYAO_ATG_GAME_PROFILE_OVERRIDE__ = next;
-      window.__XIANYAO_ATG_GAME_PROFILE_HINT__ = next;
+      const path = typeof event?.composedPath === 'function'
+        ? event.composedPath()
+        : [event?.target].filter(Boolean);
+
+      for (const node of path.slice(0,10)) {
+        if (!node || typeof node !== 'object') continue;
+        const values = [
+          node.textContent,
+          node.innerText,
+          node.getAttribute?.('aria-label'),
+          node.getAttribute?.('title'),
+          node.getAttribute?.('alt'),
+          node.getAttribute?.('href'),
+          node.getAttribute?.('src'),
+          node.id,
+          typeof node.className === 'string' ? node.className : ''
+        ];
+        for (const value of values) {
+          if (typeof value === 'string' && value.length <= 1200) chunks.push(value);
+        }
+        try {
+          if (node.dataset) {
+            for (const [k,v] of Object.entries(node.dataset)) {
+              if (typeof v === 'string' && v.length <= 600) chunks.push(k + ':' + v);
+            }
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+    return chunks.join(' | ');
+  }
+
+  function handleGameSelectionEvent(event) {
+    const profile = profileFromSelectionText(selectionTextFromEvent(event));
+    if (profile) rememberSelectedGameProfile(profile, 'ui-click');
+  }
+
+  function installGameSelectionTracking() {
+    for (const gameWindow of sameOriginSignalWindows()) {
+      try {
+        if (GAME_SELECTION_TRACKED_WINDOWS.has(gameWindow)) continue;
+        GAME_SELECTION_TRACKED_WINDOWS.add(gameWindow);
+        gameWindow.document?.addEventListener?.('pointerdown', handleGameSelectionEvent, true);
+        gameWindow.document?.addEventListener?.('click', handleGameSelectionEvent, true);
+
+        const direct = profileFromSelectionText([
+          gameWindow.location?.href || '',
+          gameWindow.document?.title || ''
+        ].join(' | '));
+        if (direct) rememberSelectedGameProfile(direct, 'url-title');
+      } catch (_) {}
+    }
+  }
+
+  function detectCanvasThemeProfile() {
+    // test97：直接讀目前正在顯示的遊戲 Canvas。
+    // 虎小妹左側角色區域偏粉紅/橘色；賽特2左側埃及場景偏深藍/靛藍。
+    // 這個判斷不讀舊封包、resource cache 或上一款遊戲名稱。
+    try {
+      for (const gameWindow of sameOriginSignalWindows()) {
+        const canvases = [...(gameWindow.document?.querySelectorAll?.('canvas') || [])]
+          .filter(canvas => {
+            try {
+              const rect = canvas.getBoundingClientRect();
+              return rect.width >= 260 && rect.height >= 300;
+            } catch (_) {
+              return false;
+            }
+          })
+          .sort((a,b) => {
+            const aa=(a.width||0)*(a.height||0);
+            const bb=(b.width||0)*(b.height||0);
+            return bb-aa;
+          });
+
+        for (const canvas of canvases.slice(0,3)) {
+          try {
+            const sw = canvas.width || 0;
+            const sh = canvas.height || 0;
+            if (sw < 260 || sh < 300) continue;
+
+            // 避開正中央盤面，主要取左側角色/主題區。
+            const sx = Math.floor(sw * 0.04);
+            const sy = Math.floor(sh * 0.12);
+            const sWidth = Math.max(32, Math.floor(sw * 0.28));
+            const sHeight = Math.max(64, Math.floor(sh * 0.62));
+
+            const sample = gameWindow.document.createElement('canvas');
+            sample.width = 48;
+            sample.height = 72;
+            const ctx = sample.getContext('2d', { willReadFrequently:true });
+            if (!ctx) continue;
+
+            ctx.clearRect(0,0,sample.width,sample.height);
+            ctx.drawImage(
+              canvas,
+              sx, sy, Math.min(sWidth, sw-sx), Math.min(sHeight, sh-sy),
+              0, 0, sample.width, sample.height
+            );
+
+            const data = ctx.getImageData(0,0,sample.width,sample.height).data;
+            let usable=0, pink=0, orange=0, darkBlue=0, cyan=0;
+
+            for (let i=0; i<data.length; i+=4) {
+              const r=data[i], g=data[i+1], b=data[i+2], a=data[i+3];
+              if (a < 40) continue;
+              // 忽略近黑和近白 UI 線條。
+              if (r+g+b < 70 || (r>235 && g>235 && b>235)) continue;
+              usable += 1;
+
+              if (r>145 && r>g*1.28 && b>55 && r>b*1.03) pink += 1;
+              if (r>145 && g>65 && g<185 && b<105 && r>g*1.12) orange += 1;
+              if (b>65 && b>r*1.23 && g>r*0.68 && r<135) darkBlue += 1;
+              if (b>105 && g>75 && b>r*1.12) cyan += 1;
+            }
+
+            if (usable < 500) continue;
+
+            const warmRatio = (pink + orange) / usable;
+            const darkBlueRatio = darkBlue / usable;
+            const cyanRatio = cyan / usable;
+
+            // 以使用者實測畫面校正：
+            // 賽特2左側深藍明顯高；虎小妹粉紅/橘色角色區明顯高。
+            let chosen='';
+            if (
+              darkBlueRatio >= 0.125 &&
+              darkBlueRatio >= warmRatio * 1.18
+            ) {
+              chosen='seth';
+            } else if (
+              warmRatio >= 0.115 &&
+              warmRatio >= darkBlueRatio * 1.18
+            ) {
+              chosen='tiger';
+            } else if (
+              warmRatio >= 0.095 &&
+              cyanRatio >= 0.075 &&
+              darkBlueRatio < 0.11
+            ) {
+              chosen='tiger';
+            }
+
+            try {
+              window.__XIANYAO_ATG_CANVAS_PROFILE_DEBUG__ = {
+                chosen,
+                warmRatio:Math.round(warmRatio*1000)/1000,
+                darkBlueRatio:Math.round(darkBlueRatio*1000)/1000,
+                cyanRatio:Math.round(cyanRatio*1000)/1000,
+                usable,
+                at:Date.now()
+              };
+            } catch (_) {}
+
+            if (chosen) return chosen;
+          } catch (_) {
+            // WebGL/cross-origin canvas may be unreadable; fall through to text/resource detection.
+          }
+        }
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  function detectLiveSceneProfile() {
+    let tiger = 0;
+    let seth = 0;
+
+    const TIGER_LIVE_RE = /(虎小妹|虎盾|啤酒|錢袋|钱袋|tiger.?girl|tiger.?sister|tigergirl|tiger.?shield|beer.?mug|beer|money.?bag|coin.?bag|paw.?shield|paw.?mug)/i;
+    const SETH_LIVE_RE = /(戰神賽特|战神赛特|seth.?2|storm.?of.?seth|eye.?of.?horus|horus|cobra|snake|serpent|bow|arrow|archer|pharaoh|egypt|ankh|scarab|弓箭|眼睛|蛇)/i;
+
+    const score = (value, weight = 1) => {
+      const s = String(value ?? '');
+      if (!s || s.length > 16000) return;
+      if (TIGER_LIVE_RE.test(s)) tiger += weight;
+      if (SETH_LIVE_RE.test(s)) seth += weight;
+    };
+
+    for (const gameWindow of sameOriginSignalWindows()) {
+      // Current URL/title/body are stronger than payload/engine hints.
+      try { score(gameWindow.location?.href || '', 10); } catch (_) {}
+      try { score(gameWindow.document?.title || '', 10); } catch (_) {}
+      try { score(String(gameWindow.document?.body?.innerText || '').slice(0,12000), 8); } catch (_) {}
+
+      // Only recent resources: old game resources can remain cached after switching.
+      try {
+        const resources = gameWindow.performance?.getEntriesByType?.('resource') || [];
+        for (const entry of resources.slice(Math.max(0, resources.length - 180))) {
+          score(entry?.name || '', 2);
+        }
+      } catch (_) {}
+
+      // Cocos node/sprite names are the strongest current-game signature.
+      try {
+        const cocos = gameWindow?.cc || gameWindow?.legacyCC || gameWindow?._cc;
+        const scene = cocos?.director?.getScene?.();
+        const Component = cocos?.Component;
+        if (scene && Component && typeof scene.getComponentsInChildren === 'function') {
+          const components = scene.getComponentsInChildren(Component) || [];
+          for (let i = 0; i < components.length && i < 3200; i += 1) {
+            const component = components[i];
+            const node = component?.node;
+            const bits = [
+              node?.name,
+              component?.constructor?.name,
+              component?.__classname__,
+              component?.string,
+              component?._string,
+              component?.text,
+              component?._text,
+              component?.label?.string,
+              component?.spriteFrame?.name,
+              component?.spriteFrame?._name,
+              component?._spriteFrame?.name,
+              component?._spriteFrame?._name
+            ].filter(Boolean).join(' ');
+            score(bits, 3);
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (tiger >= 6 && tiger >= seth + 3) return 'tiger';
+    if (seth >= 6 && seth >= tiger + 3) return 'seth';
+    return '';
+  }
+
+  function resolveGameProfileForSpin(detail = {}) {
+    // test98：最優先採用使用者「實際點選遊戲」的結果。
+    // 這個來源不受上一款遊戲共用引擎/快取污染。
+    const selected = recentSelectedGameProfile();
+    if (selected) return selected;
+
+    const canvasProfile = detectCanvasThemeProfile();
+    if (canvasProfile) return canvasProfile;
+
+    const live = detectLiveSceneProfile();
+    if (live) return live;
+
+    const detected = detectBoardGameProfile(detail?.gameProfileHint || '');
+    if (detected === 'tiger' || detected === 'seth') return detected;
+
+    return probe.gameProfile || 'tiger';
+  }
+
+  function detectBoardGameProfile(explicitHint = '') {
+    const direct = String(explicitHint || '').toLowerCase();
+
+    // 手動覆寫仍保留最高優先，方便之後除錯；正常會員不需要操作。
+    try {
+      const forced = String(window.__XIANYAO_ATG_GAME_PROFILE_OVERRIDE__ || '').toLowerCase();
+      if (forced === 'tiger' || forced === 'seth') return forced;
     } catch (_) {}
 
-    probe.gameProfile = next;
-    probe.signalHistory = [];
-    probe.candidate = null;
-    probe.candidateCount = 0;
-    probe.signalScore = 0;
-    probe.signalReason = '等待新遊戲盤面資料';
-    probe.signalArmed = true;
-    probe.signalTriggered = false;
-    probe.status = '已切換 ' + gameProfileName(next) + '｜完成一局後重新分析';
-    render();
-  }
+    let tigerScore = 0;
+    let sethScore = 0;
+    let tigerStrong = 0;
+    let sethStrong = 0;
 
-  function gameCategorySelectorMarkup() {
-    const selected = selectedGameCategory();
-    return `
-      <div class="bp-game-category" style="position:relative;margin:0 0 7px;">
-        <button type="button" class="bp-game-category-btn"
-          style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:7px;padding:7px 9px;border:1px solid rgba(255,184,212,.38);border-radius:10px;background:rgba(255,255,255,.055);color:#fff;font-size:10px;font-weight:850;cursor:pointer;">
-          <span>🎮 遊戲類別｜${selected.icon} ${selected.label}</span>
-          <span class="bp-game-category-arrow" style="opacity:.75;">▾</span>
-        </button>
-        <div class="bp-game-category-menu"
-          style="display:none;position:absolute;z-index:20;left:0;right:0;top:calc(100% + 4px);padding:5px;border:1px solid rgba(255,184,212,.35);border-radius:10px;background:rgba(28,22,31,.985);box-shadow:0 10px 24px rgba(0,0,0,.35);">
-          ${GAME_CATEGORY_OPTIONS.map(item => `
-            <button type="button" data-game-category="${item.id}"
-              style="width:100%;display:flex;align-items:center;justify-content:space-between;border:0;border-radius:8px;padding:7px 8px;margin:0 0 3px;background:${item.id===selected.id?'rgba(255,95,158,.16)':'transparent'};color:#fff;font-size:10px;text-align:left;cursor:pointer;">
-              <span>${item.icon} ${item.label}</span>
-              <span style="color:#ffabc9;">${item.id===selected.id?'✓':''}</span>
-            </button>
-          `).join('')}
-        </div>
-      </div>
-    `;
-  }
+    const TIGER_THEME_RE = /(虎盾|虎小妹|虎妹|啤酒|錢袋|钱袋|tiger|tigergirl|tiger.?girl|tiger.?sister|beer|ale|money.?bag|coin.?bag|tiger.?shield|cat.?girl)/i;
+    const SETH_THEME_RE = /(戰神賽特|战神赛特|賽特|赛特|seth|storm.?of.?seth|覺醒之力|觉醒之力|pharaoh|egypt|ankh|cobra|弓箭|眼睛|蛇)/i;
 
-  function bindGameCategorySelector(root) {
-    if (!root) return;
-    const wrap = root.querySelector('.bp-game-category');
-    const button = root.querySelector('.bp-game-category-btn');
-    const menu = root.querySelector('.bp-game-category-menu');
-    const arrow = root.querySelector('.bp-game-category-arrow');
-    if (!wrap || !button || !menu) return;
+    const addText = (value, weight = 1, strong = false, allowTheme = false) => {
+      const s = String(value ?? '');
+      if (!s || s.length > 12000) return;
 
-    button.addEventListener('click', event => {
-      event.preventDefault();
-      event.stopPropagation();
-      const open = menu.style.display !== 'block';
-      menu.style.display = open ? 'block' : 'none';
-      if (arrow) arrow.textContent = open ? '▴' : '▾';
-    });
+      const tigerExact = TIGER_GAME_RE.test(s);
+      const sethExact = SETH_GAME_RE.test(s);
 
-    menu.querySelectorAll('[data-game-category]').forEach(option => {
-      option.addEventListener('click', event => {
-        event.preventDefault();
-        event.stopPropagation();
-        setBoardProfileMode(option.dataset.gameCategory || '');
-      });
-    });
-  }
+      if (tigerExact) {
+        tigerScore += weight;
+        if (strong) tigerStrong += weight;
+      }
+      if (sethExact) {
+        sethScore += weight;
+        if (strong) sethStrong += weight;
+      }
 
-  function detectBoardGameProfile() {
-    return boardProfileMode();
+      if (allowTheme) {
+        if (!tigerExact && TIGER_THEME_RE.test(s)) tigerScore += Math.max(1, weight * 0.45);
+        if (!sethExact && SETH_THEME_RE.test(s)) sethScore += Math.max(1, weight * 0.35);
+      }
+    };
+
+    // test88：封包提示只算低權重，避免虎小妹沿用 Seth 共用引擎名稱時被直接判成賽特。
+    if (direct === 'tiger') tigerScore += 4;
+    else if (direct === 'seth') sethScore += 4;
+
+    try {
+      const payloadHint = String(window.__XIANYAO_ATG_GAME_PROFILE_PAYLOAD_HINT__ || '').toLowerCase();
+      if (payloadHint === 'tiger') tigerScore += 2;
+      else if (payloadHint === 'seth') sethScore += 2;
+    } catch (_) {}
+
+    let sharedHint = '';
+    try {
+      sharedHint = String(window.__XIANYAO_ATG_GAME_PROFILE_HINT__ || '').toLowerCase();
+      if (sharedHint === 'tiger') tigerScore += 1;
+      else if (sharedHint === 'seth') sethScore += 1;
+    } catch (_) {}
+
+    for (const gameWindow of sameOriginSignalWindows()) {
+      try { addText(gameWindow.location?.href || '', 28, true, true); } catch (_) {}
+      try { addText(gameWindow.document?.title || '', 24, true, true); } catch (_) {}
+
+      // 目前遊戲選擇常被平台放在 local/sessionStorage，這比舊 bundle 名稱可靠。
+      for (const storage of [safe(() => gameWindow.localStorage, null), safe(() => gameWindow.sessionStorage, null)]) {
+        if (!storage) continue;
+        try {
+          const limit = Math.min(storage.length, 240);
+          for (let i = 0; i < limit; i += 1) {
+            const key = String(storage.key(i) || '');
+            const value = String(storage.getItem(key) || '');
+            const important = /(game|current|selected|select|product|title|name|slug|theme|vendor|provider|slot|machine|hall)/i.test(key);
+            addText(key + ' ' + value, important ? 18 : 3, important, true);
+          }
+        } catch (_) {}
+      }
+
+      // 只看最近載入的資源，避免上一款遊戲留在 performance cache 裡把判斷拉回賽特。
+      try {
+        const resources = gameWindow.performance?.getEntriesByType?.('resource') || [];
+        const recent = resources.slice(Math.max(0, resources.length - 360));
+        for (const entry of recent) {
+          const name = String(entry?.name || '');
+          if (name) addText(name, 5, false, true);
+        }
+      } catch (_) {}
+
+      try {
+        const attrs = [...gameWindow.document.querySelectorAll(
+          'iframe[src],script[src],img[src],link[href],source[src],video[src],audio[src]'
+        )].slice(-500);
+        for (const el of attrs) {
+          const value = String(el.src || el.href || el.getAttribute?.('src') || el.getAttribute?.('href') || '');
+          if (value) addText(value, 4, false, true);
+        }
+      } catch (_) {}
+
+      // DOM 若有遊戲名稱/選單標記，優先級很高。
+      try {
+        const bodyText = String(gameWindow.document?.body?.innerText || '');
+        if (bodyText) addText(bodyText.slice(0, 14000), 14, true, true);
+      } catch (_) {}
+
+      // 部分 ATG 頁面會把目前遊戲資訊放在全域變數。
+      try {
+        const keys = Object.keys(gameWindow).filter(key =>
+          /(game|current|selected|product|title|slug|theme|slot|machine)/i.test(key)
+        ).slice(0, 260);
+        for (const key of keys) {
+          let value;
+          try { value = gameWindow[key]; } catch (_) { continue; }
+          if (typeof value === 'string' || typeof value === 'number') {
+            addText(key + ' ' + value, 16, true, true);
+          } else if (value && typeof value === 'object') {
+            for (const sub of ['name','title','game','gameName','gameTitle','slug','code','id','product','theme']) {
+              try {
+                const v = value[sub];
+                if (typeof v === 'string' || typeof v === 'number') {
+                  addText(key + ' ' + sub + ' ' + v, 12, true, true);
+                }
+              } catch (_) {}
+            }
+          }
+        }
+      } catch (_) {}
+
+      // Canvas/Cocos 遊戲的可見文字與目前 Sprite 名稱通常最接近「正在玩的這款」。
+      try {
+        const cocos = gameWindow?.cc || gameWindow?.legacyCC || gameWindow?._cc;
+        const scene = cocos?.director?.getScene?.();
+        const Component = cocos?.Component;
+        if (scene && Component && typeof scene.getComponentsInChildren === 'function') {
+          const components = scene.getComponentsInChildren(Component) || [];
+          for (let i = 0; i < components.length && i < 2600; i += 1) {
+            const component = components[i];
+            const node = component?.node;
+            const bits = [
+              node?.name,
+              component?.constructor?.name,
+              component?.__classname__,
+              component?.string,
+              component?._string,
+              component?.text,
+              component?._text,
+              component?.label?.string,
+              component?.spriteFrame?.name,
+              component?.spriteFrame?._name,
+              component?._spriteFrame?.name,
+              component?._spriteFrame?._name
+            ].filter(Boolean).join(' ');
+            if (bits) addText(bits, 9, true, true);
+          }
+        }
+      } catch (_) {}
+    }
+
+    let chosen = '';
+    // 只要目前畫面有明確虎小妹強訊號，就壓過封包裡殘留的 Seth 共用引擎字樣。
+    if (tigerStrong >= 9 && tigerStrong > sethStrong) chosen = 'tiger';
+    else if (sethStrong >= 9 && sethStrong > tigerStrong) chosen = 'seth';
+    else if (tigerScore >= sethScore + 8) chosen = 'tiger';
+    else if (sethScore >= tigerScore + 8) chosen = 'seth';
+    else if (probe.gameProfile === 'tiger' && tigerScore > 0) chosen = 'tiger';
+    else if (probe.gameProfile === 'seth' && sethScore > tigerScore + 3) chosen = 'seth';
+    else if (direct === 'tiger' || direct === 'seth') chosen = direct;
+    else if (sharedHint === 'tiger' || sharedHint === 'seth') chosen = sharedHint;
+    else chosen = probe.gameProfile || 'seth';
+
+    try {
+      window.__XIANYAO_ATG_GAME_PROFILE_HINT__ = chosen;
+      window.__XIANYAO_ATG_GAME_PROFILE_DEBUG__ = {
+        chosen,
+        direct,
+        tigerScore: Math.round(tigerScore * 10) / 10,
+        sethScore: Math.round(sethScore * 10) / 10,
+        tigerStrong: Math.round(tigerStrong * 10) / 10,
+        sethStrong: Math.round(sethStrong * 10) / 10,
+        at: Date.now()
+      };
+    } catch (_) {}
+
+    return chosen;
   }
 
   function gameProfileName(profile = probe.gameProfile) {
@@ -7037,18 +8344,17 @@ try {
   ]);
 
   const TIGER_SYMBOL_ICON_DATA = new Map([
-    ['1','data:image/webp;base64,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'],
-    ['2','data:image/webp;base64,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'],
-    ['3','data:image/webp;base64,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'],
+    ['1','data:image/webp;base64,UklGRqAIAABXRUJQVlA4WAoAAAAQAAAALwAALwAAQUxQSOgDAAABoC3Jtmnban2MuY21dWzbtm3btm3btjaubdu2bR1rzTlGe1iO+wMRMQEAICICQGKP/6sk+XxJgCpeOsalSicG0dhx6dIqSIWzuXl5eXn5gXlRzS2YHScAUPw7sjW0IPYCQJD6A/llAgTiOAEJ8RmJAFRcnFaRIkjaK++8dx4AFJA9YPubX36cm9+yaQYAaEG0BRCNOud/4bX9XVr0//e2/+fPD/ZJBrQAEIkMEIWRt8mnl6YDTV49f27XXZ/4/12VASgAkEgESmSnRz+f6Z/pJGCy3zaAKrzmz19XKDjILgqJAApymtbjwXRAkLP24opknOiDxoe+eLsqpPqnxSDhKVR7gq71OAnxSqZ8T/747bneRZyHv5lccHEiEg6dFx2WQvWf6JIuC6ChfqafJF+Jx9vk5rGcCezuCR2GQuEf6ZK09mIViPrRdWmNx/K9SPJkr7baKZkbL2HoxFx6DPS4C47cRXqksSPaHt19cF5jBB5oDxVCYxhdBjMn4Eji7K8Z8DQA+CDVOlaVERvgBBNV7AtjgpGnoQFkHvGMSzZRVV7lm4lzHikrze9VEszBBHoMfvnqOhUHiUPOZfKvjdlx0uzQrsRaIxOAO5MRVFTSp8YE8XguEYBWjirPf7cWR60zDRsA6H/j78Ptf2oEFQQZ12iD0LgL6zStCADlj5VA9oi0FeQblWQ+AxuG8l0MFfTq4dqDElEOaMy9coh8Hiut3/VsgzAuhWNoyffWvFG594Fas8xfHxSdeWfjQpdpSUaJpL3NIVt+QP+b1lquBrCbHklbP2r0zF2D/0zBHhrX3A/0s8aSZOPoWf7z+z9FdM6v9PNMzlEaS1rergSJVtB1SP6AHr/8npYkjd0AhWDpVyOzHi8W9v1AS9IjSUuWkWDQcoxeJKTHFS1pSGsZ7FIpSBCRlNdoI7P2y89oGdqzr0AjGDJMNCL2uAhOMCjnQXrRsCYcY79NEwmh0Tc64bucBY2QCg1umRh5fClJIaQgo9EXNDEx5vfaCKv8kPfpGRs963E8HIQhGUt+dS3p2Sh55EI4CNfBGZJLHqH1IrPGuLw2FxphC0r0698eyVtdGs8aG8oajyRfrAuNaGqg7ZMM6hpjrGtIXn3+0LI4aEQsWiuIBjref+nzXxnyxvtHRnZLBBSirgQoWaH6wuW599x1/7ZprUtKAqAFsXTiEFi6XrUqgEBDCWIqQGqXlU999NKh/VVqpQOAjo2g1tFv+O+pwT2HX7t145u3tnT1IaYK3X5xb+zr7gPK79u/b+vd31x/Y1IxkegB2Vmp6cjIUFp8GVkA0ouUS0bMFUKKg9iLiEACRAQQEYkGVlA4IJIEAABQEwCdASowADAAPn0skUgkoqGhPH34AJAPiWwAnTlBUb3xZgdzxyk+FdPjKbbPzAfsz1APQA/r3UKegB+wHpj+xB+4P7Y/AB+5FYm5Afa0ddsBv/3wZWLAj6zazt4Bz+//B5XPoL2Bf5R/Zt9Q/YAt/TpMWXM7CZQscr76678bj6NhEJuNG6xTx7eFjCC/q6aZdDM9HKFEUrXnlbEPE9FW1J2AAP7ZUQdErV9ci2HD2Cy2EcMH1XXa8aQmol0BExVp0mu/YSgNNPlCga3o0pxUfAhe7k+LJT+1TKdvGDn5w3zcR1O+Q6sxHk0TuVBmRSZ6KpD/noLt1UAfisLdOEUyj/v2u+5elhPBmxFf+IeB90pILZJ8F1QT3qHHPcJq/BNv3n77XW6EsT8gqO5paUrjpeJ7eX3OgTrqgGpO3ulgn0vWy68Dm1iGgGLQa08NDNTKkLwVf/X7Oe/8uZZmHX5otCvlDyOMIfy9XLPUkDd2dW94x2ayJnEwNJSMvjNcE11/oLLpf+FUJzJOM6SKipkeBEkax3QXAW6Gpkz+L1kbXgstC2NKj1GxhMGf3tDre81TrlHfnp8gIQNsoPrcjXee6/JGBbdjM65MOIMOo9N4YCTj2w3xXcYj2Z6/88ijCFmCAO09IjYAQ9XosApY+7+6+YX20w95U8sHIneVLmo04humJC+E/945OpQZaMgJr4C3M5Z/I/PeJhNpRZFf6xF/xMKd+S7oyH88mtaSg+pHHvxqUZjLC+CxPKGrjljoVwKPK6vzi/riNZVlWT1scDYxsE2Ed9oFr9+JveLcH+0M8tTHhbev2cp28fAlamJ2SsknwTqN7ylcRnd71hBvUtwmGKQJBENbFqHJ+Gj3ky/FVVIj88cJQo+H3qPolaHTW24DcwspUT8IG+rEzqg0sms0p/Z6E4hLRBrAkpR4l3l8OdM7+BUz9FS2CNBJHW64Lwud2cjKtbeMSzQ0wgkUKXaRHWCpu1gOouxKa1Nj3oKZBShB6lNXYLVZbY3WtX5dpFQi8DSUu993VR0HZz5UNfl+leqLP65b5CMDJyeTnLlequBEvEpF81vgjldli7ItL1hwzkmf8N4Q/ztTesPRUa6pH4u1iQ+tK+pDJuP95ZwYGqRabNygUKR9+OqRMwXxbbaVfioqqyI4Xc5eQ/V+5fNIvpUj7/FougGa51CRLP+JEWGJzqQ6r/xq+/1toVzHTt+7v8nYtAdSalPFNvzWjRDrZMdlvVUU+VfYtBNXgxkfZvRZ+I/3e1pyrYsaX5O+cpTFnj+euSYXJnSQ6+JHh7x1Re+ViUG1tC+zhh2RFOfZuvz8e1AOmnTq11wne4bElRAZet5vKU2oO3cAg/iHDh2D38AqYImP4QiQe0x2bSrsqghFfJd/gpcTQAfyXUmWGt9QrgDpNHLFi4r7Xu8TivSFcbvfvVL1mRAHqgjVsbXW3MDh2DGz+dSUrO9xntRCjkN6dV/TM19vp8Mf+yspzLlVvqd6VUQ9fmVv4ZuIfzcXFwBWZADhp0DWJlU2ELr0N1+yN9QcBxHMtwuEHfXIXCuwAAA='],
+    ['2','data:image/webp;base64,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'],
+    ['3','data:image/webp;base64,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'],
     ['4','data:image/webp;base64,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'],
     ['5','data:image/webp;base64,UklGRowDAABXRUJQVlA4WAoAAAAQAAAALwAALwAAQUxQSFUBAAABkLJtm2or7zffHAWSk6iaNnSL7i6N6u6u2SLdIbs2/oAmd/f5Zl58ZlY7LSImAD2ZTpslHpAGiQdGzYBriigwaNfbL32cNEI8MGjLMyYehjbBA/22vyRDMo6DVhPBwN1PyZDImB6oSi1gwzPSEv80roHWEdf7FhkS/57sywBxVRST+SPxP40noDVEuh9a5H8bZ0MreCxj4P/H9LxLpZziBi2DxkPQYoox0ZibLAyFKyZXmEfjBGghlfGMzE7x3VC4Qg4XGPIi76C0YPC7mErcFinkcYyB+T+4HW2FFPOCFdlWDIqzDCX2VnCjGfOMS+BLQXGOlsU0BK5Cy7KScVgFKM7zx/9Z4q1uJzVapIX4j2T8vroPBBUdjr0imYIl0shbIwFBVYeBC47fJckY+GkD4AWVBUDnuGWXnpFXWnAO9UU9APSdv7QNHg0V9Q4AHJos6gU9kgBWUDggEAIAAPALAJ0BKjAAMAA+lT6bSqWjIiGnOAyQsBKJbADIHQA1GfrvFHvnwANsnuFN4v9ADy0fYj8rFogaVyZx490YBrxopHpTPrVpYqJgfIf6cLGHI8XlnpLjg/J1EcHeICUumkYh8le6ipbgAP78+ELH+N91ZcTgg3/h9mB2v3cfVv6SORUNYNfexWpHUPu7xJrbc/ZLP1brgy9V3fdMWJQfExFqI/da47cYzUj43p62J97rjvzrFwEx2+PTgr4ASZ5PA6DsqLsD5sQVTb8jZsjTTJdIb+1jOiIlaLToY3Iv5LZdARPhlVxteNnOC1dvq9wdnziKlny2Cg1VZZWjhZwjXtbEGbf8gCzuVm2acBD+kNecOEiZdUx2MTfwh9nMF2mtpRMFXDSaruBLBgH8F41V7IprzB3YAXL16EIzhrh0DP703ePLf3pucF8//KFl/anKM8UlVkP4D3BQ7UTEqcSoDlTJ+ZPVs3wA9BFkNgrokDCaQzmitylOZoC18EHkIE+vrBegfXg5+J0Kamg4fsD1sw9EonGuoLOZ1GCj0edoXjaBwJfthRg0rI9nK1BH5VU09dGlCjbVRYUC18PR5On6iXPPo1G4j3Y3luV3H5UNFBdvM6fluM9FyCY4qMwZK++xOq/MSYzI7bY39IiEXDn4VN71Lode6w/z/2sV2MCCbKr3ZNOZpuSNbFq+j1pekgAAAA=='],
     ['6','data:image/webp;base64,UklGRmwDAABXRUJQVlA4WAoAAAAQAAAALwAALwAAQUxQSFoBAAABkGttu2k73z//eWLbto36jNRJaScXYJtdTh90qdw6uQCztG1PfPGcc3Wni4gJQL28qFhTIaP406hUQxTouPXU+tEAVKsA9N3yimQ4Mq8RICqlpPGhQHrvSd7aUwtAyliZyeAjSXpP8szSJpAiiuP+B/8ZfCTPt1ApIGj3OsZ/kfTfuBm2gMV0Ov5/DK/bG8ln9AJ9Ah03w2YzGOgCU2N40QqSy8ouuiQ67obNJZjyljElhvfjYDKJaTnqc0xyPAmDzKqzXobItMWmJheAVXRJ/NIdkknMgLoXIaZ4nhFFZovFzOh/TEM2iN4IPiXycxNINot5TPI8XqPILqbRbedTYi0KwKKOdD7+R4j3G6OkSKe9z0i68Lf4jQdgS/zZYcmJ76R3MQZHvp0sWkYsgGE77/Gvj+Z2gaC0WAVaTj344s3VxT0AgyoaC6B5SwVUUFFRC0ANqiwiqB8GVlA4IOwBAACQCgCdASowADAAPpVEnEslo6Kho4wAsBKJbADIy4T/F7pfhnANsnuAN4v9ADy0fYj8rFogaVyZx490YBrxopHpTPrVpYqJgfIf6cLGHI8XlnpLjg/J1EcHeICUumkYh8le6ipbgAP78+ELH+N91ZcTgg3/h9mB2v3cfVv6SORUNYNfexWpHUPu7xJrbc/ZLP1brgy9V3fdMWJQfExFqI/da47cYzUj43p62J97rjvzrFwEx2+PTgr4ASZ5PA6DsqLsD5sQVTb8jZsjTTJdIb+1jOiIlaLToY3Iv5LZdARPhlVxteNnOC1dvq9wdnziKlny2Cg1VZZWjhZwjXtbEGbf8gCzuVm2acBD+kNecOEiZdUx2MTfwh9nMF2mtpRMFXDSaruBLBgH8F41V7IprzB3YAXL16EIzhrh0DP703ePLf3pucF8//KFl/anKM8UlVkP4D3BQ7UTEqcSoDlTJ+ZPVs3wA9BFkNgrokDCaQzmitylOZoC18EHkIE+vrBegfXg5+J0Kamg4fsD1sw9EonGuoLOZ1GCj0edoXjaBwJfthRg0rI9nK1BH5VU09dGlCjbVRYUC18PR5On6iXPPo1G4j3Y3luV3H5UNFBdvM6fluM9FyCY4qMwZK++xOq/MSYzI7bY39IiEXDn4VN71Lode6w/z/2sV2MCCbKr3ZNOZpuSNbFq+j1pekgAAAA=='],
     ['7','data:image/webp;base64,UklGRjwDAABXRUJQVlA4WAoAAAAQAAAALwAALwAAQUxQSDsBAAABkGttmyIp319/zTqu0eZ45u6h5kQccncntivgCsjd3d0dQnetv+rDq7oziCJiAvAPX1RrJM47AK4eol4BwE0YCamDAkDHkJU775OLoDVA1xELdj0iSTMOg6vK+S3P+WuwSEuXmr1U4zGTZLDI3waug6/G+XMhJP45xWf9RapQjKbxryOvOJVKdjD8HQM3Qss5GfA1poxkX4aLFvNYwcBc41G4UuK6P2XKizdRvIH5DMzjPPhSrrE/WVbix74ihQT9PlnKCmkbPEorltByUvraCVdMVE/QMoyHVVFeZfB7SxnfJqIKeCxn+CuLtyGoVHGS9odk4SsXwlfjZECIJJMFI8kbXZxUA4/F/BoiSb4+uH1yLwgqFm0cJ/nx4Oa5PQBAULnDoEMbZ3QCgHgV1FDwq3ovqKsTrw7/TwIAVlA4INoBAADQCQCdASowADAAPpVEnEslo6Kho4wAsBKJbADHI3L7dfhnE9tRuMN4A3hT90WGCtjQAe3viiMFCmXkqYY4Q1LNa+EutOnAp60RqlJNdjUnAhja/4MhXmAA/vvX//5//ZP/88CiDeAom9oSPf4tll+vv+bcc7HVKSJ7UtrFtjJ3rZIQ4oiWAlPBRE7aGOeRi4VEkW84jn8ba7HE46/ptPE+kS8rm1zBWduKNaTBj58yUHdsR+F8miTk2CzFKXq6j44NrU3wP+pxkDIJftw5zbOFO4lgp1bkBng4B4Yw25RiKoZXT0N43u165vploswrjMmiSAs0gIL/YumxTmulretnoU5wfRA+5uO/Ca0RUpuFVUMFgxGVNEU9FYmugFAHHFE/xOtPVY8uh9Wn434zhcLcXxVVU7fqwuc44cFwm/SCxZSolMiQCyMUBxKvVS6NWcioIVK5RQSIXAq+//8xwvmcwXM/z/iTTjVbFJ935ZLyMGMAd3fOxIJXZ1MCQHVvwZP+6DCCRKBPEGVvG/NcZSpo0A0UbzTXokS513VrHAsV9x82bjubxIDa3UwkA4+zrMIhP0V5j9Mc14/1YtUcwJ693XTgAxfSIcS9yed+d/kXi5cWmJvuxUytQAA='],
     ['8','data:image/webp;base64,UklGRhYDAABXRUJQVlA4WAoAAAAQAAAALwAALwAAQUxQSCMBAAABkKNt27FH9/O8b2wnVSo7mRXMCmx7pscCprVdZxljdLYr23yf97vHH8pUETEBmBSpgPMqxRH83XmVIqjHlju3DqzvEQCQ/BTYzr9emljWVYbcHRp380eMwUjy270WkXw8Om4y8K/RQuRm+Fw82q7zB//T4kPkqph1j4H/bTYNLjun80ljCl5wmpmgPVhg2hh6oVlBsYWWKvAofGai5c8Z0yR8VC+SFRzmJJaGgatRkhkcTtNShWPQ7FT6vljyf4nxFiQ7OGyk/ZclnOjUPMS7B0n8V2L8vhA5O0yl/cPI84MQzQcO+2h/JMbncwCHvEVr3sRIGnmiFaLI32EZIwM/bCqFRyE9LsXIk8MQQTEVIwwbAIfCKpZMgSgKLIBHsb1i8iQAVlA4IMwBAABwCgCdASowADAAPpVEnUqlo6Kho4wAsBKJbADNZYCDAbZjmSfUBvAHoAfrd1jf7jpFtIBq0E0BlBvqPFfCuARewQ9MyQJPHYNorJAb+PtcWkpZAtY+pz5vo54oAAD++29//v///7+n//35XGME3gs4HRddHm89jZ9vGwKV+85ZdxDemJUIW5nxmrxqbf1PTz+tJdYn+7fAsfK5Q8QEI5/xhitq1e9hl7DIrfAS9ULvXYSzHHwFdsj0tkbjt8pC8nOuVVp5zVVR4kDLune0p1ZJungfXfZW69a/XFo4/DrH0TvWbw2wx1TWW5s/8ML7E5ZRd48ukSB7M6w+gr7+P26ZPsLlUv8Ww+F09Q5dfO2ATVL3ojZUyXpg0a33WgIADjF3xNdKeqs71g/NS2Ete9BExnYZlbc20RGXiVqRfWcuLPbEJbQC4hvKg/T3X3Vi11c1eGQnvmztq5NckmX/PeZmLhX64TLC3CpO1jxZJwfDrD4mB6NL7Dek81EJWnT9NKe/PV5HP7zsPyHWtZ4ZxJ0IWfj/iAqrXWc6/0TE+Y6F6OmxvQYQHVNEhTSZ0WoBo450IQgKcf2+jcAtM/nMr4P/K8zQaZ9xXzs0AAAA'],
     ['9','data:image/webp;base64,UklGRtICAABXRUJQVlA4WAoAAAAQAAAALwAALwAAQUxQSEYBAAABkLNtm2k77/fNHMW2bdssjcq2rdYozdLOP7DT2U5Ka61Z88bJTHmqiJgAFJ4UK3EZxK2KohNLQaIxQJ8bXAsbiQK1TpAJ24mJA7nLP13OXMrjiENG3HOTttDRpW1ggqktOWf7gNxBdKTj8QiA2o1bof6bLGPqPFuLCSPoPB4oqHKBjiTf3V4PG0alb3fJxXIm9J/mHv9S+2pNkRCCcqshFiN9mvmnmHWqdNMW0BCwcrKz5GEcU3p/o9mwJViVK2Gw6Azy7QSmpOeXyw1t/5bQEILazwww/Bdm5C3U3QcbAha7j6yYu4WOJL3j0r2rYYKo1uBfJ7wJQViLzfyS/c57nqmkGkil2mfnf+PIzYAgtMF0JiSzjG/7wyjCG9lP51PydA0oYlQp+Zrkw/6AQZwGzZMnC4pDFbEK6pcADCIWwAqiVkHhSVZQOCBmAQAA0AgAnQEqMAAwAD6VRp5LJaOioaOLALASiWwAxamAgwG2g3Cm8m7xBfgD8A5MGqW+e64ipk6Jfc8hV//FZSoGCsK2O4JDWdKTfPjtmV5/YAD+/K0SB32Zc5RE+Qj1LFUGUpBhYCl/tkT+DmFi2QbtWPWNEvQle/2b6Jel7XE9jn//pUzBW22jHEEmn/rhD0lybTEAUj3VA9wcEUXr++ealydHyVyH5G6gPugUNIvVoeTNMQbk5WMQJYzG5wTnxiPg8xViAs6Y6MnymldkqlmZs9/wgLj5ugpMUtLdwZqwWAOqNjPYM8533isNLt/0wMonzBxFzDtnfdi63VjrArNjUveLP/HmMMbB2nXsuPVtM8g7x9EchY7hGMAArCrBv8FHyp2AHn76/bscfijJ8WLfM8SuEg2OMjTOtbjEN3mY3PXQQpPDyEUh+5jOQ3KjuUYyJGBifmaZPrg8So56gf0D4BjPEwAAAA']
-    ['15','data:image/webp;base64,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'],
-    ['16','data:image/webp;base64,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']
   ]);
+
 
   const TIGER_CLEAR_ICON_OVERRIDES = new Map([
     // test94：四張曾經糊掉/破圖的素材全部換成新的獨立檔案路徑，避開舊快取。
@@ -7067,6 +8373,8 @@ try {
 
   function symbolIconHtml(token) {
     const key = String(token ?? '');
+
+    // test93：虎小妹清晰圖優先；錢袋、紅寶石、SCATTER 不再用 emoji / ? 替代。
     const clearSrc = probe.gameProfile === 'tiger'
       ? TIGER_CLEAR_ICON_OVERRIDES.get(key)
       : '';
@@ -9177,6 +10485,16 @@ try {
       #${PANEL_ID} .bp-title{font-size:12px;font-weight:900;letter-spacing:.05px}
       #${PANEL_ID} .bp-mini{display:flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:5px;background:rgba(255,255,255,.07);font-size:9px;opacity:.82}
       #${PANEL_ID} .bp-status{margin-top:6px;font-size:10px;color:#8deac1;font-weight:800}
+      #${PANEL_ID} .bp-profile-switch{position:relative;margin-top:6px}
+      #${PANEL_ID} .bp-profile-main{width:100%;display:flex;align-items:center;justify-content:space-between;gap:7px;border:1px solid rgba(255,95,158,.45);border-radius:8px;background:rgba(255,95,158,.10);color:#ffd4e5;padding:6px 8px;font-size:9px;font-weight:900;cursor:pointer;box-shadow:0 0 0 1px rgba(255,95,158,.05) inset}
+      #${PANEL_ID} .bp-profile-main-label{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #${PANEL_ID} .bp-profile-arrow{font-size:8px;opacity:.78}
+      #${PANEL_ID} .bp-profile-menu{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:30;padding:5px;border:1px solid rgba(255,184,212,.35);border-radius:9px;background:rgba(22,18,28,.985);box-shadow:0 8px 22px rgba(0,0,0,.42)}
+      #${PANEL_ID} .bp-profile-menu.open{display:block}
+      #${PANEL_ID} .bp-profile-option{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid transparent;border-radius:7px;background:transparent;color:rgba(255,255,255,.82);padding:7px 8px;margin:0 0 3px;font-size:9px;font-weight:850;text-align:left;cursor:pointer}
+      #${PANEL_ID} .bp-profile-option:last-child{margin-bottom:0}
+      #${PANEL_ID} .bp-profile-option.active{border-color:rgba(255,95,158,.40);background:rgba(255,95,158,.13);color:#ffd4e5}
+      #${PANEL_ID} .bp-profile-check{color:#ff9fc4;font-weight:950}
       #${PANEL_ID} .bp-signal{margin-top:7px;padding:7px 8px;border:1px solid rgba(255,255,255,.10);border-radius:9px;background:rgba(255,255,255,.035)}
       #${PANEL_ID} .bp-signal.hot{border-color:rgba(255,95,158,.62);background:rgba(255,95,158,.10);box-shadow:0 0 0 1px rgba(255,95,158,.08) inset}
       #${PANEL_ID} .bp-signal-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:9px}
@@ -9190,8 +10508,8 @@ try {
       #${PANEL_ID} .bp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:7px}
       #${PANEL_ID} .bp-item{padding:5px 3px 6px;border:1px solid rgba(255,255,255,.07);border-radius:8px;background:rgba(255,255,255,.045);text-align:center;min-width:0;overflow:visible}
       #${PANEL_ID} .bp-icon-shell{display:flex;width:42px;height:42px;margin:0 auto;align-items:center;justify-content:center;overflow:visible;background:transparent!important}
-      #${PANEL_ID} .bp-icon{display:block;width:38px;height:38px;margin:0 auto;border-radius:0!important;box-shadow:none!important;background:transparent!important}
-      #${PANEL_ID} .bp-icon-img{object-fit:contain;object-position:center center;box-sizing:border-box;padding:0!important;background:transparent!important;overflow:visible;box-shadow:none!important;border-radius:0!important;filter:none!important}
+      #${PANEL_ID} .bp-icon{display:block;width:48px;height:48px;max-width:48px;max-height:48px;margin:0 auto;border-radius:0!important;box-shadow:none!important;background:transparent!important}
+      #${PANEL_ID} .bp-icon-img{object-fit:contain;object-position:center center;box-sizing:border-box;padding:0!important;background:transparent!important;overflow:visible;box-shadow:none!important;border-radius:0!important;filter:none!important;image-rendering:auto!important}
       /* test95：五色寶石統一「肉眼大小」，不是只統一外框。 */
       #${PANEL_ID} .bp-gem-icon{width:36px!important;height:36px!important;max-width:36px!important;max-height:36px!important;object-fit:contain!important;transform-origin:center center!important}
       #${PANEL_ID} .bp-gem-5{transform:scale(1.08)!important}
@@ -9259,6 +10577,7 @@ try {
       }
       html.xinyao-phone-ui #${PANEL_ID} .bp-icon-shell{width:30px;height:30px;margin:0 auto 2px}
       html.xinyao-phone-ui #${PANEL_ID} .bp-icon{width:28px;height:28px}
+      #${PANEL_ID} .bp-text-icon{display:flex;align-items:center;justify-content:center;font-size:22px;line-height:1}
       html.xinyao-phone-ui #${PANEL_ID} .bp-item-name{font-size:8px;line-height:1.15}
       html.xinyao-phone-ui #${PANEL_ID} .bp-item-count{font-size:10px;line-height:1.15;margin-top:2px}
 
@@ -9376,6 +10695,60 @@ try {
     return panel;
   }
 
+  function profileSwitchMarkup() {
+    const current = gameProfileOption();
+    return `
+      <div class="bp-profile-switch">
+        <button type="button" class="bp-profile-main" aria-expanded="false">
+          <span class="bp-profile-main-label">🎮 遊戲類別｜${current.icon} ${current.label}</span>
+          <span class="bp-profile-arrow">▾</span>
+        </button>
+        <div class="bp-profile-menu">
+          ${GAME_PROFILE_OPTIONS.map(item => `
+            <button type="button" class="bp-profile-option ${probe.gameProfile === item.id ? 'active' : ''}" data-profile="${item.id}">
+              <span>${item.icon} ${item.label}</span>
+              <span class="bp-profile-check">${probe.gameProfile === item.id ? '✓' : ''}</span>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  function bindProfileSwitch(root) {
+    if (!root) return;
+
+    const main = root.querySelector('.bp-profile-main');
+    const menu = root.querySelector('.bp-profile-menu');
+    const arrow = root.querySelector('.bp-profile-arrow');
+
+    if (main && menu) {
+      main.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const open = !menu.classList.contains('open');
+        menu.classList.toggle('open', open);
+        main.setAttribute('aria-expanded', String(open));
+        if (arrow) arrow.textContent = open ? '▴' : '▾';
+      });
+    }
+
+    for (const button of root.querySelectorAll('.bp-profile-option[data-profile]')) {
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const profile = String(button.dataset.profile || '');
+        if (!validManualGameProfile(profile)) return;
+
+        if (menu) menu.classList.remove('open');
+        if (main) main.setAttribute('aria-expanded', 'false');
+        if (arrow) arrow.textContent = '▾';
+
+        setManualGameProfile(profile);
+      });
+    }
+  }
+
   function render() {
     if (window.__XIANYAO_MAINTENANCE_STATE__?.enabled) {
       const existing = document.getElementById(PANEL_ID);
@@ -9406,11 +10779,11 @@ try {
 
     if (!candidate) {
       body.innerHTML = `
-        ${gameCategorySelectorMarkup()}
+        ${profileSwitchMarkup()}
         <div class="bp-status">● ${esc(probe.status)}</div>
         <div class="bp-path">房號 ${esc(roomText())}｜完成一局後才分析已結束盤面</div>
       `;
-      bindGameCategorySelector(body);
+      bindProfileSwitch(body);
       return;
     }
 
@@ -9446,7 +10819,7 @@ try {
       : '';
 
     body.innerHTML = `
-      ${gameCategorySelectorMarkup()}
+      ${profileSwitchMarkup()}
       <div class="bp-status">● 已完成盤面偵測｜${esc(gameProfileName())}｜${esc(roomText())} 房</div>
       ${signalMarkup}
       <div class="bp-grid">${cards}</div>
@@ -9460,8 +10833,8 @@ try {
       </div>
     `;
 
+    bindProfileSwitch(body);
     cleanRenderedIconCards(body);
-    bindGameCategorySelector(body);
 
     const boardToggle = body.querySelector('.bp-board-toggle');
     const boardWrap = body.querySelector('.bp-board-wrap');
@@ -9493,12 +10866,8 @@ try {
 
     const previousRoom = probe.roomNumber;
     const previousGameProfile = probe.gameProfile;
-
-    const result = chooseCandidate(detail.finalState, detail.engine);
-
-    // test108：遊戲類別由會員在單一選單中指定，盤面 ID 不再自行覆寫。
-    probe.gameProfile = boardProfileMode();
-
+    // test99：圖示組只看右上角手動選擇，任何封包/Canvas/上一款遊戲都不得覆寫。
+    probe.gameProfile = loadManualGameProfile();
     probe.roomNumber = detail.roomNumber ?? null;
     probe.updatedAt = Date.now();
 
@@ -9514,8 +10883,13 @@ try {
       probe.autoStopRetryUntil = 0;
       probe.autoStopAttempts = 0;
       probe.learnedStopButtonRef = null;
+      try {
+        window.__XIANYAO_ATG_GAME_PROFILE_HINT__ = probe.gameProfile;
+        window.__XIANYAO_ATG_GAME_PROFILE_PAYLOAD_HINT__ = '';
+      } catch (_) {}
     }
 
+    const result = chooseCandidate(detail.finalState, detail.engine);
     probe.candidate = result.best;
     probe.candidateCount = result.count;
     probe.status = result.best
@@ -9627,59 +11001,17 @@ try {
   }
 
 
-  probe.gameProfile = boardProfileMode();
   window.addEventListener(EVENT_NAME, handleSpinFinal);
 
   try {
     window.addEventListener('xinyao:maintenance', render);
   } catch (_) {}
 
-  function keepBoardPanelAlive() {
-    try {
-      if (window.__XIANYAO_MAINTENANCE_STATE__?.enabled) return;
-      if (!document.documentElement) return;
-
-      const panel = document.getElementById(PANEL_ID);
-      if (!panel || !panel.isConnected) {
-        probe.status = probe.candidate
-          ? probe.status
-          : '遊戲載入中／等待第一局完成資料…';
-        render();
-        return;
-      }
-
-      // 某些遊戲 Loading / SPA 切場會把 HUD 設成 none 或移出 body。
-      if (panel.style.display === 'none') panel.style.display = '';
-      if (document.body && panel.parentNode !== document.body) {
-        document.body.appendChild(panel);
-      }
-    } catch (_) {}
-  }
-
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      render();
-      keepBoardPanelAlive();
-    }, { once:true });
+    document.addEventListener('DOMContentLoaded', render, { once:true });
   } else {
     render();
-    keepBoardPanelAlive();
   }
-
-  // test109：切遊戲 / Loading / SPA 換場期間如果 DOM 被重建，自動把盤面面板掛回來。
-  setInterval(keepBoardPanelAlive, 350);
-
-  try {
-    const boardRootObserver = new MutationObserver(() => {
-      if (!document.getElementById(PANEL_ID)) keepBoardPanelAlive();
-    });
-    const startBoardObserver = () => {
-      const root = document.body || document.documentElement;
-      if (root) boardRootObserver.observe(root, { childList:true, subtree:true });
-    };
-    if (document.body) startBoardObserver();
-    else document.addEventListener('DOMContentLoaded', startBoardObserver, { once:true });
-  } catch (_) {}
 })();
 
 
