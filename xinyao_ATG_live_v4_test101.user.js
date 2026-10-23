@@ -2,7 +2,7 @@
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
 // @version      4.0.0-test.101
-// @description  v4 HUD 測試版：電腦與全裝置統一使用同一套超小懸浮工具；完整即時助手只在點擊詳細資料時展開，盤面監測預設收合。請勿與正式版同時啟用。
+// @description  test101：延續 test100，新增排行榜「進入此房」自動選房流程（開選機台→切頁→選房→確定）。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -3750,7 +3750,9 @@ try {
     autoTimer: null,
     renderTimer: null,
     // v3.2.4：全裝置滑動全房分析時暫停重建 DOM，避免手指滑動被即時刷新打斷。
-    panelInteractingUntil: 0
+    panelInteractingUntil: 0,
+    enterRoomBusy: false,
+    enterRoomStatus: ''
   };
 
   function clearStoredFullScanSession() {
@@ -5765,17 +5767,274 @@ try {
     setTimeout(() => { if (el) el.textContent = old; }, 1500);
   }
 
+  function sameOriginRoomWindows() {
+    const out = [];
+    const seen = new Set();
+    const visit = w => {
+      if (!w || seen.has(w)) return;
+      seen.add(w);
+      try {
+        void w.location.href;
+        out.push(w);
+        for (let i = 0; i < w.frames.length; i += 1) visit(w.frames[i]);
+      } catch (_) {}
+    };
+    visit(window);
+    return out;
+  }
+
+  function cocosButtonText(button, cocos) {
+    try {
+      const node = button?.node;
+      const Label = cocos?.Label;
+      if (!node || !Label || typeof node.getComponentsInChildren !== 'function') return '';
+      return (node.getComponentsInChildren(Label) || [])
+        .map(label => String(label?.string ?? label?._string ?? '').trim())
+        .filter(Boolean)
+        .join(' | ');
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function cocosNodePath(node) {
+    const parts = [];
+    let cur = node;
+    for (let i = 0; cur && i < 10; i += 1) {
+      const name = String(cur?.name || '').trim();
+      if (name) parts.push(name);
+      cur = cur.parent || cur._parent || null;
+    }
+    return parts.reverse().join('/');
+  }
+
+  function emitRoomCocosButton(button, cocos) {
+    if (!button?.node) return false;
+    try {
+      if (button.interactable === false || button.enabledInHierarchy === false) return false;
+    } catch (_) {}
+
+    try {
+      if (typeof button._emitButtonEvent === 'function') {
+        button._emitButtonEvent();
+        return true;
+      }
+    } catch (_) {}
+    try {
+      if (typeof button._emitClickEvent === 'function') {
+        button._emitClickEvent();
+        return true;
+      }
+    } catch (_) {}
+    try {
+      const events = Array.isArray(button.clickEvents) ? button.clickEvents : [];
+      const EventHandler = cocos?.Component?.EventHandler || cocos?.EventHandler;
+      if (events.length && typeof EventHandler?.emitEvents === 'function') {
+        EventHandler.emitEvents(events, button);
+        return true;
+      }
+    } catch (_) {}
+    try {
+      const type = cocos?.Button?.EventType?.CLICK || 'click';
+      button.node.emit?.(type, button);
+      return true;
+    } catch (_) {}
+    return false;
+  }
+
+  function findRoomCocosButton(matchFn) {
+    for (const w of sameOriginRoomWindows()) {
+      try {
+        const cocos = w.cc || w.legacyCC || w._cc;
+        const scene = cocos?.director?.getScene?.();
+        const Button = cocos?.Button;
+        if (!scene || !Button || typeof scene.getComponentsInChildren !== 'function') continue;
+        const buttons = scene.getComponentsInChildren(Button) || [];
+        for (const button of buttons) {
+          const node = button?.node;
+          if (!node || node.activeInHierarchy === false) continue;
+          const text = cocosButtonText(button, cocos);
+          const path = cocosNodePath(node);
+          if (matchFn({ button, cocos, text, path, window:w })) {
+            return { button, cocos, text, path, window:w };
+          }
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  function currentRoomNumberForOpenButton() {
+    const id = finiteNumber(state.currentSelectedRoomId);
+    if (id !== null) {
+      const mapped = roomNumberByRoomIdFromScanner(id);
+      if (mapped !== null) return mapped;
+    }
+    try {
+      const n = finiteNumber(window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.roomNumber);
+      if (n !== null) return n;
+    } catch (_) {}
+    return null;
+  }
+
+  function machineSelectionLooksOpen() {
+    // 選擇機台畫面一定會同時出現「顯示全部/顯示空桌」或頁碼列等控制。
+    return Boolean(findRoomCocosButton(({text,path}) =>
+      /(顯示全部|顯示空桌|選擇機台)/.test(text) ||
+      /(?:Select|Choose).*(?:Table|Room|Machine)/i.test(path)
+    ));
+  }
+
+  async function openMachineSelectionForAutoEnter() {
+    if (machineSelectionLooksOpen()) return true;
+
+    const currentRoom = currentRoomNumberForOpenButton();
+    let found = null;
+
+    if (currentRoom !== null) {
+      const exact = String(Math.trunc(currentRoom));
+      found = findRoomCocosButton(({text,path}) => {
+        const labels = String(text || '').split('|').map(v => v.trim());
+        const hasExact = labels.some(v => v === exact);
+        return hasExact && /(table|room|machine|select|change|switch|button|spinbar)/i.test(path);
+      });
+    }
+
+    if (!found) {
+      found = findRoomCocosButton(({text,path}) =>
+        /(選擇機台|換房|換桌|機台)/.test(text) ||
+        /(?:table|room|machine).*(?:select|switch|change)/i.test(path)
+      );
+    }
+
+    if (!found || !emitRoomCocosButton(found.button, found.cocos)) return false;
+
+    const started = Date.now();
+    while (Date.now() - started < 2600) {
+      if (machineSelectionLooksOpen()) return true;
+      await delay(100);
+    }
+    return machineSelectionLooksOpen();
+  }
+
+  function findTargetRoomButton(roomNumber) {
+    const exact = String(Math.trunc(roomNumber));
+    return findRoomCocosButton(({text,path}) => {
+      const labels = String(text || '').split('|').map(v => v.trim());
+      if (!labels.some(v => v === exact)) return false;
+      // 避免誤按底部「目前房號」：選機台格子的路徑通常位於 table/list/item/card/grid 類節點。
+      return /(table|room|machine|item|cell|card|grid|list|choose|select)/i.test(path);
+    });
+  }
+
+  function findConfirmRoomButton() {
+    return findRoomCocosButton(({text,path}) => {
+      const t = String(text || '').replace(/\s+/g,'').trim();
+      if (t === '確定' || t === '确认' || t === '確認') return true;
+      return /(confirm|enter).*(table|room|machine)/i.test(path);
+    });
+  }
+
+  async function enterRoomFromRanking(roomNumber, roomId) {
+    const number = finiteNumber(roomNumber);
+    const id = finiteNumber(roomId);
+    if (number === null || id === null || state.enterRoomBusy) return;
+
+    state.enterRoomBusy = true;
+    state.enterRoomStatus = `🚪 準備進入 ${Math.trunc(number)} 房…`;
+    scheduleRender();
+
+    try {
+      const opened = await openMachineSelectionForAutoEnter();
+      if (!opened) throw new Error('找不到「選擇機台」按鈕');
+
+      const plan = buildDynamicScanPlan(state);
+      const targetPage = clamp(
+        Math.floor((number - 1) / Math.max(1, plan.tablePerPage)) + 1,
+        1,
+        Math.max(1, plan.totalPages)
+      );
+
+      state.enterRoomStatus = `🚪 ${Math.trunc(number)} 房｜切到第 ${targetPage} 頁…`;
+      scheduleRender();
+
+      if (finiteNumber(state.currentPage) !== targetPage) {
+        const moved = await navigateToPageAdaptive(targetPage, plan.totalPages);
+        if (!moved) throw new Error(`無法切到第 ${targetPage} 頁`);
+        await delay(180);
+      }
+
+      let target = findTargetRoomButton(number);
+      if (!target) {
+        // 頁面資料有時比 Cocos UI 慢一拍。
+        await delay(350);
+        target = findTargetRoomButton(number);
+      }
+      if (!target) throw new Error(`找不到 ${Math.trunc(number)} 房按鈕`);
+
+      state.enterRoomStatus = `🚪 已找到 ${Math.trunc(number)} 房，正在選取…`;
+      scheduleRender();
+
+      if (!emitRoomCocosButton(target.button, target.cocos)) {
+        throw new Error('房號按鈕無法點擊');
+      }
+
+      // 等 ATG 送出 getSlotTableDetail；這正是實機 Network 抓到的選房事件。
+      const selectedStarted = Date.now();
+      while (Date.now() - selectedStarted < 2200) {
+        if (finiteNumber(state.currentSelectedRoomId) === id) break;
+        await delay(80);
+      }
+
+      await delay(160);
+      let confirm = findConfirmRoomButton();
+      if (!confirm) {
+        await delay(300);
+        confirm = findConfirmRoomButton();
+      }
+      if (!confirm) throw new Error('找不到「確定」按鈕');
+
+      state.enterRoomStatus = `🚪 ${Math.trunc(number)} 房已選取，正在確認…`;
+      scheduleRender();
+
+      if (!emitRoomCocosButton(confirm.button, confirm.cocos)) {
+        throw new Error('確定按鈕無法點擊');
+      }
+
+      state.enterRoomStatus = `✅ 已送出進入 ${Math.trunc(number)} 房`;
+      scheduleRender();
+      setTimeout(() => {
+        if (state.enterRoomStatus.startsWith('✅')) {
+          state.enterRoomStatus = '';
+          scheduleRender();
+        }
+      }, 3500);
+    } catch (error) {
+      state.enterRoomStatus = `⚠️ 進房失敗：${String(error?.message || error)}`;
+      scheduleRender();
+    } finally {
+      state.enterRoomBusy = false;
+    }
+  }
+
   function topRowsHtml() {
     const rows = topRooms();
     if (!rows.length) return `<div style="opacity:.65;padding:8px 0;">尚無可排行的空房資料。</div>`;
     return rows.map((r, i) => {
       const m = r.metrics;
-      return `<div style="display:grid;grid-template-columns:34px 58px 1fr 1fr 58px;gap:5px;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.07);font-size:11px;">
+      return `<div style="display:grid;grid-template-columns:30px 52px 1fr 1fr 48px 72px;gap:5px;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.07);font-size:11px;">
         <b>#${i + 1}</b>
         <b>${String(r.number).padStart(4, '0')}</b>
         <span>今日 ${formatPct(m.todayRate)}</span>
         <span>累計 ${formatPct(m.totalRate)}</span>
         <span style="text-align:right;">${m.observationScore === null ? '—' : m.observationScore.toFixed(1)}</span>
+        <button type="button"
+          class="xinyao-enter-room"
+          data-room-number="${Math.trunc(r.number)}"
+          data-room-id="${Math.trunc(r.roomId)}"
+          style="border:1px solid rgba(255,190,215,.5);border-radius:7px;background:rgba(255,95,158,.14);color:#ffd3e4;padding:5px 4px;font-size:9px;font-weight:900;cursor:pointer;">
+          進入此房
+        </button>
       </div>`;
     }).join('');
   }
@@ -5850,8 +6109,9 @@ try {
               <option value="todayBet" ${ui.rankMode === 'todayBet' ? 'selected' : ''}>今日投注量</option>
             </select>
           </div>
-          <div style="display:grid;grid-template-columns:34px 58px 1fr 1fr 58px;gap:5px;font-size:10px;opacity:.7;padding-bottom:3px;"><span>名次</span><span>房號</span><span>今日率</span><span>累計率</span><span>分數</span></div>
+          <div style="display:grid;grid-template-columns:30px 52px 1fr 1fr 48px 72px;gap:5px;font-size:10px;opacity:.7;padding-bottom:3px;"><span>名次</span><span>房號</span><span>今日率</span><span>累計率</span><span>分數</span><span>操作</span></div>
           ${topRowsHtml()}
+          ${state.enterRoomStatus ? `<div style="margin-top:6px;padding:6px 7px;border:1px solid rgba(255,184,212,.18);border-radius:7px;background:rgba(255,255,255,.04);font-size:9.5px;color:#ffd2e4;">${escapeHtml(state.enterRoomStatus)}</div>` : ''}
           <div style="font-size:9.5px;opacity:.6;line-height:1.5;margin-top:6px;">觀察分數只整理已發生的統計資料，並以投注量做簡單權重修正，不代表下一局結果。</div>
         </div>
 
@@ -6057,6 +6317,17 @@ try {
           event.preventDefault();
           event.stopPropagation();
         }
+        return;
+      }
+
+      const enterRoomButton = event.target?.closest?.('.xinyao-enter-room[data-room-number][data-room-id]');
+      if (enterRoomButton && panel.contains(enterRoomButton)) {
+        event.preventDefault();
+        event.stopPropagation();
+        holdPanelInteraction(5000);
+        const roomNumber = Number(enterRoomButton.dataset.roomNumber);
+        const roomId = Number(enterRoomButton.dataset.roomId);
+        enterRoomFromRanking(roomNumber, roomId);
         return;
       }
 
@@ -6578,6 +6849,62 @@ try {
     gameProfile: 'tiger'
   };
 
+  // test100：遊戲類別集中在同一份清單。
+  // 之後新增遊戲，只要新增一筆選項＋對應圖示辨識資料，不需要再改版面。
+  const MANUAL_GAME_PROFILE_KEY = 'xinyao_atg_board_manual_profile_v1';
+  const GAME_PROFILE_OPTIONS = Object.freeze([
+    { id:'seth', label:'戰神賽特2', shortLabel:'賽特2', icon:'👁️' },
+    { id:'tiger', label:'虎小妹', shortLabel:'虎小妹', icon:'🐯' }
+  ]);
+
+  function validManualGameProfile(profile) {
+    return GAME_PROFILE_OPTIONS.some(item => item.id === String(profile || ''));
+  }
+
+  function gameProfileOption(profile = probe.gameProfile) {
+    return GAME_PROFILE_OPTIONS.find(item => item.id === String(profile || ''))
+      || GAME_PROFILE_OPTIONS[0];
+  }
+
+  function loadManualGameProfile() {
+    try {
+      const saved = String(localStorage.getItem(MANUAL_GAME_PROFILE_KEY) || '').toLowerCase();
+      if (validManualGameProfile(saved)) return saved;
+    } catch (_) {}
+    return 'tiger';
+  }
+
+  function setManualGameProfile(profile) {
+    profile = String(profile || '');
+    if (!validManualGameProfile(profile)) return;
+    if (probe.gameProfile === profile) return;
+
+    probe.gameProfile = profile;
+    try { localStorage.setItem(MANUAL_GAME_PROFILE_KEY, profile); } catch (_) {}
+
+    // 換遊戲組時清掉上一款的盤面自適應暫存狀態，避免名稱/權重混用。
+    probe.signalHistory = [];
+    probe.signalArmed = true;
+    probe.signalTriggered = false;
+    probe.signalScore = 0;
+    probe.signalReason = '已切換圖示組，下一局重新分析';
+    probe.autoStopStatus = '';
+    probe.autoStopRetryToken += 1;
+    probe.autoStopRetryUntil = 0;
+    probe.autoStopAttempts = 0;
+    probe.learnedStopButtonRef = null;
+
+    try {
+      window.__XIANYAO_ATG_GAME_PROFILE_HINT__ = profile;
+      window.__XIANYAO_ATG_GAME_PROFILE_PAYLOAD_HINT__ = '';
+      window.__XIANYAO_ATG_MANUAL_GAME_PROFILE__ = profile;
+    } catch (_) {}
+
+    render();
+  }
+
+  probe.gameProfile = loadManualGameProfile();
+
   const SIGNAL_THRESHOLD = 80;
   const SIGNAL_REARM_THRESHOLD = 60;
   const SIGNAL_AUTOSTOP_KEY = 'xinyao_atg_signal_autostop_v1';
@@ -6951,240 +7278,6 @@ try {
     }
   }
 
-  // test100：遊戲設定檔自動辨識。
-  // 每款遊戲只需要新增一筆 profile，不會在面板增加任何按鈕。
-  // 重點：只讀「目前盤面 / 當下新載入資源」，不讀跑馬燈、整頁文字或舊快取。
-  const GAME_PROFILE_REGISTRY = [
-    {
-      id:'tiger',
-      label:'虎小妹',
-      // 不用 axe / gem，因為其他遊戲也會有。
-      assetRe:/(tigergirl|tiger[_-]?(?:girl|sister|shield|head)|cat[_-]?girl|paw[_-]?(?:shield|mug)|beer[_-]?(?:mug)?|ale[_-]?mug|money[_-]?bag|coin[_-]?bag|虎小妹|虎盾|啤酒|錢袋|钱袋)/i
-    },
-    {
-      id:'seth',
-      label:'戰神賽特2',
-      // 只抓賽特專屬埃及符號；不把共用 engine 名稱 "seth" 本身當證據。
-      assetRe:/(eye[_-]?of[_-]?horus|horus[_-]?eye|cobra|serpent|egyptian[_-]?snake|bow[_-]?arrow|archer[_-]?bow|ankh|pharaoh|scarab|眼睛|荷魯斯|荷鲁斯|眼|蛇|弓箭)/i
-    }
-  ];
-
-  function nodeWorldPoint(node, cocos) {
-    try {
-      const p = node?.worldPosition || node?._worldPosition;
-      if (Number.isFinite(Number(p?.x)) && Number.isFinite(Number(p?.y))) {
-        return {x:Number(p.x),y:Number(p.y)};
-      }
-    } catch (_) {}
-    try {
-      if (typeof node?.convertToWorldSpaceAR === 'function') {
-        const zero = typeof cocos?.v2 === 'function' ? cocos.v2(0,0) : {x:0,y:0};
-        const p = node.convertToWorldSpaceAR(zero);
-        if (Number.isFinite(Number(p?.x)) && Number.isFinite(Number(p?.y))) {
-          return {x:Number(p.x),y:Number(p.y)};
-        }
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  function currentProfileFromGameCanvasAspect() {
-    // test101：目前兩款遊戲的「主遊戲畫布版型」是最穩定的區別。
-    // 戰神賽特2：固定直式遊戲框；虎小妹：橫式寬畫面。
-    // 只看當下可見最大 Canvas 的 CSS 顯示比例，不讀文字、不讀快取。
-    let best = null;
-
-    for (const gameWindow of sameOriginSignalWindows()) {
-      try {
-        const canvases = [...(gameWindow.document?.querySelectorAll?.('canvas') || [])];
-        for (const canvas of canvases) {
-          let rect;
-          try { rect = canvas.getBoundingClientRect(); } catch (_) { continue; }
-          const width = Number(rect?.width) || 0;
-          const height = Number(rect?.height) || 0;
-          if (width < 240 || height < 300) continue;
-
-          let style;
-          try { style = gameWindow.getComputedStyle(canvas); } catch (_) {}
-          if (style && (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0)) continue;
-
-          const area = width * height;
-          if (!best || area > best.area) {
-            best = { width, height, area, ratio: width / height };
-          }
-        }
-      } catch (_) {}
-    }
-
-    if (!best) return '';
-
-    let chosen = '';
-    // 使用者實測：
-    // Seth2 約 0.55～0.60 的直式框；Tiger 桌面版約 1.5～1.7 的橫式框。
-    // 中間保留很大的灰區，避免手機/特殊縮放時硬判錯。
-    if (best.ratio <= 0.78) chosen = 'seth';
-    else if (best.ratio >= 1.18) chosen = 'tiger';
-
-    try {
-      window.__XIANYAO_ATG_CANVAS_ASPECT_DEBUG__ = {
-        chosen,
-        width: Math.round(best.width),
-        height: Math.round(best.height),
-        ratio: Math.round(best.ratio * 1000) / 1000,
-        at: Date.now()
-      };
-    } catch (_) {}
-
-    return chosen;
-  }
-
-  function currentProfileFromActiveReelAssets() {
-    const scores = Object.fromEntries(GAME_PROFILE_REGISTRY.map(p => [p.id, 0]));
-    const evidence = Object.fromEntries(GAME_PROFILE_REGISTRY.map(p => [p.id, []]));
-
-    const addEvidence = (text, weight, source) => {
-      const s = String(text ?? '');
-      if (!s || s.length > 5000) return;
-      for (const profile of GAME_PROFILE_REGISTRY) {
-        if (!profile.assetRe.test(s)) continue;
-        scores[profile.id] += weight;
-        if (evidence[profile.id].length < 12) evidence[profile.id].push(source + ':' + s.slice(0,180));
-      }
-    };
-
-    for (const gameWindow of sameOriginSignalWindows()) {
-      // A. Cocos：只看目前 active node，而且排除跑馬燈/公告/HUD。
-      try {
-        const cocos = gameWindow?.cc || gameWindow?.legacyCC || gameWindow?._cc;
-        const scene = cocos?.director?.getScene?.();
-        const Component = cocos?.Component;
-        if (scene && Component && typeof scene.getComponentsInChildren === 'function') {
-          let visible = {width:0,height:0};
-          try {
-            const size=cocos?.view?.getVisibleSize?.();
-            visible={width:Number(size?.width)||0,height:Number(size?.height)||0};
-          } catch (_) {}
-
-          const components=scene.getComponentsInChildren(Component)||[];
-          for(let i=0;i<components.length && i<5000;i+=1){
-            const component=components[i];
-            const node=component?.node;
-            if(!node || node.activeInHierarchy===false) continue;
-
-            const names=[];
-            let cursor=node;
-            for(let depth=0;cursor && depth<7;depth+=1){
-              names.push(String(cursor.name||''));
-              cursor=cursor.parent||cursor._parent||null;
-            }
-            const path=names.join('/');
-
-            // 明確排除會出現其他遊戲名稱的全域區塊。
-            if (/(ticker|marquee|broadcast|announcement|notice|winner|news|jackpot|grand|major|minor|mini|topbar|message)/i.test(path)) continue;
-
-            let inGameArea=true;
-            const point=nodeWorldPoint(node,cocos);
-            if(point && visible.width>0 && visible.height>0){
-              const nx=point.x/visible.width;
-              const ny=point.y/visible.height;
-              // 排除最上方跑馬燈與最下方控制列；保留左側角色與中央盤面。
-              inGameArea = nx>=0.02 && nx<=0.98 && ny>=0.16 && ny<=0.90;
-            }
-            if(!inGameArea) continue;
-
-            const spriteFrame=component?.spriteFrame || component?._spriteFrame;
-            const texture=spriteFrame?.texture || spriteFrame?._texture || component?.texture || component?._texture;
-            const image=texture?.image || texture?._image;
-
-            const bits=[
-              path,
-              component?.constructor?.name,
-              component?.__classname__,
-              spriteFrame?.name,
-              spriteFrame?._name,
-              spriteFrame?._uuid,
-              texture?.name,
-              texture?._name,
-              texture?._uuid,
-              image?.url,
-              image?._url,
-              component?.atlas?.name,
-              component?._atlas?.name,
-              component?.spriteAtlas?.name,
-              component?._spriteAtlas?.name
-            ].filter(Boolean).join(' | ');
-
-            addEvidence(bits, point ? 5 : 3, 'cocos');
-          }
-        }
-      } catch (_) {}
-
-      // B. 只看最近 20 秒「新載入」的資源。
-      // 切遊戲後新的 bundle/atlas/texture 會在這裡；上一款舊資源不會繼續加分。
-      try {
-        const now=Number(gameWindow.performance?.now?.()||0);
-        const resources=gameWindow.performance?.getEntriesByType?.('resource')||[];
-        for(const entry of resources.slice(-500)){
-          const age=now-Number(entry?.startTime||0);
-          if(age<0 || age>20000) continue;
-          const name=String(entry?.name||'');
-          if(!name || /githubusercontent\.com\/xinyao-ai|xinyao-atg/i.test(name)) continue;
-          addEvidence(name, 4, 'resource');
-        }
-      } catch (_) {}
-
-      // C. 目前 iframe / script / image 的 URL 可以算，但不看 body.innerText。
-      try {
-        const els=[...gameWindow.document.querySelectorAll('iframe[src],script[src],img[src],source[src],link[href]')].slice(-600);
-        for(const el of els){
-          const value=String(el.src||el.href||el.getAttribute?.('src')||el.getAttribute?.('href')||'');
-          if(!value || /githubusercontent\.com\/xinyao-ai|xinyao-atg/i.test(value)) continue;
-          addEvidence(value,2,'dom-url');
-        }
-      } catch (_) {}
-    }
-
-    const ranked=Object.entries(scores).sort((a,b)=>b[1]-a[1]);
-    const [best,bestScore]=ranked[0]||['',0];
-    const secondScore=ranked[1]?.[1]||0;
-
-    try {
-      window.__XIANYAO_ATG_PROFILE_AUTO_DEBUG__={
-        scores,
-        evidence,
-        best,
-        bestScore,
-        secondScore,
-        at:Date.now()
-      };
-    } catch (_) {}
-
-    // 必須有至少兩個強證據，且明顯勝過第二名才切換。
-    if(bestScore>=8 && bestScore>=secondScore+4) return best;
-    return '';
-  }
-
-  function autoDetectCurrentGameProfile(detail = {}) {
-    // 1. test101：主遊戲 Canvas 版型最高優先。
-    const aspect = currentProfileFromGameCanvasAspect();
-    if (aspect) return aspect;
-
-    // 2. 盤面正在使用的 Sprite / 當下新資源。
-    const active = currentProfileFromActiveReelAssets();
-    if (active) return active;
-
-    // 3. Canvas 顏色主題只當備援。
-    const canvas = detectCanvasThemeProfile();
-    if (canvas) return canvas;
-
-    // 4. 封包只有明確虎小妹才採用；共用 Seth engine 不能單獨判賽特。
-    const payload = String(detail?.gameProfileHint || '').toLowerCase();
-    if (payload === 'tiger') return 'tiger';
-
-    // 沒有足夠證據就維持目前，不亂跳。
-    return probe.gameProfile || 'tiger';
-  }
-
   function detectCanvasThemeProfile() {
     // test97：直接讀目前正在顯示的遊戲 Canvas。
     // 虎小妹左側角色區域偏粉紅/橘色；賽特2左側埃及場景偏深藍/靛藍。
@@ -7359,7 +7452,21 @@ try {
   }
 
   function resolveGameProfileForSpin(detail = {}) {
-    return autoDetectCurrentGameProfile(detail);
+    // test98：最優先採用使用者「實際點選遊戲」的結果。
+    // 這個來源不受上一款遊戲共用引擎/快取污染。
+    const selected = recentSelectedGameProfile();
+    if (selected) return selected;
+
+    const canvasProfile = detectCanvasThemeProfile();
+    if (canvasProfile) return canvasProfile;
+
+    const live = detectLiveSceneProfile();
+    if (live) return live;
+
+    const detected = detectBoardGameProfile(detail?.gameProfileHint || '');
+    if (detected === 'tiger' || detected === 'seth') return detected;
+
+    return probe.gameProfile || 'tiger';
   }
 
   function detectBoardGameProfile(explicitHint = '') {
@@ -9748,6 +9855,16 @@ try {
       #${PANEL_ID} .bp-title{font-size:12px;font-weight:900;letter-spacing:.05px}
       #${PANEL_ID} .bp-mini{display:flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:5px;background:rgba(255,255,255,.07);font-size:9px;opacity:.82}
       #${PANEL_ID} .bp-status{margin-top:6px;font-size:10px;color:#8deac1;font-weight:800}
+      #${PANEL_ID} .bp-profile-switch{position:relative;margin-top:6px}
+      #${PANEL_ID} .bp-profile-main{width:100%;display:flex;align-items:center;justify-content:space-between;gap:7px;border:1px solid rgba(255,95,158,.45);border-radius:8px;background:rgba(255,95,158,.10);color:#ffd4e5;padding:6px 8px;font-size:9px;font-weight:900;cursor:pointer;box-shadow:0 0 0 1px rgba(255,95,158,.05) inset}
+      #${PANEL_ID} .bp-profile-main-label{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #${PANEL_ID} .bp-profile-arrow{font-size:8px;opacity:.78}
+      #${PANEL_ID} .bp-profile-menu{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:30;padding:5px;border:1px solid rgba(255,184,212,.35);border-radius:9px;background:rgba(22,18,28,.985);box-shadow:0 8px 22px rgba(0,0,0,.42)}
+      #${PANEL_ID} .bp-profile-menu.open{display:block}
+      #${PANEL_ID} .bp-profile-option{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid transparent;border-radius:7px;background:transparent;color:rgba(255,255,255,.82);padding:7px 8px;margin:0 0 3px;font-size:9px;font-weight:850;text-align:left;cursor:pointer}
+      #${PANEL_ID} .bp-profile-option:last-child{margin-bottom:0}
+      #${PANEL_ID} .bp-profile-option.active{border-color:rgba(255,95,158,.40);background:rgba(255,95,158,.13);color:#ffd4e5}
+      #${PANEL_ID} .bp-profile-check{color:#ff9fc4;font-weight:950}
       #${PANEL_ID} .bp-signal{margin-top:7px;padding:7px 8px;border:1px solid rgba(255,255,255,.10);border-radius:9px;background:rgba(255,255,255,.035)}
       #${PANEL_ID} .bp-signal.hot{border-color:rgba(255,95,158,.62);background:rgba(255,95,158,.10);box-shadow:0 0 0 1px rgba(255,95,158,.08) inset}
       #${PANEL_ID} .bp-signal-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:9px}
@@ -9948,6 +10065,60 @@ try {
     return panel;
   }
 
+  function profileSwitchMarkup() {
+    const current = gameProfileOption();
+    return `
+      <div class="bp-profile-switch">
+        <button type="button" class="bp-profile-main" aria-expanded="false">
+          <span class="bp-profile-main-label">🎮 遊戲類別｜${current.icon} ${current.label}</span>
+          <span class="bp-profile-arrow">▾</span>
+        </button>
+        <div class="bp-profile-menu">
+          ${GAME_PROFILE_OPTIONS.map(item => `
+            <button type="button" class="bp-profile-option ${probe.gameProfile === item.id ? 'active' : ''}" data-profile="${item.id}">
+              <span>${item.icon} ${item.label}</span>
+              <span class="bp-profile-check">${probe.gameProfile === item.id ? '✓' : ''}</span>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  function bindProfileSwitch(root) {
+    if (!root) return;
+
+    const main = root.querySelector('.bp-profile-main');
+    const menu = root.querySelector('.bp-profile-menu');
+    const arrow = root.querySelector('.bp-profile-arrow');
+
+    if (main && menu) {
+      main.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const open = !menu.classList.contains('open');
+        menu.classList.toggle('open', open);
+        main.setAttribute('aria-expanded', String(open));
+        if (arrow) arrow.textContent = open ? '▴' : '▾';
+      });
+    }
+
+    for (const button of root.querySelectorAll('.bp-profile-option[data-profile]')) {
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const profile = String(button.dataset.profile || '');
+        if (!validManualGameProfile(profile)) return;
+
+        if (menu) menu.classList.remove('open');
+        if (main) main.setAttribute('aria-expanded', 'false');
+        if (arrow) arrow.textContent = '▾';
+
+        setManualGameProfile(profile);
+      });
+    }
+  }
+
   function render() {
     if (window.__XIANYAO_MAINTENANCE_STATE__?.enabled) {
       const existing = document.getElementById(PANEL_ID);
@@ -9978,9 +10149,11 @@ try {
 
     if (!candidate) {
       body.innerHTML = `
+        ${profileSwitchMarkup()}
         <div class="bp-status">● ${esc(probe.status)}</div>
         <div class="bp-path">房號 ${esc(roomText())}｜完成一局後才分析已結束盤面</div>
       `;
+      bindProfileSwitch(body);
       return;
     }
 
@@ -10016,6 +10189,7 @@ try {
       : '';
 
     body.innerHTML = `
+      ${profileSwitchMarkup()}
       <div class="bp-status">● 已完成盤面偵測｜${esc(gameProfileName())}｜${esc(roomText())} 房</div>
       ${signalMarkup}
       <div class="bp-grid">${cards}</div>
@@ -10029,6 +10203,7 @@ try {
       </div>
     `;
 
+    bindProfileSwitch(body);
     cleanRenderedIconCards(body);
 
     const boardToggle = body.querySelector('.bp-board-toggle');
@@ -10061,7 +10236,8 @@ try {
 
     const previousRoom = probe.roomNumber;
     const previousGameProfile = probe.gameProfile;
-    probe.gameProfile = resolveGameProfileForSpin(detail);
+    // test99：圖示組只看右上角手動選擇，任何封包/Canvas/上一款遊戲都不得覆寫。
+    probe.gameProfile = loadManualGameProfile();
     probe.roomNumber = detail.roomNumber ?? null;
     probe.updatedAt = Date.now();
 
@@ -10194,31 +10370,6 @@ try {
     } catch (_) {}
   }
 
-
-  let lastAutoProfileCheckAt = 0;
-  setInterval(() => {
-    try {
-      if (Date.now() - lastAutoProfileCheckAt < 900) return;
-      lastAutoProfileCheckAt = Date.now();
-      const detected = autoDetectCurrentGameProfile({});
-      if (detected && detected !== probe.gameProfile) {
-        probe.gameProfile = detected;
-        probe.candidate = null;
-        probe.candidateCount = 0;
-        probe.signalHistory = [];
-        probe.signalArmed = true;
-        probe.signalTriggered = false;
-        probe.signalScore = 0;
-        probe.signalReason = '';
-        probe.status = '已自動切換 ' + gameProfileName(detected) + '｜等待本局完成';
-        try {
-          window.__XIANYAO_ATG_GAME_PROFILE_HINT__ = detected;
-          window.__XIANYAO_ATG_GAME_PROFILE_PAYLOAD_HINT__ = '';
-        } catch (_) {}
-        render();
-      }
-    } catch (_) {}
-  }, 1000);
 
   window.addEventListener(EVENT_NAME, handleSpinFinal);
 
