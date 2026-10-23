@@ -2,7 +2,7 @@
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
 // @version      4.0.0-test.100
-// @description  v4 HUD 測試版：電腦與全裝置統一使用同一套超小懸浮工具；完整即時助手只在點擊詳細資料時展開，盤面監測預設收合。請勿與正式版同時啟用。
+// @description  test100：保留 test99 全部功能，只把右上遊戲切換改成可擴充的「遊戲類別」下拉選單。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -6578,6 +6578,62 @@ try {
     gameProfile: 'tiger'
   };
 
+  // test100：遊戲類別集中在同一份清單。
+  // 之後新增遊戲，只要新增一筆選項＋對應圖示辨識資料，不需要再改版面。
+  const MANUAL_GAME_PROFILE_KEY = 'xinyao_atg_board_manual_profile_v1';
+  const GAME_PROFILE_OPTIONS = Object.freeze([
+    { id:'seth', label:'戰神賽特2', shortLabel:'賽特2', icon:'👁️' },
+    { id:'tiger', label:'虎小妹', shortLabel:'虎小妹', icon:'🐯' }
+  ]);
+
+  function validManualGameProfile(profile) {
+    return GAME_PROFILE_OPTIONS.some(item => item.id === String(profile || ''));
+  }
+
+  function gameProfileOption(profile = probe.gameProfile) {
+    return GAME_PROFILE_OPTIONS.find(item => item.id === String(profile || ''))
+      || GAME_PROFILE_OPTIONS[0];
+  }
+
+  function loadManualGameProfile() {
+    try {
+      const saved = String(localStorage.getItem(MANUAL_GAME_PROFILE_KEY) || '').toLowerCase();
+      if (validManualGameProfile(saved)) return saved;
+    } catch (_) {}
+    return 'tiger';
+  }
+
+  function setManualGameProfile(profile) {
+    profile = String(profile || '');
+    if (!validManualGameProfile(profile)) return;
+    if (probe.gameProfile === profile) return;
+
+    probe.gameProfile = profile;
+    try { localStorage.setItem(MANUAL_GAME_PROFILE_KEY, profile); } catch (_) {}
+
+    // 換遊戲組時清掉上一款的盤面自適應暫存狀態，避免名稱/權重混用。
+    probe.signalHistory = [];
+    probe.signalArmed = true;
+    probe.signalTriggered = false;
+    probe.signalScore = 0;
+    probe.signalReason = '已切換圖示組，下一局重新分析';
+    probe.autoStopStatus = '';
+    probe.autoStopRetryToken += 1;
+    probe.autoStopRetryUntil = 0;
+    probe.autoStopAttempts = 0;
+    probe.learnedStopButtonRef = null;
+
+    try {
+      window.__XIANYAO_ATG_GAME_PROFILE_HINT__ = profile;
+      window.__XIANYAO_ATG_GAME_PROFILE_PAYLOAD_HINT__ = '';
+      window.__XIANYAO_ATG_MANUAL_GAME_PROFILE__ = profile;
+    } catch (_) {}
+
+    render();
+  }
+
+  probe.gameProfile = loadManualGameProfile();
+
   const SIGNAL_THRESHOLD = 80;
   const SIGNAL_REARM_THRESHOLD = 60;
   const SIGNAL_AUTOSTOP_KEY = 'xinyao_atg_signal_autostop_v1';
@@ -6951,186 +7007,6 @@ try {
     }
   }
 
-  // test100：遊戲設定檔自動辨識。
-  // 每款遊戲只需要新增一筆 profile，不會在面板增加任何按鈕。
-  // 重點：只讀「目前盤面 / 當下新載入資源」，不讀跑馬燈、整頁文字或舊快取。
-  const GAME_PROFILE_REGISTRY = [
-    {
-      id:'tiger',
-      label:'虎小妹',
-      // 不用 axe / gem，因為其他遊戲也會有。
-      assetRe:/(tigergirl|tiger[_-]?(?:girl|sister|shield|head)|cat[_-]?girl|paw[_-]?(?:shield|mug)|beer[_-]?(?:mug)?|ale[_-]?mug|money[_-]?bag|coin[_-]?bag|虎小妹|虎盾|啤酒|錢袋|钱袋)/i
-    },
-    {
-      id:'seth',
-      label:'戰神賽特2',
-      // 只抓賽特專屬埃及符號；不把共用 engine 名稱 "seth" 本身當證據。
-      assetRe:/(eye[_-]?of[_-]?horus|horus[_-]?eye|cobra|serpent|egyptian[_-]?snake|bow[_-]?arrow|archer[_-]?bow|ankh|pharaoh|scarab|眼睛|荷魯斯|荷鲁斯|眼|蛇|弓箭)/i
-    }
-  ];
-
-  function nodeWorldPoint(node, cocos) {
-    try {
-      const p = node?.worldPosition || node?._worldPosition;
-      if (Number.isFinite(Number(p?.x)) && Number.isFinite(Number(p?.y))) {
-        return {x:Number(p.x),y:Number(p.y)};
-      }
-    } catch (_) {}
-    try {
-      if (typeof node?.convertToWorldSpaceAR === 'function') {
-        const zero = typeof cocos?.v2 === 'function' ? cocos.v2(0,0) : {x:0,y:0};
-        const p = node.convertToWorldSpaceAR(zero);
-        if (Number.isFinite(Number(p?.x)) && Number.isFinite(Number(p?.y))) {
-          return {x:Number(p.x),y:Number(p.y)};
-        }
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  function currentProfileFromActiveReelAssets() {
-    const scores = Object.fromEntries(GAME_PROFILE_REGISTRY.map(p => [p.id, 0]));
-    const evidence = Object.fromEntries(GAME_PROFILE_REGISTRY.map(p => [p.id, []]));
-
-    const addEvidence = (text, weight, source) => {
-      const s = String(text ?? '');
-      if (!s || s.length > 5000) return;
-      for (const profile of GAME_PROFILE_REGISTRY) {
-        if (!profile.assetRe.test(s)) continue;
-        scores[profile.id] += weight;
-        if (evidence[profile.id].length < 12) evidence[profile.id].push(source + ':' + s.slice(0,180));
-      }
-    };
-
-    for (const gameWindow of sameOriginSignalWindows()) {
-      // A. Cocos：只看目前 active node，而且排除跑馬燈/公告/HUD。
-      try {
-        const cocos = gameWindow?.cc || gameWindow?.legacyCC || gameWindow?._cc;
-        const scene = cocos?.director?.getScene?.();
-        const Component = cocos?.Component;
-        if (scene && Component && typeof scene.getComponentsInChildren === 'function') {
-          let visible = {width:0,height:0};
-          try {
-            const size=cocos?.view?.getVisibleSize?.();
-            visible={width:Number(size?.width)||0,height:Number(size?.height)||0};
-          } catch (_) {}
-
-          const components=scene.getComponentsInChildren(Component)||[];
-          for(let i=0;i<components.length && i<5000;i+=1){
-            const component=components[i];
-            const node=component?.node;
-            if(!node || node.activeInHierarchy===false) continue;
-
-            const names=[];
-            let cursor=node;
-            for(let depth=0;cursor && depth<7;depth+=1){
-              names.push(String(cursor.name||''));
-              cursor=cursor.parent||cursor._parent||null;
-            }
-            const path=names.join('/');
-
-            // 明確排除會出現其他遊戲名稱的全域區塊。
-            if (/(ticker|marquee|broadcast|announcement|notice|winner|news|jackpot|grand|major|minor|mini|topbar|message)/i.test(path)) continue;
-
-            let inGameArea=true;
-            const point=nodeWorldPoint(node,cocos);
-            if(point && visible.width>0 && visible.height>0){
-              const nx=point.x/visible.width;
-              const ny=point.y/visible.height;
-              // 排除最上方跑馬燈與最下方控制列；保留左側角色與中央盤面。
-              inGameArea = nx>=0.02 && nx<=0.98 && ny>=0.16 && ny<=0.90;
-            }
-            if(!inGameArea) continue;
-
-            const spriteFrame=component?.spriteFrame || component?._spriteFrame;
-            const texture=spriteFrame?.texture || spriteFrame?._texture || component?.texture || component?._texture;
-            const image=texture?.image || texture?._image;
-
-            const bits=[
-              path,
-              component?.constructor?.name,
-              component?.__classname__,
-              spriteFrame?.name,
-              spriteFrame?._name,
-              spriteFrame?._uuid,
-              texture?.name,
-              texture?._name,
-              texture?._uuid,
-              image?.url,
-              image?._url,
-              component?.atlas?.name,
-              component?._atlas?.name,
-              component?.spriteAtlas?.name,
-              component?._spriteAtlas?.name
-            ].filter(Boolean).join(' | ');
-
-            addEvidence(bits, point ? 5 : 3, 'cocos');
-          }
-        }
-      } catch (_) {}
-
-      // B. 只看最近 20 秒「新載入」的資源。
-      // 切遊戲後新的 bundle/atlas/texture 會在這裡；上一款舊資源不會繼續加分。
-      try {
-        const now=Number(gameWindow.performance?.now?.()||0);
-        const resources=gameWindow.performance?.getEntriesByType?.('resource')||[];
-        for(const entry of resources.slice(-500)){
-          const age=now-Number(entry?.startTime||0);
-          if(age<0 || age>20000) continue;
-          const name=String(entry?.name||'');
-          if(!name || /githubusercontent\.com\/xinyao-ai|xinyao-atg/i.test(name)) continue;
-          addEvidence(name, 4, 'resource');
-        }
-      } catch (_) {}
-
-      // C. 目前 iframe / script / image 的 URL 可以算，但不看 body.innerText。
-      try {
-        const els=[...gameWindow.document.querySelectorAll('iframe[src],script[src],img[src],source[src],link[href]')].slice(-600);
-        for(const el of els){
-          const value=String(el.src||el.href||el.getAttribute?.('src')||el.getAttribute?.('href')||'');
-          if(!value || /githubusercontent\.com\/xinyao-ai|xinyao-atg/i.test(value)) continue;
-          addEvidence(value,2,'dom-url');
-        }
-      } catch (_) {}
-    }
-
-    const ranked=Object.entries(scores).sort((a,b)=>b[1]-a[1]);
-    const [best,bestScore]=ranked[0]||['',0];
-    const secondScore=ranked[1]?.[1]||0;
-
-    try {
-      window.__XIANYAO_ATG_PROFILE_AUTO_DEBUG__={
-        scores,
-        evidence,
-        best,
-        bestScore,
-        secondScore,
-        at:Date.now()
-      };
-    } catch (_) {}
-
-    // 必須有至少兩個強證據，且明顯勝過第二名才切換。
-    if(bestScore>=8 && bestScore>=secondScore+4) return best;
-    return '';
-  }
-
-  function autoDetectCurrentGameProfile(detail = {}) {
-    // 1. 最可靠：目前 active 盤面 Sprite / 當下資源。
-    const active=currentProfileFromActiveReelAssets();
-    if(active) return active;
-
-    // 2. 次選：Canvas 主題；只看目前畫面，不吃跑馬燈。
-    const canvas=detectCanvasThemeProfile();
-    if(canvas) return canvas;
-
-    // 3. 封包只有「明確虎小妹」才採用；共用 Seth engine 不可單獨判賽特。
-    const payload=String(detail?.gameProfileHint||'').toLowerCase();
-    if(payload==='tiger') return 'tiger';
-
-    // 沒有足夠證據就維持目前，不亂跳。
-    return probe.gameProfile || 'tiger';
-  }
-
   function detectCanvasThemeProfile() {
     // test97：直接讀目前正在顯示的遊戲 Canvas。
     // 虎小妹左側角色區域偏粉紅/橘色；賽特2左側埃及場景偏深藍/靛藍。
@@ -7305,7 +7181,21 @@ try {
   }
 
   function resolveGameProfileForSpin(detail = {}) {
-    return autoDetectCurrentGameProfile(detail);
+    // test98：最優先採用使用者「實際點選遊戲」的結果。
+    // 這個來源不受上一款遊戲共用引擎/快取污染。
+    const selected = recentSelectedGameProfile();
+    if (selected) return selected;
+
+    const canvasProfile = detectCanvasThemeProfile();
+    if (canvasProfile) return canvasProfile;
+
+    const live = detectLiveSceneProfile();
+    if (live) return live;
+
+    const detected = detectBoardGameProfile(detail?.gameProfileHint || '');
+    if (detected === 'tiger' || detected === 'seth') return detected;
+
+    return probe.gameProfile || 'tiger';
   }
 
   function detectBoardGameProfile(explicitHint = '') {
@@ -9694,6 +9584,16 @@ try {
       #${PANEL_ID} .bp-title{font-size:12px;font-weight:900;letter-spacing:.05px}
       #${PANEL_ID} .bp-mini{display:flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:5px;background:rgba(255,255,255,.07);font-size:9px;opacity:.82}
       #${PANEL_ID} .bp-status{margin-top:6px;font-size:10px;color:#8deac1;font-weight:800}
+      #${PANEL_ID} .bp-profile-switch{position:relative;margin-top:6px}
+      #${PANEL_ID} .bp-profile-main{width:100%;display:flex;align-items:center;justify-content:space-between;gap:7px;border:1px solid rgba(255,95,158,.45);border-radius:8px;background:rgba(255,95,158,.10);color:#ffd4e5;padding:6px 8px;font-size:9px;font-weight:900;cursor:pointer;box-shadow:0 0 0 1px rgba(255,95,158,.05) inset}
+      #${PANEL_ID} .bp-profile-main-label{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #${PANEL_ID} .bp-profile-arrow{font-size:8px;opacity:.78}
+      #${PANEL_ID} .bp-profile-menu{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:30;padding:5px;border:1px solid rgba(255,184,212,.35);border-radius:9px;background:rgba(22,18,28,.985);box-shadow:0 8px 22px rgba(0,0,0,.42)}
+      #${PANEL_ID} .bp-profile-menu.open{display:block}
+      #${PANEL_ID} .bp-profile-option{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid transparent;border-radius:7px;background:transparent;color:rgba(255,255,255,.82);padding:7px 8px;margin:0 0 3px;font-size:9px;font-weight:850;text-align:left;cursor:pointer}
+      #${PANEL_ID} .bp-profile-option:last-child{margin-bottom:0}
+      #${PANEL_ID} .bp-profile-option.active{border-color:rgba(255,95,158,.40);background:rgba(255,95,158,.13);color:#ffd4e5}
+      #${PANEL_ID} .bp-profile-check{color:#ff9fc4;font-weight:950}
       #${PANEL_ID} .bp-signal{margin-top:7px;padding:7px 8px;border:1px solid rgba(255,255,255,.10);border-radius:9px;background:rgba(255,255,255,.035)}
       #${PANEL_ID} .bp-signal.hot{border-color:rgba(255,95,158,.62);background:rgba(255,95,158,.10);box-shadow:0 0 0 1px rgba(255,95,158,.08) inset}
       #${PANEL_ID} .bp-signal-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:9px}
@@ -9894,6 +9794,60 @@ try {
     return panel;
   }
 
+  function profileSwitchMarkup() {
+    const current = gameProfileOption();
+    return `
+      <div class="bp-profile-switch">
+        <button type="button" class="bp-profile-main" aria-expanded="false">
+          <span class="bp-profile-main-label">🎮 遊戲類別｜${current.icon} ${current.label}</span>
+          <span class="bp-profile-arrow">▾</span>
+        </button>
+        <div class="bp-profile-menu">
+          ${GAME_PROFILE_OPTIONS.map(item => `
+            <button type="button" class="bp-profile-option ${probe.gameProfile === item.id ? 'active' : ''}" data-profile="${item.id}">
+              <span>${item.icon} ${item.label}</span>
+              <span class="bp-profile-check">${probe.gameProfile === item.id ? '✓' : ''}</span>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  function bindProfileSwitch(root) {
+    if (!root) return;
+
+    const main = root.querySelector('.bp-profile-main');
+    const menu = root.querySelector('.bp-profile-menu');
+    const arrow = root.querySelector('.bp-profile-arrow');
+
+    if (main && menu) {
+      main.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const open = !menu.classList.contains('open');
+        menu.classList.toggle('open', open);
+        main.setAttribute('aria-expanded', String(open));
+        if (arrow) arrow.textContent = open ? '▴' : '▾';
+      });
+    }
+
+    for (const button of root.querySelectorAll('.bp-profile-option[data-profile]')) {
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const profile = String(button.dataset.profile || '');
+        if (!validManualGameProfile(profile)) return;
+
+        if (menu) menu.classList.remove('open');
+        if (main) main.setAttribute('aria-expanded', 'false');
+        if (arrow) arrow.textContent = '▾';
+
+        setManualGameProfile(profile);
+      });
+    }
+  }
+
   function render() {
     if (window.__XIANYAO_MAINTENANCE_STATE__?.enabled) {
       const existing = document.getElementById(PANEL_ID);
@@ -9924,9 +9878,11 @@ try {
 
     if (!candidate) {
       body.innerHTML = `
+        ${profileSwitchMarkup()}
         <div class="bp-status">● ${esc(probe.status)}</div>
         <div class="bp-path">房號 ${esc(roomText())}｜完成一局後才分析已結束盤面</div>
       `;
+      bindProfileSwitch(body);
       return;
     }
 
@@ -9962,6 +9918,7 @@ try {
       : '';
 
     body.innerHTML = `
+      ${profileSwitchMarkup()}
       <div class="bp-status">● 已完成盤面偵測｜${esc(gameProfileName())}｜${esc(roomText())} 房</div>
       ${signalMarkup}
       <div class="bp-grid">${cards}</div>
@@ -9975,6 +9932,7 @@ try {
       </div>
     `;
 
+    bindProfileSwitch(body);
     cleanRenderedIconCards(body);
 
     const boardToggle = body.querySelector('.bp-board-toggle');
@@ -10007,7 +9965,8 @@ try {
 
     const previousRoom = probe.roomNumber;
     const previousGameProfile = probe.gameProfile;
-    probe.gameProfile = resolveGameProfileForSpin(detail);
+    // test99：圖示組只看右上角手動選擇，任何封包/Canvas/上一款遊戲都不得覆寫。
+    probe.gameProfile = loadManualGameProfile();
     probe.roomNumber = detail.roomNumber ?? null;
     probe.updatedAt = Date.now();
 
@@ -10140,23 +10099,6 @@ try {
     } catch (_) {}
   }
 
-
-  let lastAutoProfileCheckAt = 0;
-  setInterval(() => {
-    try {
-      if (Date.now() - lastAutoProfileCheckAt < 900) return;
-      lastAutoProfileCheckAt = Date.now();
-      const detected = autoDetectCurrentGameProfile({});
-      if (detected && detected !== probe.gameProfile) {
-        probe.gameProfile = detected;
-        probe.signalHistory = [];
-        probe.signalArmed = true;
-        probe.signalTriggered = false;
-        probe.status = '已自動切換 ' + gameProfileName(detected) + ' 圖示組｜完成一局後重新分析';
-        render();
-      }
-    } catch (_) {}
-  }, 1000);
 
   window.addEventListener(EVENT_NAME, handleSpinFinal);
 
