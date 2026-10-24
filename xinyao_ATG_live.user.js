@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.143
-// @description  test143：修正排行榜空房狀態停留舊快照；掃描核心與賽特2進房流程不動。
+// @version      4.0.0-test.144
+// @description  test144：新增虎小妹專屬進房流程；排行榜即時空房修正保留；掃描核心與賽特2進房流程不動。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -8654,16 +8654,193 @@ try {
     }
   }
 
-  function enterTigerRoomFromRanking(roomNumber, roomId) {
+  async function enterTigerRoomFromRanking(roomNumber, roomId) {
     const number = finiteNumber(roomNumber);
     const id = finiteNumber(roomId);
-    const roomText = number === null ? '—' : String(Math.trunc(number)).padStart(4,'0');
-    const roomIdText = id === null ? '—' : Math.trunc(id);
+    if (number === null || id === null || state.enterRoomBusy) return;
 
-    // test140 第一階段：虎小妹獨立通道已建立，但尚未接入任何賽特2原生選房控制器。
-    // 寧可不進房，也絕不 fallback 到 enterRoomFromRanking()，避免碰壞賽特2。
-    state.enterRoomStatus = `🐯 虎小妹模式｜${roomText} 房 roomId=${roomIdText}｜專屬進房模組尚未建立，未執行賽特2進房機制`;
+    const roomNo = Math.trunc(number);
+    const wantedId = Math.trunc(id);
+    const roomText = String(roomNo).padStart(4,'0');
+
+    state.enterRoomBusy = true;
+    state.enterRoomStatus = `🐯 直達 ${roomText}｜準備虎小妹原生選房資料…`;
     scheduleRender();
+
+    try {
+      if (state.scanRunning) {
+        state.scanAbort = true;
+        const stopStarted = Date.now();
+        while (state.scanRunning && Date.now() - stopStarted < 6000) {
+          await roomWait(100);
+        }
+      }
+
+      const opened = await openMachineSelectionForAutoEnter();
+      if (!opened) throw new Error('虎小妹：無法打開選擇機台');
+      await roomWait(160);
+
+      // 虎小妹使用自己的進房通道；只共用掃描已取得的頁數與 ATG 原生控制器工具。
+      // 不呼叫賽特2 enterRoomFromRanking()，也不 fallback 到賽特2進房。
+      const perPage = Math.max(1, Math.trunc(finiteNumber(state.tablePerPage) || 500));
+      const totalPages = Math.max(
+        1,
+        Math.trunc(
+          finiteNumber(state.totalPages) ||
+          Math.ceil(Math.max(roomNo, 1) / perPage)
+        )
+      );
+      const targetPage = Math.max(1, Math.min(totalPages, Math.ceil(roomNo / perPage)));
+
+      state.enterRoomStatus = `🐯 ${roomText} = 第 ${targetPage} 頁｜載入虎小妹原生房間資料…`;
+      scheduleRender();
+
+      const beforeSeq = state.pageLoadSeq;
+      let pageReady = false;
+
+      if (currentPageDataHasRoom(roomNo)) {
+        pageReady = true;
+      } else {
+        pageReady = await forceSemanticPageForEnter(targetPage, totalPages);
+        if (!pageReady) {
+          pageReady = await navigateToPageForEnter(targetPage);
+        }
+      }
+
+      const loadStarted = Date.now();
+      while (Date.now() - loadStarted < 3200) {
+        if (currentPageDataHasRoom(roomNo)) {
+          pageReady = true;
+          break;
+        }
+        await roomWait(80);
+      }
+
+      if (!pageReady || !currentPageDataHasRoom(roomNo)) {
+        const first = (state.latestTableNumbers || []).slice(0, 3).join(',');
+        const last = (state.latestTableNumbers || []).slice(-3).join(',');
+        throw new Error(
+          `虎小妹第 ${targetPage} 頁資料未對上 ${roomText}｜目前 ${first || '—'}…${last || '—'}｜seq ${beforeSeq}→${state.pageLoadSeq}`
+        );
+      }
+
+      // 這裡只讀虎小妹當前頁 ATG 原生 slotTableMap。
+      // 剛才已實測 0223 房：排行榜 roomId=354263 = ATG 原生選房 roomId=354263。
+      const controllerStarted = Date.now();
+      let controller = null;
+      let nativeInfo = null;
+
+      while (Date.now() - controllerStarted < 2200) {
+        controller = findSlotTableController();
+        nativeInfo = controller ? findRoomInfoInSlotTableMap(controller, wantedId) : null;
+        if (controller && nativeInfo) break;
+        await roomWait(80);
+      }
+
+      if (!controller) throw new Error('虎小妹：找不到 SlotTableView 選房控制器');
+      if (!nativeInfo) {
+        const snap = slotTableControllerSnapshot(controller);
+        throw new Error(
+          `虎小妹目標頁已載入，但 slotTableMap 找不到 ${roomText}｜roomId=${wantedId} map=${snap?.mapSize ?? '—'}`
+        );
+      }
+
+      state.enterRoomStatus = `🐯 ${roomText} 原生 tableInfo 已取得｜roomId=${wantedId}｜鎖定虎小妹選房控制器…`;
+      scheduleRender();
+
+      const comp = controller.component;
+      const before = slotTableControllerSnapshot(controller);
+      let setError = '';
+
+      try { comp.selectRoomId = wantedId; } catch (_) {}
+      try {
+        if ('isUpdateSelectFlag' in comp) comp.isUpdateSelectFlag = true;
+      } catch (_) {}
+
+      if (typeof comp.setTableInfo === 'function') {
+        try {
+          comp.setTableInfo(nativeInfo);
+        } catch (error) {
+          setError = String(error?.message || error);
+        }
+      }
+
+      try { comp.selectRoomId = wantedId; } catch (_) {}
+      try {
+        if ('isUpdateSelectFlag' in comp) comp.isUpdateSelectFlag = true;
+      } catch (_) {}
+
+      const after = slotTableControllerSnapshot(controller);
+      if (finiteNumber(after?.selectRoomId) !== wantedId) {
+        throw new Error(
+          `虎小妹控制器未鎖定目標房｜before=${before?.selectRoomId ?? '—'} after=${after?.selectRoomId ?? '—'}${setError ? `｜setTableInfo=${setError}` : ''}`
+        );
+      }
+
+      state.enterRoomStatus = `🐯 ${roomText} 已鎖定｜送出虎小妹原生 getSlotTableDetail…`;
+      scheduleRender();
+
+      let direct = emitDirectRoomSelection(wantedId);
+      if (!direct?.ok) {
+        direct = replayRawSelectFrame(wantedId);
+      }
+
+      if (!direct?.ok) {
+        state.enterRoomStatus =
+          `🐯 未擷取虎小妹 getSlotTableDetail 模板（${direct?.reason || 'unknown'}）｜改由原生控制器確認 ${roomText}…`;
+        scheduleRender();
+      } else {
+        await roomWait(220);
+      }
+
+      // 送出前硬驗證：任何不一致直接停，不准進錯房，也不准 fallback 賽特2。
+      const finalSnap = slotTableControllerSnapshot(controller);
+      const finalId = finiteNumber(finalSnap?.selectRoomId);
+      if (finalId !== wantedId) {
+        throw new Error(
+          `虎小妹送出前驗證失敗｜目標=${wantedId} selectRoomId=${finalId ?? '—'}`
+        );
+      }
+
+      const finalInfo = findRoomInfoInSlotTableMap(controller, wantedId);
+      if (!finalInfo) {
+        throw new Error(`虎小妹送出前原生 tableInfo 消失｜roomId=${wantedId}`);
+      }
+
+      const confirm = findConfirmRoomButton();
+      if (!confirm?.node) throw new Error('虎小妹：找不到 confirmBtn/selectBtn');
+
+      state.enterRoomStatus =
+        `🐯 ${roomText} 已驗證｜觸發 ${String(confirm.node?.name || 'selectBtn')}…`;
+      scheduleRender();
+
+      if (!triggerConfirmRoomControl(confirm)) {
+        throw new Error(
+          `虎小妹：${String(confirm.node?.name || 'selectBtn')} 無法觸發 touch-end`
+        );
+      }
+
+      state.enterRoomStatus = `🐯 ${roomText} 已選定｜等待切換確認視窗…`;
+      scheduleRender();
+
+      const dialogConfirm = await autoConfirmRoomSwitchDialog(roomNo, 3000);
+      if (!dialogConfirm?.ok) {
+        throw new Error(
+          `虎小妹已選到 ${roomText}，但自動按確定失敗｜${dialogConfirm?.reason || 'unknown'}`
+        );
+      }
+
+      state.enterRoomStatus =
+        `✅ 🐯 已自動確認並進入 ${roomText} 房｜roomId=${wantedId}`;
+      scheduleRender();
+
+    } catch (error) {
+      state.enterRoomStatus =
+        `⚠️ 🐯 虎小妹進房失敗：${String(error?.message || error)}｜未執行賽特2進房`;
+      scheduleRender();
+    } finally {
+      state.enterRoomBusy = false;
+    }
   }
 
   function routeEnterRoomFromRanking(roomNumber, roomId) {
@@ -8681,7 +8858,7 @@ try {
     const option = XIANYAO_GAME_MODULES[current] || XIANYAO_GAME_MODULES.seth;
     const detail = current === 'seth'
       ? '盤面監測＋進入此房使用賽特2專屬機制'
-      : '盤面監測使用虎小妹專屬機制；進房模組尚未開放';
+      : '盤面監測＋進入此房使用虎小妹專屬機制';
     return `
       <div style="margin-top:7px;padding:8px 9px;border:1px solid rgba(255,190,215,.18);border-radius:10px;background:rgba(255,255,255,.04);">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
