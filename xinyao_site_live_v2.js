@@ -311,28 +311,76 @@
     tiger: 'https://www.hd5577.com/GameLobby?g=ATG&c=tiger-princess&p=web&l=zh-cn'
   });
 
+  let xinyaoGameWindow = null;
+
   function launchHuangDingGame(gameId) {
     const id = String(gameId || '').toLowerCase();
     const url = XIANYAO_HUANGDING_GAME_LINKS[id];
     if (!url) return;
 
-    // 使用同一分頁跨站導向時 window.name 會跟著 browsing context 保留；
-    // ATG userscript 會讀取這個標記並固定對應遊戲機制。
-    try {
-      window.name = 'xinyao-hd-launch:' + id + ':' + Date.now() + ':' + Math.random().toString(36).slice(2, 10);
-    } catch (_) {}
+    const marker =
+      'xinyao-hd-launch:' +
+      id + ':' +
+      Date.now() + ':' +
+      Math.random().toString(36).slice(2, 10);
 
-    const button = $('xinyaoLaunchSeth');
+    const button =
+      id === 'tiger'
+        ? $('xinyaoLaunchTiger')
+        : $('xinyaoLaunchSeth');
+
     if (button) {
       button.classList.add('launching');
       button.setAttribute('aria-busy', 'true');
       const enter = button.querySelector('.game-launcher-enter span');
-      if (enter) enter.textContent = '正在前往皇鼎…';
+      if (enter) enter.textContent = '正在切換遊戲…';
+    }
+
+    try {
+      // 會員頁固定留著；ATG 永遠使用同一個遊戲分頁。
+      // 第二次切遊戲時直接把舊遊戲分頁導向新遊戲，避免同帳號同時存在兩個 ATG 連線。
+      if (!xinyaoGameWindow || xinyaoGameWindow.closed) {
+        xinyaoGameWindow = window.open('about:blank', '_blank');
+      }
+
+      if (!xinyaoGameWindow) {
+        throw new Error('popup-blocked');
+      }
+
+      try {
+        xinyaoGameWindow.name = marker;
+      } catch (_) {}
+
+      try {
+        xinyaoGameWindow.location.replace(url);
+      } catch (_) {
+        xinyaoGameWindow.location.href = url;
+      }
+
+      try {
+        xinyaoGameWindow.focus();
+      } catch (_) {}
+    } catch (_) {
+      // 瀏覽器若封鎖新分頁才退回同頁開啟，至少不讓按鈕失效。
+      try {
+        window.name = marker;
+      } catch (_) {}
+      window.location.assign(url);
+      return;
     }
 
     window.setTimeout(() => {
-      window.location.assign(url);
-    }, 120);
+      if (!button) return;
+      button.classList.remove('launching');
+      button.removeAttribute('aria-busy');
+      const enter = button.querySelector('.game-launcher-enter span');
+      if (enter) {
+        enter.textContent =
+          id === 'tiger'
+            ? '進入皇鼎虎小妹'
+            : '進入皇鼎賽特2';
+      }
+    }, 1200);
   }
 
   function bindGameLauncher() {
