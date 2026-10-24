@@ -307,7 +307,8 @@
 
   // ===== 會員頁遊戲入口：只負責選定遊戲並前往皇鼎 =====
   const XIANYAO_HUANGDING_GAME_LINKS = Object.freeze({
-    seth: 'https://hd5577.com/GameLobby?g=ATG&c=golden-seth'
+    seth: 'https://hd5577.com/GameLobby?g=ATG&c=golden-seth',
+    tiger: 'https://www.hd5577.com/GameLobby?g=ATG&c=tiger-princess&p=web&l=zh-cn'
   });
 
   function launchHuangDingGame(gameId) {
@@ -336,9 +337,16 @@
 
   function bindGameLauncher() {
     const sethButton = $('xinyaoLaunchSeth');
-    if (!sethButton || sethButton.dataset.bound === '1') return;
-    sethButton.dataset.bound = '1';
-    sethButton.addEventListener('click', () => launchHuangDingGame('seth'));
+    if (sethButton && sethButton.dataset.bound !== '1') {
+      sethButton.dataset.bound = '1';
+      sethButton.addEventListener('click', () => launchHuangDingGame('seth'));
+    }
+
+    const tigerButton = $('xinyaoLaunchTiger');
+    if (tigerButton && tigerButton.dataset.bound !== '1') {
+      tigerButton.dataset.bound = '1';
+      tigerButton.addEventListener('click', () => launchHuangDingGame('tiger'));
+    }
   }
 
   if (document.readyState === 'loading') {
