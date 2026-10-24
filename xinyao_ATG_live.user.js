@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.157
-// @description  test157：虎小妹找房先用賽特2同款房號頁碼直達，找不到才快速逐頁保險搜尋；後半段維持賽特2成功流程。
+// @version      4.0.0-test.158
+// @description  test158：排行榜改以 slotTableUpdated 最新 roomId 狀態優先剔除非空房；虎小妹/賽特2進房與掃描流程不動。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -4325,6 +4325,7 @@ try {
     latestTableNumbers: [],
     latestInferredPage: null,
     currentSelectedRoomId: null,
+    liveStatusByRoomId: new Map(),
     autoPagerProfile: null,
     learningPageNav: false,
     learningStartPage: null,
@@ -4371,6 +4372,7 @@ try {
     state.rankingSnapshotAt = '';
     state.latestTableNumbers = [];
     state.latestInferredPage = null;
+    state.liveStatusByRoomId = new Map();
   }
 
   function resetFullScanProgressPreservingRooms({ clearStored = true } = {}) {
@@ -4699,6 +4701,15 @@ try {
 
     if (idFallbackKey && idFallbackKey !== key) state.roomMap.delete(idFallbackKey);
     state.roomMap.set(key, merged);
+
+    const mergedRoomId = finiteNumber(merged?.roomId);
+    if (mergedRoomId !== null && typeof merged?.status === 'string') {
+      state.liveStatusByRoomId.set(Math.trunc(mergedRoomId), {
+        status: merged.status,
+        updatedAt: Date.now()
+      });
+    }
+
     state.lastSource = source;
     if (finiteNumber(state.currentSelectedRoomId) !== null && finiteNumber(merged.roomId) === finiteNumber(state.currentSelectedRoomId) && finiteNumber(merged.number) !== null) {
       publishCurrentRoomSelection(state.currentSelectedRoomId, `${source}:room-map`);
@@ -4713,6 +4724,13 @@ try {
     for (const [roomIdRaw, status] of Object.entries(statusObj)) {
       const roomId = Number(roomIdRaw);
       if (!Number.isFinite(roomId) || typeof status !== 'string') continue;
+
+      // 無論能不能立刻對回房號，都先保存 ATG 最新 roomId 狀態。
+      // 排行榜會直接讀這份資料，避免舊 Empty 快照殘留。
+      state.liveStatusByRoomId.set(Math.trunc(roomId), {
+        status,
+        updatedAt: Date.now()
+      });
 
       let matched = false;
       for (const [key, prev] of state.roomMap.entries()) {
@@ -6123,17 +6141,31 @@ try {
       .map(snapshotRoom => {
         const rid = finiteNumber(snapshotRoom?.roomId);
         const rnum = finiteNumber(snapshotRoom?.number);
+
+        const directLiveStatus =
+          rid !== null
+            ? state.liveStatusByRoomId.get(Math.trunc(rid))
+            : null;
+
         const live =
           (rid !== null ? liveByRoomId.get(Math.trunc(rid)) : null) ||
           (rnum !== null ? liveByNumber.get(Math.trunc(rnum)) : null) ||
           null;
 
-        if (!live) return snapshotRoom;
-
         return {
           ...snapshotRoom,
-          status: live.status ?? snapshotRoom.status,
-          updatedAt: live.updatedAt ?? snapshotRoom.updatedAt
+          // 優先順序：
+          // 1. slotTableUpdated / 最新 tables 對該 roomId 的即時狀態
+          // 2. roomMap 目前狀態
+          // 3. 掃描完成當下快照
+          status:
+            directLiveStatus?.status ??
+            live?.status ??
+            snapshotRoom.status,
+          updatedAt:
+            directLiveStatus?.updatedAt ??
+            live?.updatedAt ??
+            snapshotRoom.updatedAt
         };
       })
       .filter(room => room?.status === 'Empty');
