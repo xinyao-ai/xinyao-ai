@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.145
-// @description  test145：虎小妹進房改走 ATG 原生房卡點擊流程；掃描核心與賽特2進房流程不動。
+// @version      4.0.0-test.146
+// @description  test146：虎小妹看到目標房號後直接觸發該房原生節點並驗證 roomId；掃描核心與賽特2進房流程不動。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -8654,6 +8654,177 @@ try {
     }
   }
 
+  function tigerRoomNodeCandidates(roomNumber) {
+    const wanted = Math.trunc(finiteNumber(roomNumber) || 0);
+    if (!wanted) return [];
+
+    const candidates = [];
+    const seen = new Set();
+
+    for (const gameWindow of collectSameOriginWindows()) {
+      try {
+        const cocos = gameWindow.cc || gameWindow.legacyCC || gameWindow._cc;
+        const scene = cocos?.director?.getScene?.();
+        const Label = cocos?.Label;
+        const Button = cocos?.Button;
+        if (!scene || !Label || typeof scene.getComponentsInChildren !== 'function') continue;
+
+        for (const label of (scene.getComponentsInChildren(Label) || [])) {
+          const text = String(label?.string ?? label?._string ?? '').trim();
+          if (text !== String(wanted)) continue;
+
+          let node = label?.node || null;
+          for (let depth = 0; node && depth < 14; depth += 1) {
+            const path = cocosNodePath(node).toLowerCase();
+
+            // 排除底部目前房號與 HUD，只保留選擇機台內容區。
+            if (/slottable2btn|spinbar|bottom|footer|jackpot|grand|major|minor|mini|balance|wallet|bet|stake/.test(path)) {
+              node = node.parent || node._parent || null;
+              continue;
+            }
+
+            let button = null;
+            try {
+              if (Button && typeof node.getComponent === 'function') button = node.getComponent(Button);
+            } catch (_) {}
+
+            const components = Array.isArray(node.components)
+              ? node.components
+              : (Array.isArray(node._components) ? node._components : []);
+
+            const eventComponent = components.find(component =>
+              component && (
+                (Array.isArray(component.clickEvents) && component.clickEvents.length) ||
+                /button/i.test(String(component.constructor?.name || ''))
+              )
+            ) || null;
+
+            const key = String(node.uuid || node._id || '') + '|' + path;
+            if (!seen.has(key)) {
+              seen.add(key);
+
+              let score = 0;
+              if (button) score += 100;
+              if (eventComponent) score += 70;
+              if (/spincontent|infocontent|content|item|cell|card|table|room|machine/.test(path)) score += 35;
+              if (depth <= 4) score += 20 - depth * 3;
+
+              candidates.push({
+                node,
+                button: button || eventComponent || null,
+                label,
+                cocos,
+                gameWindow,
+                path,
+                depth,
+                score
+              });
+            }
+
+            node = node.parent || node._parent || null;
+          }
+        }
+      } catch (_) {}
+    }
+
+    candidates.sort((a,b) => b.score - a.score || a.depth - b.depth);
+    return candidates;
+  }
+
+  function tigerEmitRoomCandidate(candidate) {
+    if (!candidate?.node) return false;
+
+    try {
+      if (candidate.button) {
+        if (emitRoomCocosButton(candidate.button, candidate.cocos)) return true;
+      }
+    } catch (_) {}
+
+    try {
+      if (emitCocosClick(candidate)) return true;
+    } catch (_) {}
+
+    // 虎小妹部分房卡不是 cc.Button，而是父節點直接聽 touch-end。
+    try {
+      candidate.node.emit?.('touch-end', {
+        target:candidate.node,
+        currentTarget:candidate.node
+      });
+      return true;
+    } catch (_) {}
+
+    return false;
+  }
+
+  async function tigerSelectVisibleNativeRoom(roomNumber, roomId) {
+    const wantedRoom = Math.trunc(finiteNumber(roomNumber) || 0);
+    const wantedId = Math.trunc(finiteNumber(roomId) || 0);
+    if (!wantedRoom || !wantedId) return { ok:false, reason:'invalid-target' };
+
+    // 必須先確定目標房號真的出現在目前 Cocos 選房內容中。
+    const visible = visibleRoomNumbersFromCocos()
+      .map(v => Math.trunc(finiteNumber(v) || 0))
+      .filter(v => v > 0);
+
+    if (!visible.includes(wantedRoom)) {
+      return {
+        ok:false,
+        reason:`target-not-currently-rendered-${wantedRoom}-visible-${visible.slice(0,30).join('_') || 'none'}`
+      };
+    }
+
+    const candidates = tigerRoomNodeCandidates(wantedRoom);
+    if (!candidates.length) {
+      return {
+        ok:false,
+        reason:`no-native-node-for-${wantedRoom}-visible-${visible.slice(0,30).join('_') || 'none'}`
+      };
+    }
+
+    for (let index = 0; index < Math.min(candidates.length, 12); index += 1) {
+      const candidate = candidates[index];
+
+      const beforeController = findSlotTableController();
+      const beforeSnap = beforeController ? slotTableControllerSnapshot(beforeController) : null;
+      const beforeId = finiteNumber(beforeSnap?.selectRoomId);
+      const beforeCaptureAt = Number(window.__XIANYAO_ATG_DIRECT_ROOM__?.capturedAt || 0);
+
+      const sent = tigerEmitRoomCandidate(candidate);
+      if (!sent) continue;
+
+      const started = Date.now();
+      while (Date.now() - started < 700) {
+        const controller = findSlotTableController();
+        const snap = controller ? slotTableControllerSnapshot(controller) : null;
+        const selectedId = finiteNumber(snap?.selectRoomId);
+
+        const cap = window.__XIANYAO_ATG_DIRECT_ROOM__;
+        const capAt = Number(cap?.capturedAt || 0);
+        const capturedId = capAt > beforeCaptureAt ? directCaptureRoomId(cap) : null;
+
+        if (selectedId === wantedId || capturedId === wantedId) {
+          return {
+            ok:true,
+            candidate,
+            selectedId:selectedId ?? capturedId,
+            capture:capAt > beforeCaptureAt ? cap : null,
+            beforeId,
+            via:candidate.button ? 'native-button-or-handler' : 'native-node-event'
+          };
+        }
+        await roomWait(60);
+      }
+    }
+
+    const controller = findSlotTableController();
+    const snap = controller ? slotTableControllerSnapshot(controller) : null;
+    return {
+      ok:false,
+      reason:`native-candidates-did-not-select-${wantedRoom}-wanted-${wantedId}-selected-${finiteNumber(snap?.selectRoomId) ?? '—'}`,
+      candidates:candidates.slice(0,8).map(item => item.path)
+    };
+  }
+
   async function enterTigerRoomFromRanking(roomNumber, roomId) {
     const number = finiteNumber(roomNumber);
     const id = finiteNumber(roomId);
@@ -8680,31 +8851,57 @@ try {
       if (!opened) throw new Error('虎小妹：無法打開選擇機台');
       await roomWait(180);
 
-      // 虎小妹已實測：掃描 roomId 與手動點同一房的 ATG 原生 roomId 一致。
-      // 因此不再直接寫 controller；改成真的找到並點擊 ATG 原生房卡，
-      // 完整走和使用者手動點房相同的事件流程。
-      state.enterRoomStatus = `🐯 正在定位 ${roomText} 原生房卡…`;
+      const position = locateRoomPositionFromFullScan(roomNo);
+      if (!position) {
+        throw new Error(`虎小妹：全房資料找不到 ${roomText}`);
+      }
+
+      // 只負責切到目標頁；不再使用共用的虛擬捲動進房流程。
+      let moved = await forceSemanticPageForEnter(position.page, position.totalPages);
+      if (!moved) moved = await navigateToPageForEnter(position.page);
+
+      const pageStarted = Date.now();
+      let targetVisible = false;
+      while (Date.now() - pageStarted < 2600) {
+        const nums = visibleRoomNumbersFromCocos()
+          .map(v => Math.trunc(finiteNumber(v) || 0))
+          .filter(v => v > 0);
+        if (nums.includes(roomNo)) {
+          targetVisible = true;
+          break;
+        }
+        await roomWait(80);
+      }
+
+      // 虎小妹選房清單會保留大量房卡在同頁內容中，但目前畫面可能只顯示其中一段。
+      // 若目標暫時不在可見區，先使用原生 Canvas 小幅拖曳直到房號出現；
+      // 一旦出現就立即停止拖曳，改走房號節點本身，不依賴 ScrollView/viewport。
+      if (!targetVisible) {
+        const dragged = await dragSelectionUntilRoom(roomNo, 90);
+        const nums = visibleRoomNumbersFromCocos()
+          .map(v => Math.trunc(finiteNumber(v) || 0))
+          .filter(v => v > 0);
+        targetVisible = nums.includes(roomNo);
+
+        if (!targetVisible) {
+          throw new Error(
+            `虎小妹：找不到 ${roomText} 可見房號｜${dragged?.reason || 'drag-failed'}｜visible=${nums.slice(0,30).join('_') || 'none'}`
+          );
+        }
+      }
+
+      state.enterRoomStatus =
+        `🐯 已看到 ${roomText}｜直接觸發該房原生節點…`;
       scheduleRender();
 
-      const selected = await locateAndSelectRoomByVisibleNumber(roomNo);
+      const selected = await tigerSelectVisibleNativeRoom(roomNo, wantedId);
       if (!selected?.ok) {
         throw new Error(
-          `虎小妹原生房卡選取失敗｜${selected?.reason || 'unknown'}`
+          `虎小妹原生房卡事件失敗｜${selected?.reason || 'unknown'}`
         );
       }
 
-      await roomWait(180);
-
-      // 驗證原生 getSlotTableDetail 捕捉到的 roomId。
-      const capturedId = directCaptureRoomId(selected.capture);
-      if (capturedId !== null && finiteNumber(capturedId) !== wantedId) {
-        throw new Error(
-          `虎小妹原生房卡選錯｜目標 roomId=${wantedId}｜實際=${capturedId}`
-        );
-      }
-
-      // 再驗證 SlotTableView controller 已被原生房卡事件切到目標房。
-      const verify = await waitForNativeRoomSelection(wantedId, selected.capture, 3000);
+      const verify = await waitForNativeRoomSelection(wantedId, selected.capture, 2200);
       if (!verify?.ok) {
         throw new Error(
           `虎小妹原生選房未鎖定｜目標=${wantedId}｜select=${verify?.selectedId ?? '—'}`
@@ -8716,9 +8913,7 @@ try {
       scheduleRender();
 
       const confirm = findConfirmRoomButton();
-      if (!confirm?.node) {
-        throw new Error('虎小妹：找不到 confirmBtn/selectBtn');
-      }
+      if (!confirm?.node) throw new Error('虎小妹：找不到 confirmBtn/selectBtn');
 
       if (!triggerConfirmRoomControl(confirm)) {
         throw new Error(
