@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.148
-// @description  test148：掃描資料附記實際頁碼，虎小妹進房不再用房號推算頁碼；掃描流程與賽特2進房流程不動。
+// @version      4.0.0-test.149
+// @description  test149：虎小妹只認螢幕內真正可見房卡，自動捲到目標後再 Canvas 點擊；掃描流程與賽特2進房流程不動。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -8817,16 +8817,182 @@ try {
     }
   }
 
+  function tigerClientPointForTarget(target) {
+    try {
+      const point = target?.point || scannerNodeWorldPoint(target?.node, target?.cocos);
+      const gameWindow = target?.gameWindow;
+      const cocos = target?.cocos;
+      if (!point || !gameWindow) return null;
+
+      const doc = gameWindow.document;
+      const canvas =
+        doc?.querySelector?.('canvas#GameCanvas') ||
+        doc?.querySelector?.('canvas') ||
+        cocos?.game?.canvas ||
+        cocos?.game?._canvas;
+      if (!canvas || typeof canvas.getBoundingClientRect !== 'function') return null;
+
+      const rect = canvas.getBoundingClientRect();
+      let visibleWidth = 0;
+      let visibleHeight = 0;
+      try {
+        const size = cocos?.view?.getVisibleSize?.();
+        visibleWidth = Number(size?.width) || Number(canvas.width) || 0;
+        visibleHeight = Number(size?.height) || Number(canvas.height) || 0;
+      } catch (_) {}
+
+      if (!(visibleWidth > 0) || !(visibleHeight > 0) || !(rect.width > 0) || !(rect.height > 0)) {
+        return null;
+      }
+
+      const clientX = rect.left + (Number(point.x) / visibleWidth) * rect.width;
+      const clientY = rect.top + (1 - (Number(point.y) / visibleHeight)) * rect.height;
+
+      if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return null;
+
+      return { clientX, clientY, rect, canvas };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function tigerSelectionBandForTarget(target) {
+    const mapped = tigerClientPointForTarget(target);
+    if (!mapped) return null;
+
+    const { rect } = mapped;
+
+    // 虎小妹的選房格位於頁碼列下方、底部機台資訊列上方。
+    // 不依賴 Cocos ScrollView/Mask 類別（不同版本抓不到），
+    // 直接用目前遊戲 Canvas 的比例建立可點選房區。
+    return {
+      left: rect.left + rect.width * 0.14,
+      right: rect.left + rect.width * 0.92,
+      top: rect.top + rect.height * 0.18,
+      bottom: rect.top + rect.height * 0.75,
+      centerY: rect.top + rect.height * 0.465
+    };
+  }
+
+  function tigerTargetReallyVisible(target) {
+    const mapped = tigerClientPointForTarget(target);
+    const band = tigerSelectionBandForTarget(target);
+    if (!mapped || !band) return false;
+
+    return mapped.clientX >= band.left &&
+      mapped.clientX <= band.right &&
+      mapped.clientY >= band.top &&
+      mapped.clientY <= band.bottom;
+  }
+
+  async function tigerBringRoomIntoVisibleGrid(roomNumber, maxAttempts = 110) {
+    const wanted = Math.trunc(finiteNumber(roomNumber) || 0);
+    if (!wanted) return { ok:false, reason:'invalid-room' };
+
+    let lastPoint = null;
+    let stagnant = 0;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const targets = tigerVisibleRoomLabelTargets(wanted);
+
+      // 目標節點存在時，直接依它「實際畫面座標」決定往哪裡捲；
+      // 不再用 visibleRoomNumbersFromCocos，因為那會把裁切區外節點也當可見。
+      if (targets.length) {
+        const ranked = targets
+          .map(target => ({ target, mapped:tigerClientPointForTarget(target) }))
+          .filter(item => item.mapped)
+          .sort((a,b) => {
+            const ba = tigerSelectionBandForTarget(a.target);
+            const bb = tigerSelectionBandForTarget(b.target);
+            const da = ba ? Math.abs(a.mapped.clientY - ba.centerY) : 999999;
+            const db = bb ? Math.abs(b.mapped.clientY - bb.centerY) : 999999;
+            return da - db;
+          });
+
+        for (const item of ranked) {
+          if (tigerTargetReallyVisible(item.target)) {
+            return {
+              ok:true,
+              target:item.target,
+              attempt,
+              mapped:item.mapped,
+              via:'client-viewport'
+            };
+          }
+        }
+
+        const best = ranked[0];
+        if (best?.mapped) {
+          const band = tigerSelectionBandForTarget(best.target);
+          const y = best.mapped.clientY;
+          lastPoint = { x:Math.round(best.mapped.clientX), y:Math.round(y) };
+
+          let direction = null;
+          let gap = 0;
+
+          if (y > band.bottom) {
+            // 目標在可視區下方：像手指往上拖，顯示更後面的房卡。
+            direction = 'down';
+            gap = y - band.bottom;
+          } else if (y < band.top) {
+            // 目標在可視區上方：往下拖回去。
+            direction = 'up';
+            gap = band.top - y;
+          } else {
+            // Y 已進可視帶但 X 落在外面，先小幅抖動讓虛擬列表重新布局。
+            direction = attempt % 2 ? 'up' : 'down';
+            gap = 12;
+          }
+
+          let strength = 0.30;
+          const h = Math.max(1, best.mapped.rect.height);
+          const ratio = gap / h;
+          if (ratio > 0.45) strength = 1.05;
+          else if (ratio > 0.25) strength = 0.80;
+          else if (ratio > 0.12) strength = 0.58;
+          else if (ratio > 0.05) strength = 0.40;
+
+          const sent = dispatchSelectionDrag(direction, strength);
+          if (!sent) {
+            return {
+              ok:false,
+              reason:`canvas-drag-not-sent-${direction}-point-${lastPoint.x}_${lastPoint.y}`
+            };
+          }
+
+          await roomWait(110);
+          continue;
+        }
+      }
+
+      // 虛擬列表偶爾會暫時卸載目標節點；這時以小步往後找，
+      // 每一步都重新查 exact room label，找到即停。
+      const signature = visibleRoomNumbersFromCocos().slice(0,40).join('_');
+      if (!signature) stagnant += 1;
+      else stagnant = 0;
+
+      dispatchSelectionDrag('down', stagnant >= 3 ? 0.70 : 0.42);
+      await roomWait(stagnant >= 3 ? 160 : 110);
+    }
+
+    return {
+      ok:false,
+      reason:`target-never-entered-client-viewport-${wanted}-last-${lastPoint ? lastPoint.x + '_' + lastPoint.y : 'none'}`
+    };
+  }
+
   async function tigerSelectRoomByCanvasHitTest(roomNumber, roomId) {
     const wantedRoom = Math.trunc(finiteNumber(roomNumber) || 0);
     const wantedId = Math.trunc(finiteNumber(roomId) || 0);
     if (!wantedRoom || !wantedId) return { ok:false, reason:'invalid-target' };
 
-    const labels = tigerVisibleRoomLabelTargets(wantedRoom);
+    const labels = tigerVisibleRoomLabelTargets(wantedRoom)
+      .filter(target => tigerTargetReallyVisible(target));
+
     if (!labels.length) {
       return {
         ok:false,
-        reason:`no-visible-label-for-${wantedRoom}-visible-${visibleRoomNumbersFromCocos().slice(0,30).join('_') || 'none'}`
+        reason:`no-client-visible-label-for-${wantedRoom}`
       };
     }
 
@@ -8920,36 +9086,19 @@ try {
       let moved = await forceSemanticPageForEnter(targetPage, totalPages);
       if (!moved) moved = await navigateToPageForEnter(targetPage);
 
-      const pageStarted = Date.now();
-      let targetVisible = false;
+      state.enterRoomStatus =
+        `🐯 已到掃描頁碼第 ${targetPage} 頁｜正在把 ${roomText} 捲到螢幕內…`;
+      scheduleRender();
 
-      while (Date.now() - pageStarted < 2400) {
-        const nums = visibleRoomNumbersFromCocos()
-          .map(v => Math.trunc(finiteNumber(v) || 0))
-          .filter(v => v > 0);
-        if (nums.includes(roomNo)) {
-          targetVisible = true;
-          break;
-        }
-        await roomWait(80);
-      }
-
-      if (!targetVisible) {
-        const dragged = await dragSelectionUntilRoom(roomNo, 90);
-        const nums = visibleRoomNumbersFromCocos()
-          .map(v => Math.trunc(finiteNumber(v) || 0))
-          .filter(v => v > 0);
-        targetVisible = nums.includes(roomNo);
-
-        if (!targetVisible) {
-          throw new Error(
-            `虎小妹：找不到 ${roomText} 可見房號｜${dragged?.reason || 'drag-failed'}｜visible=${nums.slice(0,30).join('_') || 'none'}`
-          );
-        }
+      const visibleTarget = await tigerBringRoomIntoVisibleGrid(roomNo, 110);
+      if (!visibleTarget?.ok || !visibleTarget.target) {
+        throw new Error(
+          `虎小妹：無法把 ${roomText} 捲進可點區｜${visibleTarget?.reason || 'unknown'}`
+        );
       }
 
       state.enterRoomStatus =
-        `🐯 已看到 ${roomText}｜用 Canvas hit-test 真實點擊房卡…`;
+        `🐯 ${roomText} 已真正顯示在螢幕內｜Canvas 真實點擊…`;
       scheduleRender();
 
       const selected = await tigerSelectRoomByCanvasHitTest(roomNo, wantedId);
