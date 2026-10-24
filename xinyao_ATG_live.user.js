@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.140
-// @description  test140：以 test137 為穩定底版；掃描核心不動，新增全域遊戲模式，將賽特2/虎小妹的盤面監測與進房機制隔離。
+// @version      4.0.0-test.141
+// @description  test141：以 test137 為穩定底版；掃描核心不動，遊戲由會員頁入口固定，盤面監測 / 進房依遊戲模組隔離。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -130,11 +130,23 @@ function xinyaoNormalizeGameModule(value) {
 }
 
 function xinyaoLoadActiveGameModule() {
+  // 從芯瑤會員頁點遊戲進皇鼎時，會員頁會把選擇寫在同一 browsing context 的 window.name。
+  // 優先使用這個入口標記，再保存到 ATG 自己的 localStorage，確保進房重載後仍維持同一遊戲機制。
+  try {
+    const launchMatch = String(window.name || '').match(/^xinyao-game:(seth|tiger)$/i);
+    const launched = xinyaoNormalizeGameModule(launchMatch?.[1] || '');
+    if (launched) {
+      try { localStorage.setItem(XIANYAO_GAME_MODULE_KEY, launched); } catch (_) {}
+      return launched;
+    }
+  } catch (_) {}
+
   try {
     const saved = xinyaoNormalizeGameModule(localStorage.getItem(XIANYAO_GAME_MODULE_KEY));
     if (saved) return saved;
   } catch (_) {}
-  // test137 目前已驗證的是賽特2，沒有選擇紀錄時一律先走穩定路徑。
+
+  // 沒有入口紀錄時維持 test137 已驗證的賽特2穩定路徑。
   return 'seth';
 }
 
@@ -8597,31 +8609,17 @@ try {
   function gameModuleSelectorHtml() {
     const current = xinyaoActiveGameModule();
     const option = XIANYAO_GAME_MODULES[current] || XIANYAO_GAME_MODULES.seth;
-    const itemStyle = active => [
-      'border:1px solid ' + (active ? 'rgba(255,160,202,.78)' : 'rgba(255,255,255,.14)'),
-      'border-radius:9px',
-      'padding:7px 8px',
-      'background:' + (active ? 'rgba(255,89,157,.20)' : 'rgba(255,255,255,.045)'),
-      'color:#fff',
-      'font-size:10px',
-      'font-weight:900',
-      'cursor:pointer',
-      'text-align:center'
-    ].join(';');
+    const detail = current === 'seth'
+      ? '盤面監測＋進入此房使用賽特2專屬機制'
+      : '盤面監測使用虎小妹專屬機制；進房模組尚未開放';
     return `
-      <div style="margin-top:7px;padding:7px;border:1px solid rgba(255,190,215,.16);border-radius:10px;background:rgba(255,255,255,.035);">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;">
-          <b style="font-size:10.5px;color:#ffd3e4;">🎮 固定遊戲機制</b>
-          <span style="font-size:9px;opacity:.68;">掃描核心共用、不切換</span>
+      <div style="margin-top:7px;padding:8px 9px;border:1px solid rgba(255,190,215,.18);border-radius:10px;background:rgba(255,255,255,.04);">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <b style="font-size:10.5px;color:#ffd3e4;">🔒 已固定：${option.icon} ${option.label}</b>
+          <span style="font-size:9px;opacity:.68;">由會員頁入口決定</span>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-          <button type="button" id="xinyao-game-seth" style="${itemStyle(current === 'seth')}">👁️ 戰神賽特2${current === 'seth' ? ' ✓' : ''}</button>
-          <button type="button" id="xinyao-game-tiger" style="${itemStyle(current === 'tiger')}">🐯 虎小妹${current === 'tiger' ? ' ✓' : ''}</button>
-        </div>
-        <div style="margin-top:6px;font-size:9.5px;line-height:1.5;color:${current === 'seth' ? '#bff5dd' : '#ffd8a3'};">
-          ${current === 'seth'
-            ? `目前：${option.icon} ${option.label}｜盤面監測＋進入此房＝test137 賽特2機制`
-            : `目前：${option.icon} ${option.label}｜盤面監測已獨立；進入此房目前安全鎖定，等待虎小妹專屬機制`}
+        <div style="margin-top:5px;font-size:9.5px;line-height:1.5;color:${current === 'seth' ? '#bff5dd' : '#ffd8a3'};">
+          ${detail}
         </div>
       </div>`;
   }
