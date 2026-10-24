@@ -311,18 +311,37 @@
     tiger: 'https://www.hd5577.com/GameLobby?g=ATG&c=tiger-princess&p=web&l=zh-cn'
   });
 
-  let xinyaoGameWindow = null;
+  const XIANYAO_GAME_WINDOW_KEY =
+    'xinyao_atg_game_window_name_v1';
+
+  function validSavedGameWindowName(value) {
+    return /^xinyao-hd-launch:(seth|tiger):\d+:[a-z0-9]+$/i.test(String(value || ''));
+  }
 
   function launchHuangDingGame(gameId) {
     const id = String(gameId || '').toLowerCase();
-    const url = XIANYAO_HUANGDING_GAME_LINKS[id];
-    if (!url) return;
+    if (!XIANYAO_HUANGDING_GAME_LINKS[id]) return;
 
     const marker =
       'xinyao-hd-launch:' +
       id + ':' +
       Date.now() + ':' +
       Math.random().toString(36).slice(2, 10);
+
+    let targetName = '';
+    try {
+      const saved = localStorage.getItem(XIANYAO_GAME_WINDOW_KEY);
+      if (validSavedGameWindowName(saved)) targetName = saved;
+    } catch (_) {}
+
+    // 第一次沒有舊分頁時，就直接用這次 marker 當分頁名稱。
+    // 第二次以後則用「上一個 marker」命中原本的 ATG 分頁；
+    // 轉接頁載入後再把 window.name 換成新的 marker。
+    if (!targetName) targetName = marker;
+
+    try {
+      localStorage.setItem(XIANYAO_GAME_WINDOW_KEY, marker);
+    } catch (_) {}
 
     const button =
       id === 'tiger'
@@ -336,38 +355,25 @@
       if (enter) enter.textContent = '正在切換遊戲…';
     }
 
+    const handoffUrl =
+      './game-launch.html?game=' +
+      encodeURIComponent(id) +
+      '&marker=' +
+      encodeURIComponent(marker) +
+      '&v=346';
+
+    let gameWindow = null;
     try {
-      // 會員頁固定留著；ATG 永遠使用同一個遊戲分頁。
-      // 第二次切遊戲時直接把舊遊戲分頁導向新遊戲，避免同帳號同時存在兩個 ATG 連線。
-      if (!xinyaoGameWindow || xinyaoGameWindow.closed) {
-        xinyaoGameWindow = window.open('about:blank', '_blank');
-      }
+      gameWindow = window.open(handoffUrl, targetName);
+    } catch (_) {}
 
-      if (!xinyaoGameWindow) {
-        throw new Error('popup-blocked');
-      }
-
-      try {
-        xinyaoGameWindow.name = marker;
-      } catch (_) {}
-
-      try {
-        xinyaoGameWindow.location.replace(url);
-      } catch (_) {
-        xinyaoGameWindow.location.href = url;
-      }
-
-      try {
-        xinyaoGameWindow.focus();
-      } catch (_) {}
-    } catch (_) {
-      // 瀏覽器若封鎖新分頁才退回同頁開啟，至少不讓按鈕失效。
-      try {
-        window.name = marker;
-      } catch (_) {}
-      window.location.assign(url);
+    if (!gameWindow) {
+      // 若瀏覽器完全封鎖彈出視窗，才退回同頁切換。
+      location.assign(handoffUrl);
       return;
     }
+
+    try { gameWindow.focus(); } catch (_) {}
 
     window.setTimeout(() => {
       if (!button) return;
