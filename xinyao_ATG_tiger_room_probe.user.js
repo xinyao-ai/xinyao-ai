@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 虎小妹進房探測器 DEV
 // @namespace    xinyao-atg-tiger-room-probe
-// @version      0.1.4
+// @version      0.1.5
 // @description  虎小妹專屬只讀探測器：只觀察 roomId / getSlotTableDetail / SlotTableView，不修改 test142、不自動進房。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -61,24 +61,32 @@
   };
 
   function isTigerMode() {
-    // 先讀 test142 已經公開在頁面上的遊戲模式，這是最準的來源。
-    try {
-      if (String(window.__XIANYAO_ATG_ACTIVE_GAME_MODULE__ || '').toLowerCase() === 'tiger') {
-        return true;
-      }
-    } catch (_) {}
+    // 探測器可能執行在遊戲 frame，而 test142 面板在另一個同源 frame。
+    // 因此跨所有同源 window / document 判斷虎小妹模式。
+    for (const w of sameOriginWindows()) {
+      try {
+        if (String(w.__XIANYAO_ATG_ACTIVE_GAME_MODULE__ || '').toLowerCase() === 'tiger') {
+          return true;
+        }
+      } catch (_) {}
 
-    // 再用會員頁導入時留下的 window.name 標記。
-    try {
-      if (/^xinyao-hd-launch:tiger:/i.test(String(window.name || ''))) return true;
-    } catch (_) {}
+      try {
+        if (/^xinyao-hd-launch:tiger:/i.test(String(w.name || ''))) return true;
+      } catch (_) {}
 
-    // 最後才退回 ATG 同源 localStorage。
-    try {
-      return String(localStorage.getItem('xinyao_atg_active_game_module_v1') || '').toLowerCase() === 'tiger';
-    } catch (_) {
-      return false;
+      try {
+        if (String(w.localStorage?.getItem('xinyao_atg_active_game_module_v1') || '').toLowerCase() === 'tiger') {
+          return true;
+        }
+      } catch (_) {}
+
+      try {
+        const panel = w.document?.getElementById?.('xinyao-atg-room-scanner');
+        const text = String(panel?.textContent || '');
+        if (/固定[^\n]*虎小妹|虎小妹模式/i.test(text)) return true;
+      } catch (_) {}
     }
+    return false;
   }
 
   function sameOriginWindows() {
@@ -199,39 +207,89 @@
 
   function syncTargetFromMainPanelText() {
     try {
-      const panel = document.getElementById('xinyao-atg-room-scanner');
-      if (!panel) return false;
+      for (const w of sameOriginWindows()) {
+        let panel = null;
+        try {
+          panel = w.document?.getElementById?.('xinyao-atg-room-scanner');
+        } catch (_) {}
+        if (!panel) continue;
 
-      const text = String(panel.textContent || '').replace(/\s+/g, ' ').trim();
-      const m =
-        text.match(/虎小妹模式[^\d]*(\d{1,4})\s*房\s*roomId\s*=\s*(\d+)/i) ||
-        text.match(/已點擊\s*(\d{1,4})\s*房[^\d]+roomId\s*=\s*(\d+)/i);
+        const text = String(panel.textContent || '').replace(/\s+/g, ' ').trim();
 
-      if (!m) return false;
+        // test142 虎小妹「進入此房」安全分流後，會把目標直接寫進狀態列。
+        const m =
+          text.match(/虎小妹模式[^\d]*(\d{1,4})\s*房\s*roomId\s*=\s*(\d+)/i) ||
+          text.match(/已點擊\s*(\d{1,4})\s*房[^\d]*(?:roomId\s*=\s*)?(\d{4,})/i);
 
-      const roomNumber = Number(m[1]);
-      const roomId = Number(m[2]);
-      if (!Number.isFinite(roomNumber) || !Number.isFinite(roomId)) return false;
+        if (m) {
+          const roomNumber = Number(m[1]);
+          const roomId = Number(m[2]);
+          if (Number.isFinite(roomNumber) && Number.isFinite(roomId)) {
+            const changed =
+              state.targetRoomNumber !== Math.trunc(roomNumber) ||
+              state.targetRoomId !== Math.trunc(roomId);
 
-      const changed =
-        state.targetRoomNumber !== Math.trunc(roomNumber) ||
-        state.targetRoomId !== Math.trunc(roomId);
+            state.targetRoomNumber = Math.trunc(roomNumber);
+            state.targetRoomId = Math.trunc(roomId);
 
-      state.targetRoomNumber = Math.trunc(roomNumber);
-      state.targetRoomId = Math.trunc(roomId);
+            if (changed) {
+              state.note =
+                '✅ 已跨 frame 讀到排行榜目標：' +
+                state.targetRoomNumber +
+                ' 房｜roomId=' +
+                state.targetRoomId +
+                '。現在請手動選同一房，再按「更新資料」。';
+              saveState();
+            }
+            return true;
+          }
+        }
 
-      if (changed) {
+        // 如果狀態列還沒更新，直接讀排行榜按鈕 data-*。
+        // 找到目前滑鼠/鍵盤焦點或第一個可用按鈕時，不自動當目標；
+        // 只建立事件監聽，實際按下時才保存。
+        bindRankingCaptureForDocument(w.document);
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  const boundDocs = new WeakSet();
+
+  function bindRankingCaptureForDocument(doc) {
+    if (!doc || boundDocs.has(doc)) return;
+    boundDocs.add(doc);
+
+    const capture = event => {
+      try {
+        const btn = event.target?.closest?.('.xinyao-enter-room[data-room-number][data-room-id]');
+        if (!btn) return;
+
+        const roomNumber = num(btn.dataset.roomNumber);
+        const roomId = num(btn.dataset.roomId);
+        if (roomNumber === null || roomId === null) return;
+
+        state.targetRoomNumber = Math.trunc(roomNumber);
+        state.targetRoomId = Math.trunc(roomId);
         state.note =
-          '✅ 已從主程式讀到目標：' +
+          '✅ 已跨 frame 記錄排行榜目標：' +
           state.targetRoomNumber +
           ' 房｜roomId=' +
           state.targetRoomId +
-          '。現在請手動選同一房，再按「更新資料」。';
+          '。';
         saveState();
-      }
-      return true;
-    } catch (_) {
-      return false;
+        render();
+      } catch (_) {}
+    };
+
+    doc.addEventListener('pointerdown', capture, true);
+    doc.addEventListener('click', capture, true);
+    doc.addEventListener('touchstart', capture, {capture:true, passive:true});
+  }
+
+  function bindAllRankingDocuments() {
+    for (const w of sameOriginWindows()) {
+      try { bindRankingCaptureForDocument(w.document); } catch (_) {}
     }
   }
 
@@ -399,6 +457,7 @@
     if (!document.body) return;
     ensurePanel();
     if (isTigerMode()) {
+      bindAllRankingDocuments();
       syncTargetFromMainPanelText();
       readStableCaptures();
       render();
