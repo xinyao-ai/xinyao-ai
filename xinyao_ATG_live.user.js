@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.152
-// @description  test152：虎小妹原生 Socket 選房＋進房模板跨重新載入保留；一次學習後持續使用；掃描核心與賽特2進房流程不動。
+// @version      4.0.0-test.153
+// @description  test153：虎小妹進房學習改為記錄選房後同 Socket 全部候選事件，切房完成時自動回推真正進房事件；掃描核心與賽特2進房流程不動。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -2964,6 +2964,139 @@ try {
     }
   }
 
+  function xinyaoEventContainsRoomId(args, roomId) {
+    const wanted = Number(roomId);
+    if (!Number.isFinite(wanted)) return false;
+
+    const seen = new WeakSet();
+    const walk = (value, depth = 0) => {
+      if (depth > 12 || value == null) return false;
+
+      if (typeof value === 'number') return Number(value) === wanted;
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (/^\d+$/.test(trimmed) && Number(trimmed) === wanted) return true;
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (parsed && typeof parsed === 'object') return walk(parsed, depth + 1);
+        } catch (_) {}
+        return false;
+      }
+
+      if (typeof value !== 'object') return false;
+      if (seen.has(value)) return false;
+      seen.add(value);
+
+      if (Array.isArray(value)) {
+        return value.some(item => walk(item, depth + 1));
+      }
+
+      for (const [key, child] of Object.entries(value)) {
+        const normalized = String(key).replace(/[^a-z0-9]/gi,'').toLowerCase();
+        if (['roomid','tableid','slottableid','machineid'].includes(normalized)) {
+          if (Number(child) === wanted) return true;
+        }
+        if (walk(child, depth + 1)) return true;
+      }
+      return false;
+    };
+
+    return walk(args);
+  }
+
+  function xinyaoNativeEnterCandidateScore(candidate, roomId) {
+    if (!candidate) return -Infinity;
+    const event = String(candidate.event || '').toLowerCase();
+
+    // 只排除明確不可能是進房的高頻事件；不再要求事件名稱符合 enter/join/switch。
+    if (/^(?:ping|pong|heartbeat|spin|bet|balance|wallet|keepalive|ack)$/i.test(event)) {
+      return -10000;
+    }
+    if (/^getslottabledetail$/i.test(event)) return -10000;
+
+    let score = 0;
+    if (xinyaoEventContainsRoomId(candidate.args, roomId)) score += 1000;
+    if (/(room|table|slot|machine)/i.test(event)) score += 80;
+    if (/(enter|join|select|switch|change|open|play|confirm)/i.test(event)) score += 60;
+    score += Math.max(0, 300 - Math.floor((Date.now() - Number(candidate.at || 0)) / 20));
+    return score;
+  }
+
+  function finalizeNativeEnterLearning(reason = 'selection-closed') {
+    try {
+      const learn = window.__XIANYAO_ATG_ENTER_LEARN_WINDOW__;
+      if (!learn || !Array.isArray(learn.candidates) || !learn.candidates.length) return false;
+
+      const candidates = learn.candidates
+        .filter(item => item && item.socket === learn.socket)
+        .map(item => ({
+          ...item,
+          score:xinyaoNativeEnterCandidateScore(item, learn.roomId)
+        }))
+        .filter(item => item.score > -1000)
+        .sort((a,b) => b.score - a.score || Number(b.at || 0) - Number(a.at || 0));
+
+      const best = candidates[0];
+      if (!best) return false;
+
+      window.__XIANYAO_ATG_ENTER_TEMPLATE__ = {
+        socket:learn.socket,
+        event:best.event,
+        args:best.args.slice(),
+        capturedAt:Number(best.at || Date.now()),
+        sourceRoomId:learn.roomId,
+        learnedBy:reason
+      };
+
+      persistNativeRoomTemplate(
+        'enter',
+        best.event,
+        best.args,
+        {
+          sourceRoomId:learn.roomId,
+          learnedBy:reason,
+          score:best.score
+        }
+      );
+
+      learn.completed = true;
+      learn.completedAt = Date.now();
+      learn.selectedEvent = best.event;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function monitorNativeEnterLearning() {
+    try {
+      const learn = window.__XIANYAO_ATG_ENTER_LEARN_WINDOW__;
+      if (!learn || learn.completed) return;
+
+      const age = Date.now() - Number(learn.startedAt || 0);
+      if (age > 12000) {
+        // 超時仍嘗試從已收集候選挑最佳，不讓一次完整手動進房白做。
+        finalizeNativeEnterLearning('timeout-best-candidate');
+        return;
+      }
+
+      // getSlotTableDetail 發生時選機台視窗一定還在；
+      // 等它真的消失，代表使用者已完成「選取/確認/切房」。
+      const nowOpen = (() => {
+        try { return !!isMachineSelectionOpenFromCocos(); }
+        catch (_) { return null; }
+      })();
+
+      if (learn.wasSelectionOpen === undefined && nowOpen !== null) {
+        learn.wasSelectionOpen = nowOpen;
+      }
+
+      if (learn.wasSelectionOpen === true && nowOpen === false && age > 150) {
+        finalizeNativeEnterLearning('selection-closed');
+      }
+    } catch (_) {}
+  }
+
   function patchSocketIO() {
     for (const gameWindow of collectSameOriginLiveWindows()) {
       try {
@@ -3006,7 +3139,13 @@ try {
                 window.__XIANYAO_ATG_ENTER_LEARN_WINDOW__ = {
                   socket: this,
                   startedAt: nowAt,
-                  roomId: learnedRoomId
+                  roomId: learnedRoomId,
+                  candidates: [],
+                  completed: false,
+                  wasSelectionOpen: (() => {
+                    try { return !!isMachineSelectionOpenFromCocos(); }
+                    catch (_) { return true; }
+                  })()
                 };
 
                 persistNativeRoomTemplate(
@@ -3020,25 +3159,22 @@ try {
               // 2) 自動學習「按選取後真正進房」的 Socket 事件。
               // 只在剛發生 getSlotTableDetail 後幾秒內收集，避免把一般遊戲事件誤認成進房。
               const learn = window.__XIANYAO_ATG_ENTER_LEARN_WINDOW__;
-              const inLearnWindow = !!learn && learn.socket === this && (nowAt - Number(learn.startedAt || 0) <= 6000);
-              const roomActionEvent =
-                /(?:(?:enter|join|select|switch|change|open|play).*(?:room|table|slot|machine)|(?:room|table|slot|machine).*(?:enter|join|select|switch|change|open|play))/i.test(eventHint);
+              const inLearnWindow =
+                !!learn &&
+                !learn.completed &&
+                learn.socket === this &&
+                (nowAt - Number(learn.startedAt || 0) <= 12000);
 
-              if (inLearnWindow && roomActionEvent && !/^getSlotTableDetail$/i.test(eventHint)) {
-                window.__XIANYAO_ATG_ENTER_TEMPLATE__ = {
-                  socket: this,
-                  event: eventHint,
-                  args: args.slice(),
-                  capturedAt: nowAt,
-                  sourceRoomId: learn.roomId
-                };
-
-                persistNativeRoomTemplate(
-                  'enter',
-                  eventHint,
-                  args,
-                  { sourceRoomId: learn.roomId }
-                );
+              if (inLearnWindow && !/^getSlotTableDetail$/i.test(eventHint)) {
+                try {
+                  learn.candidates.push({
+                    socket:this,
+                    event:eventHint,
+                    args:args.slice(),
+                    at:nowAt
+                  });
+                  if (learn.candidates.length > 40) learn.candidates.shift();
+                } catch (_) {}
               }
             } catch (_) {}
             return nativeEmit.apply(this, args);
@@ -3138,6 +3274,7 @@ try {
   syncCocosRoomIdentity();
   setInterval(syncCocosRoomIdentity, 200);
   setInterval(refreshCurrentRoomMappingFromScan, 250);
+  setInterval(monitorNativeEnterLearning, 120);
   patchWebSocket();
   patchJSON();
   patchTextDecoder();
@@ -9245,7 +9382,7 @@ try {
 
       if (!hasCurrentTemplates && !hasPersistedTemplates) {
         throw new Error(
-          '虎小妹原生選房＋進房模板尚未學習｜只要手動進任一虎小妹房一次，之後同分頁重新載入都會自動保留'
+          '虎小妹原生進房模板尚未學習｜請手動完成一次「選房→選取→確認→進到轉輪」，程式會在切房完成時自動學習'
         );
       }
 
