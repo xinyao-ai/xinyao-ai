@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.150
-// @description  test150：虎小妹以 roomId 逐頁查原生 slotTableMap 定位真實頁碼；不再相信掃描頁碼；掃描核心與賽特2進房流程不動。
+// @version      4.0.0-test.151
+// @description  test151：虎小妹改走已學習的 ATG 原生 Socket 選房＋進房事件；不再模擬頁碼/房卡/Canvas；掃描核心與賽特2進房流程不動。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -9038,7 +9038,8 @@ try {
     const roomText = String(roomNo).padStart(4,'0');
 
     state.enterRoomBusy = true;
-    state.enterRoomStatus = `🐯 直達 ${roomText}｜準備虎小妹 Canvas 原生點擊…`;
+    state.enterRoomStatus =
+      `🐯 直達 ${roomText}｜改走虎小妹 ATG 原生 Socket 進房…`;
     scheduleRender();
 
     try {
@@ -9050,105 +9051,104 @@ try {
         }
       }
 
-      const opened = await openMachineSelectionForAutoEnter();
-      if (!opened) throw new Error('虎小妹：無法打開選擇機台');
-      await roomWait(180);
+      // 虎小妹不再使用：
+      // 1. 房號推算頁碼
+      // 2. scanner currentPage
+      // 3. Cocos 房卡父節點 handler
+      // 4. Canvas 模擬點擊
+      //
+      // 直接重播 ATG 自己「手動選房 -> 進房」時學到的原生 Socket 事件。
+      // 此函式只存在虎小妹分流，不會呼叫賽特2 enterRoomFromRanking()。
+      const selector = directRoomSelectorSnapshot();
+      const enterTemplate = directEnterTemplateSnapshot();
 
-      const totalPages = Math.max(1, Math.trunc(finiteNumber(state.totalPages) || 1));
+      if (!selector || !enterTemplate) {
+        const missing = [
+          !selector ? '選房模板' : '',
+          !enterTemplate ? '進房模板' : ''
+        ].filter(Boolean).join('＋');
 
-      // test150：虎小妹不再相信 scanner 的 currentPage / scanPage。
-      // 實機已確認 scanner 顯示頁碼可能與 ATG 原生頁碼不同。
-      // 改成逐頁切換 ATG 原生頁碼，直接用 roomId 查該頁 slotTableMap；
-      // 找到目標 roomId 的頁才算真正定位成功。
-      let targetPage = null;
-      let nativeInfo = null;
-      let targetController = null;
+        throw new Error(
+          `虎小妹原生 ${missing} 尚未學習｜請先手動選任一虎小妹房並完成進房一次，再回排行榜按「進入此房」`
+        );
+      }
 
-      for (let page = 1; page <= totalPages; page += 1) {
-        state.enterRoomStatus =
-          `🐯 正在找 ${roomText}｜檢查 ATG 原生第 ${page}/${totalPages} 頁…`;
-        scheduleRender();
+      state.enterRoomStatus =
+        `🐯 已取得 ATG 原生模板｜送出 ${roomText}｜roomId=${wantedId}…`;
+      scheduleRender();
 
-        let moved = await forceSemanticPageForEnter(page, totalPages);
-        if (!moved) moved = await navigateToPageForEnter(page);
+      const replay = replayNativeEnterTemplate(wantedId, roomNo);
+      if (!replay?.ok) {
+        throw new Error(
+          `虎小妹原生進房事件送出失敗｜${replay?.reason || 'unknown'}`
+        );
+      }
 
-        const started = Date.now();
-        while (Date.now() - started < 2200) {
-          const ctrl = findSlotTableController();
-          const info = ctrl ? findRoomInfoInSlotTableMap(ctrl, wantedId) : null;
-          if (ctrl && info) {
-            targetPage = page;
-            nativeInfo = info;
-            targetController = ctrl;
-            break;
-          }
-          await roomWait(80);
+      // 等待 ATG 接收 selector / enter；若它仍走原生確認視窗，就自動按確定。
+      const started = Date.now();
+      let dialogSeen = false;
+      let selectedSeen = false;
+
+      while (Date.now() - started < 3600) {
+        const ctrl = findSlotTableController();
+        const snap = ctrl ? slotTableControllerSnapshot(ctrl) : null;
+        const selectedId =
+          finiteNumber(snap?.selectRoomId) ??
+          finiteNumber(state.currentSelectedRoomId);
+
+        if (selectedId === wantedId) selectedSeen = true;
+
+        const dialog = roomSwitchDialogState(roomNo);
+        if (dialog?.visible) {
+          dialogSeen = true;
+          break;
         }
 
-        if (targetPage !== null) break;
+        // 原生 enter event 有些版本會直接關閉選房畫面 / 重新載入，
+        // 沒有確認視窗；一旦 selector 已命中就不再送任何 Cocos/Canvas 操作。
+        if (selectedSeen && !machineSelectionLooksOpen()) {
+          state.enterRoomStatus =
+            `✅ 🐯 已用 ATG 原生事件進入 ${roomText} 房｜roomId=${wantedId}`;
+          scheduleRender();
+          return;
+        }
+
+        await roomWait(80);
       }
 
-      if (targetPage === null || !nativeInfo || !targetController) {
+      if (dialogSeen) {
+        state.enterRoomStatus =
+          `🐯 ${roomText} 原生切房確認已出現｜自動按確定…`;
+        scheduleRender();
+
+        const confirmed = await autoConfirmRoomSwitchDialog(roomNo, 3200);
+        if (!confirmed?.ok) {
+          throw new Error(
+            `虎小妹原生切房已送出，但自動確認失敗｜${confirmed?.reason || 'unknown'}`
+          );
+        }
+
+        state.enterRoomStatus =
+          `✅ 🐯 已用 ATG 原生事件確認進入 ${roomText} 房｜roomId=${wantedId}`;
+        scheduleRender();
+        return;
+      }
+
+      // 不以「有呼叫 socket.emit」當成功；至少要看到 selector/controller 命中。
+      const ctrl = findSlotTableController();
+      const snap = ctrl ? slotTableControllerSnapshot(ctrl) : null;
+      const finalSelected =
+        finiteNumber(snap?.selectRoomId) ??
+        finiteNumber(state.currentSelectedRoomId);
+
+      if (finalSelected !== wantedId) {
         throw new Error(
-          `虎小妹：1～${totalPages} 頁原生 slotTableMap 都找不到 ${roomText}｜roomId=${wantedId}`
+          `虎小妹原生事件未命中目標｜wanted=${wantedId}｜selected=${finalSelected ?? '—'}｜selectEvent=${replay.selectEvent || '—'}｜enterEvent=${replay.enterEvent || '—'}`
         );
       }
 
       state.enterRoomStatus =
-        `✅ 🐯 已用 roomId 找到 ${roomText} 真正位於 ATG 第 ${targetPage} 頁｜正在捲到房卡…`;
-      scheduleRender();
-
-      const visibleTarget = await tigerBringRoomIntoVisibleGrid(roomNo, 110);
-      if (!visibleTarget?.ok || !visibleTarget.target) {
-        throw new Error(
-          `虎小妹：無法把 ${roomText} 捲進可點區｜${visibleTarget?.reason || 'unknown'}`
-        );
-      }
-
-      state.enterRoomStatus =
-        `🐯 ${roomText} 已真正顯示在螢幕內｜Canvas 真實點擊…`;
-      scheduleRender();
-
-      const selected = await tigerSelectRoomByCanvasHitTest(roomNo, wantedId);
-      if (!selected?.ok) {
-        throw new Error(
-          `虎小妹 Canvas 點擊失敗｜${selected?.reason || 'unknown'}`
-        );
-      }
-
-      const verify = await waitForNativeRoomSelection(wantedId, selected.capture, 2200);
-      if (!verify?.ok) {
-        throw new Error(
-          `虎小妹原生選房未鎖定｜目標=${wantedId}｜select=${verify?.selectedId ?? '—'}`
-        );
-      }
-
-      state.enterRoomStatus =
-        `✅ 🐯 Canvas 已原生選中 ${roomText}｜roomId=${wantedId}｜準備確認…`;
-      scheduleRender();
-
-      const confirm = findConfirmRoomButton();
-      if (!confirm?.node) throw new Error('虎小妹：找不到 confirmBtn/selectBtn');
-
-      if (!triggerConfirmRoomControl(confirm)) {
-        throw new Error(
-          `虎小妹：${String(confirm.node?.name || 'selectBtn')} 無法觸發`
-        );
-      }
-
-      state.enterRoomStatus =
-        `🐯 ${roomText} 已選定｜等待切換確認視窗…`;
-      scheduleRender();
-
-      const dialogConfirm = await autoConfirmRoomSwitchDialog(roomNo, 3000);
-      if (!dialogConfirm?.ok) {
-        throw new Error(
-          `虎小妹已選到 ${roomText}，但自動按確定失敗｜${dialogConfirm?.reason || 'unknown'}`
-        );
-      }
-
-      state.enterRoomStatus =
-        `✅ 🐯 已自動確認並進入 ${roomText} 房｜roomId=${wantedId}`;
+        `✅ 🐯 原生事件已鎖定 ${roomText}｜等待 ATG 完成切房…`;
       scheduleRender();
 
     } catch (error) {
