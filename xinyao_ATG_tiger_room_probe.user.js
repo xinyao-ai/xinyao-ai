@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 虎小妹進房探測器 DEV
 // @namespace    xinyao-atg-tiger-room-probe
-// @version      0.1.1
+// @version      0.1.2
 // @description  虎小妹專屬只讀探測器：只觀察 roomId / getSlotTableDetail / SlotTableView，不修改 test142、不自動進房。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -15,17 +15,45 @@
   if (window.__XIANYAO_TIGER_ROOM_PROBE__) return;
   window.__XIANYAO_TIGER_ROOM_PROBE__ = true;
 
+  const STORE_KEY = 'xinyao_tiger_room_probe_v1';
+
+  function loadSaved() {
+    try {
+      const raw = sessionStorage.getItem(STORE_KEY);
+      const saved = raw ? JSON.parse(raw) : null;
+      return saved && typeof saved === 'object' ? saved : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  const saved = loadSaved();
+
   const state = {
-    targetRoomNumber: null,
-    targetRoomId: null,
-    lastRawFrame: '',
-    lastRawAt: 0,
-    lastDirectRoomId: null,
-    lastDirectAt: 0,
+    targetRoomNumber: Number.isFinite(Number(saved.targetRoomNumber)) ? Number(saved.targetRoomNumber) : null,
+    targetRoomId: Number.isFinite(Number(saved.targetRoomId)) ? Number(saved.targetRoomId) : null,
+    lastRawFrame: String(saved.lastRawFrame || ''),
+    lastRawAt: Number(saved.lastRawAt || 0),
+    lastDirectRoomId: Number.isFinite(Number(saved.lastDirectRoomId)) ? Number(saved.lastDirectRoomId) : null,
+    lastDirectAt: Number(saved.lastDirectAt || 0),
     controller: null,
     active: false,
-    note: '等待虎小妹模式'
+    note: saved.note ? String(saved.note) : '等待虎小妹模式'
   };
+
+  function saveState() {
+    try {
+      sessionStorage.setItem(STORE_KEY, JSON.stringify({
+        targetRoomNumber: state.targetRoomNumber,
+        targetRoomId: state.targetRoomId,
+        lastRawFrame: state.lastRawFrame,
+        lastRawAt: state.lastRawAt,
+        lastDirectRoomId: state.lastDirectRoomId,
+        lastDirectAt: state.lastDirectAt,
+        note: state.note
+      }));
+    } catch (_) {}
+  }
 
   const num = value => {
     const n = Number(value);
@@ -158,6 +186,7 @@
     } catch (_) {}
 
     state.controller = findSlotTableController();
+    saveState();
   }
 
   function parseRoomIdFromFrame(frame) {
@@ -238,8 +267,10 @@
         try {
           await navigator.clipboard.writeText(text);
           state.note = '✅ 已複製檢測結果';
+          saveState();
         } catch (_) {
           state.note = '⚠️ 無法自動複製，請直接截圖';
+          saveState();
         }
         render();
       }
@@ -292,6 +323,7 @@
     state.targetRoomNumber = roomNumber === null ? null : Math.trunc(roomNumber);
     state.targetRoomId = roomId === null ? null : Math.trunc(roomId);
     state.note = '① 已記錄排行榜目標。現在請到 ATG 原生「選擇機台」手動選同一個房號，再回來按「更新資料」。';
+    saveState();
     readStableCaptures();
     render();
   }, true);
