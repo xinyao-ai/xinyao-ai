@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 虎小妹進房探測器 DEV
 // @namespace    xinyao-atg-tiger-room-probe
-// @version      0.1.3
+// @version      0.1.4
 // @description  虎小妹專屬只讀探測器：只觀察 roomId / getSlotTableDetail / SlotTableView，不修改 test142、不自動進房。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -197,6 +197,44 @@
     return m ? Number(m[1]) : null;
   }
 
+  function syncTargetFromMainPanelText() {
+    try {
+      const panel = document.getElementById('xinyao-atg-room-scanner');
+      if (!panel) return false;
+
+      const text = String(panel.textContent || '').replace(/\s+/g, ' ').trim();
+      const m =
+        text.match(/虎小妹模式[^\d]*(\d{1,4})\s*房\s*roomId\s*=\s*(\d+)/i) ||
+        text.match(/已點擊\s*(\d{1,4})\s*房[^\d]+roomId\s*=\s*(\d+)/i);
+
+      if (!m) return false;
+
+      const roomNumber = Number(m[1]);
+      const roomId = Number(m[2]);
+      if (!Number.isFinite(roomNumber) || !Number.isFinite(roomId)) return false;
+
+      const changed =
+        state.targetRoomNumber !== Math.trunc(roomNumber) ||
+        state.targetRoomId !== Math.trunc(roomId);
+
+      state.targetRoomNumber = Math.trunc(roomNumber);
+      state.targetRoomId = Math.trunc(roomId);
+
+      if (changed) {
+        state.note =
+          '✅ 已從主程式讀到目標：' +
+          state.targetRoomNumber +
+          ' 房｜roomId=' +
+          state.targetRoomId +
+          '。現在請手動選同一房，再按「更新資料」。';
+        saveState();
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   function resultObject() {
     const rawRoomId = parseRoomIdFromFrame(state.lastRawFrame);
     return {
@@ -257,6 +295,7 @@
       const action = btn.dataset.tigerProbeAction;
 
       if (action === 'refresh') {
+        syncTargetFromMainPanelText();
         readStableCaptures();
         render();
         return;
@@ -360,6 +399,7 @@
     if (!document.body) return;
     ensurePanel();
     if (isTigerMode()) {
+      syncTargetFromMainPanelText();
       readStableCaptures();
       render();
     } else {
