@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 虎小妹進房探測器 DEV
 // @namespace    xinyao-atg-tiger-room-probe
-// @version      0.1.0
+// @version      0.1.1
 // @description  虎小妹專屬只讀探測器：只觀察 roomId / getSlotTableDetail / SlotTableView，不修改 test142、不自動進房。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -33,9 +33,19 @@
   };
 
   function isTigerMode() {
+    // 先讀 test142 已經公開在頁面上的遊戲模式，這是最準的來源。
+    try {
+      if (String(window.__XIANYAO_ATG_ACTIVE_GAME_MODULE__ || '').toLowerCase() === 'tiger') {
+        return true;
+      }
+    } catch (_) {}
+
+    // 再用會員頁導入時留下的 window.name 標記。
     try {
       if (/^xinyao-hd-launch:tiger:/i.test(String(window.name || ''))) return true;
     } catch (_) {}
+
+    // 最後才退回 ATG 同源 localStorage。
     try {
       return String(localStorage.getItem('xinyao_atg_active_game_module_v1') || '').toLowerCase() === 'tiger';
     } catch (_) {
