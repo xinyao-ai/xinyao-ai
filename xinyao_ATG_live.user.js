@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.153
-// @description  test153：虎小妹進房學習改為記錄選房後同 Socket 全部候選事件，切房完成時自動回推真正進房事件；掃描核心與賽特2進房流程不動。
+// @version      4.0.0-test.154
+// @description  test154：虎小妹切房 reload 前於 pagehide/beforeunload 立即結算並保存原生進房模板；掃描核心與賽特2進房流程不動。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -3062,6 +3062,7 @@ try {
       learn.completed = true;
       learn.completedAt = Date.now();
       learn.selectedEvent = best.event;
+      try { sessionStorage.removeItem(nativeRoomTemplateStorageKey() + ':learning'); } catch (_) {}
       return true;
     } catch (_) {
       return false;
@@ -3096,6 +3097,58 @@ try {
       }
     } catch (_) {}
   }
+
+  function finalizeNativeEnterLearningOnUnload(reason = 'pagehide') {
+    try {
+      // 優先使用記憶體中的完整候選（仍保有原始 args）。
+      if (finalizeNativeEnterLearning(reason)) return true;
+
+      // 若記憶體剛好來不及保留，退回 sessionStorage 的序列化候選。
+      const raw = sessionStorage.getItem(nativeRoomTemplateStorageKey() + ':learning');
+      const saved = raw ? JSON.parse(raw) : null;
+      if (!saved || !Array.isArray(saved.candidates) || !saved.candidates.length) return false;
+
+      const roomId = saved.roomId;
+      const candidates = saved.candidates
+        .map(item => ({
+          event:String(item?.event || ''),
+          args:Array.isArray(item?.args) ? item.args : [],
+          at:Number(item?.at || 0),
+          score:xinyaoNativeEnterCandidateScore(item, roomId)
+        }))
+        .filter(item => item.score > -1000)
+        .sort((a,b) => b.score - a.score || Number(b.at || 0) - Number(a.at || 0));
+
+      const best = candidates[0];
+      if (!best) return false;
+
+      persistNativeRoomTemplate(
+        'enter',
+        best.event,
+        [best.event, ...best.args],
+        {
+          sourceRoomId:roomId,
+          learnedBy:reason + '-persisted-buffer',
+          score:best.score
+        }
+      );
+
+      sessionStorage.removeItem(nativeRoomTemplateStorageKey() + ':learning');
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  try {
+    window.addEventListener('pagehide', () => {
+      try { finalizeNativeEnterLearningOnUnload('pagehide'); } catch (_) {}
+    }, { capture:true });
+
+    window.addEventListener('beforeunload', () => {
+      try { finalizeNativeEnterLearningOnUnload('beforeunload'); } catch (_) {}
+    }, { capture:true });
+  } catch (_) {}
 
   function patchSocketIO() {
     for (const gameWindow of collectSameOriginLiveWindows()) {
@@ -3174,6 +3227,24 @@ try {
                     at:nowAt
                   });
                   if (learn.candidates.length > 40) learn.candidates.shift();
+
+                  // 虎小妹切房會直接 reload，先把「可序列化候選事件」同步保存，
+                  // 即使下一毫秒頁面被重載也不會全部遺失。
+                  try {
+                    const safeCandidates = learn.candidates.map(item => ({
+                      event:String(item.event || ''),
+                      args:serializableRoomTemplateValue(item.args || []),
+                      at:Number(item.at || 0)
+                    }));
+                    sessionStorage.setItem(
+                      nativeRoomTemplateStorageKey() + ':learning',
+                      JSON.stringify({
+                        roomId:learn.roomId,
+                        startedAt:learn.startedAt,
+                        candidates:safeCandidates
+                      })
+                    );
+                  } catch (_) {}
                 } catch (_) {}
               }
             } catch (_) {}
