@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.142
-// @description  test142：修正會員頁→皇鼎→ATG 的授權接力；掃描核心不動，遊戲仍由會員頁入口固定。
+// @version      4.0.0-test.143
+// @description  test143：修正排行榜空房狀態停留舊快照；掃描核心與賽特2進房流程不動。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -5798,9 +5798,42 @@ try {
   }
 
   function topRooms() {
-    const source = Array.isArray(state.rankingSnapshotRooms)
+    const snapshotSource = Array.isArray(state.rankingSnapshotRooms)
       ? state.rankingSnapshotRooms
       : numberedRooms();
+
+    // 排行分數仍以「完整掃描完成當下」的快照為基準，
+    // 但空房狀態必須跟 ATG 即時 slotTableUpdated 同步。
+    // 否則房間已被會員進入後，舊快照仍會把它顯示成空房。
+    const liveByRoomId = new Map();
+    const liveByNumber = new Map();
+
+    for (const room of numberedRooms()) {
+      const rid = finiteNumber(room?.roomId);
+      const rnum = finiteNumber(room?.number);
+      if (rid !== null) liveByRoomId.set(Math.trunc(rid), room);
+      if (rnum !== null) liveByNumber.set(Math.trunc(rnum), room);
+    }
+
+    const source = snapshotSource
+      .map(snapshotRoom => {
+        const rid = finiteNumber(snapshotRoom?.roomId);
+        const rnum = finiteNumber(snapshotRoom?.number);
+        const live =
+          (rid !== null ? liveByRoomId.get(Math.trunc(rid)) : null) ||
+          (rnum !== null ? liveByNumber.get(Math.trunc(rnum)) : null) ||
+          null;
+
+        if (!live) return snapshotRoom;
+
+        return {
+          ...snapshotRoom,
+          status: live.status ?? snapshotRoom.status,
+          updatedAt: live.updatedAt ?? snapshotRoom.updatedAt
+        };
+      })
+      .filter(room => room?.status === 'Empty');
+
     return rankRooms(source, { onlyEmpty: true, mode: ui.rankMode }).slice(0, ui.topN);
   }
 
