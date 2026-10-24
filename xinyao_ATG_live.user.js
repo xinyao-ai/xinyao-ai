@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.147
-// @description  test147：虎小妹改用房號世界座標→Canvas hit-test 真實點擊；掃描核心與賽特2進房流程不動。
+// @version      4.0.0-test.148
+// @description  test148：掃描資料附記實際頁碼，虎小妹進房不再用房號推算頁碼；掃描流程與賽特2進房流程不動。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -3104,6 +3104,7 @@ try {
       status: typeof obj.status === 'string' ? obj.status : null,
       bet: finiteNumber(obj.bet),
       win: finiteNumber(obj.win),
+      scanPage: finiteNumber(obj.scanPage),
       today: {
         bet: finiteNumber(obj.today?.bet),
         win: finiteNumber(obj.today?.win)
@@ -4387,6 +4388,7 @@ try {
       status: room.status ?? prev.status ?? null,
       bet: room.bet ?? prev.bet ?? null,
       win: room.win ?? prev.win ?? null,
+      scanPage: room.scanPage ?? prev.scanPage ?? null,
       today: {
         bet: room.today?.bet ?? prev.today?.bet ?? null,
         win: room.today?.win ?? prev.today?.win ?? null
@@ -4526,14 +4528,29 @@ try {
     if (tables) {
       let count = 0;
       const tableNumbers = [];
-      for (const room of tables) {
-        const n = finiteNumber(room?.number);
+      const ingestIntent = freshPageIntent();
+      const metaPage =
+        finiteNumber(value?.tableMeta?.currentPage) ??
+        finiteNumber(value?.data?.tableMeta?.currentPage);
+      const packetPage =
+        finiteNumber(ingestIntent?.page) ??
+        metaPage ??
+        finiteNumber(state.currentPage);
+
+      for (const rawRoom of tables) {
+        const n = finiteNumber(rawRoom?.number);
         if (n !== null) tableNumbers.push(n);
+
+        const room =
+          packetPage !== null && rawRoom && typeof rawRoom === 'object'
+            ? { ...rawRoom, scanPage: Math.trunc(packetPage) }
+            : rawRoom;
+
         if (upsertRoom(room, `${source}:tables`)) count++;
       }
 
       if (count || tableNumbers.length) {
-        const intent = freshPageIntent();
+        const intent = ingestIntent || freshPageIntent();
         const inferredPage = inferPageFromRoomNumbers(tableNumbers);
 
         state.latestTableNumbers = tableNumbers.slice();
@@ -8654,6 +8671,26 @@ try {
     }
   }
 
+  function tigerStoredScanPage(roomNumber, roomId) {
+    const wantedRoom = Math.trunc(finiteNumber(roomNumber) || 0);
+    const wantedId = Math.trunc(finiteNumber(roomId) || 0);
+
+    let byNumber = null;
+    let byId = null;
+
+    for (const room of state.roomMap.values()) {
+      const n = Math.trunc(finiteNumber(room?.number) || 0);
+      const id = Math.trunc(finiteNumber(room?.roomId) || 0);
+      const page = Math.trunc(finiteNumber(room?.scanPage) || 0);
+      if (!page) continue;
+
+      if (wantedRoom && n === wantedRoom) byNumber = page;
+      if (wantedId && id === wantedId) byId = page;
+    }
+
+    return byNumber || byId || null;
+  }
+
   function tigerVisibleRoomLabelTargets(roomNumber) {
     const wanted = Math.trunc(finiteNumber(roomNumber) || 0);
     if (!wanted) return [];
@@ -8868,11 +8905,20 @@ try {
       if (!opened) throw new Error('虎小妹：無法打開選擇機台');
       await roomWait(180);
 
-      const position = locateRoomPositionFromFullScan(roomNo);
-      if (!position) throw new Error(`虎小妹：全房資料找不到 ${roomText}`);
+      const targetPage = tigerStoredScanPage(roomNo, wantedId);
+      if (!targetPage) {
+        throw new Error(
+          `虎小妹：${roomText} 尚無掃描頁碼紀錄｜請重新執行一次完整掃描後再進房`
+        );
+      }
 
-      let moved = await forceSemanticPageForEnter(position.page, position.totalPages);
-      if (!moved) moved = await navigateToPageForEnter(position.page);
+      const totalPages = Math.max(1, Math.trunc(finiteNumber(state.totalPages) || 1));
+      state.enterRoomStatus =
+        `🐯 ${roomText} 掃描紀錄在第 ${targetPage}/${totalPages} 頁｜直接切原始頁面…`;
+      scheduleRender();
+
+      let moved = await forceSemanticPageForEnter(targetPage, totalPages);
+      if (!moved) moved = await navigateToPageForEnter(targetPage);
 
       const pageStarted = Date.now();
       let targetVisible = false;
