@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.156
-// @description  test156：虎小妹進房後半段完整複製賽特2成功流程；僅前段改用 roomId 逐頁定位；掃描核心與賽特2進房流程不動。
+// @version      4.0.0-test.157
+// @description  test157：虎小妹找房先用賽特2同款房號頁碼直達，找不到才快速逐頁保險搜尋；後半段維持賽特2成功流程。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -9576,35 +9576,87 @@ try {
       if (!opened) throw new Error('虎小妹：無法打開選擇機台');
       await roomWait(160);
 
-      // 虎小妹唯一和賽特2不同的地方：
-      // 不用房號推頁碼，直接逐頁載入 ATG 原生 slotTableMap，
-      // 找到 wantedId 真正存在的那一頁後，後面完全照賽特2成功流程。
-      const totalPages = Math.max(1, Math.trunc(finiteNumber(state.totalPages) || 6));
+      // test157：正常情況直接比照賽特2，用 500 房/頁快速定位。
+      // 只有該頁找不到目標 roomId 時，才啟動保險逐頁搜尋。
+      const perPage = Math.max(1, Math.trunc(finiteNumber(state.tablePerPage) || 500));
+      const totalPages = Math.max(
+        1,
+        Math.trunc(
+          finiteNumber(state.totalPages) ||
+          Math.ceil(Math.max(roomNo, 1) / perPage)
+        )
+      );
+      const likelyPage = Math.max(
+        1,
+        Math.min(totalPages, Math.ceil(roomNo / perPage))
+      );
+
       let targetPage = null;
       let controller = null;
       let nativeInfo = null;
 
-      for (let page = 1; page <= totalPages; page += 1) {
-        state.enterRoomStatus = `🐯 ${roomText}｜搜尋 ATG 原生第 ${page}/${totalPages} 頁…`;
+      const tryTigerPage = async (page, timeout = 1100) => {
+        state.enterRoomStatus =
+          `🐯 ${roomText}｜快速定位第 ${page}/${totalPages} 頁…`;
         scheduleRender();
+
+        // 如果目前 slotTableMap 已經有目標，連翻頁都省掉。
+        let ctrl = findSlotTableController();
+        let info = ctrl ? findRoomInfoInSlotTableMap(ctrl, wantedId) : null;
+        if (ctrl && info) {
+          return { page, controller:ctrl, nativeInfo:info };
+        }
 
         let pageReady = await forceSemanticPageForEnter(page, totalPages);
         if (!pageReady) pageReady = await navigateToPageForEnter(page);
 
-        const pageStarted = Date.now();
-        while (Date.now() - pageStarted < 2600) {
-          const ctrl = findSlotTableController();
-          const info = ctrl ? findRoomInfoInSlotTableMap(ctrl, wantedId) : null;
+        const started = Date.now();
+        while (Date.now() - started < timeout) {
+          ctrl = findSlotTableController();
+          info = ctrl ? findRoomInfoInSlotTableMap(ctrl, wantedId) : null;
           if (ctrl && info) {
-            targetPage = page;
-            controller = ctrl;
-            nativeInfo = info;
+            return { page, controller:ctrl, nativeInfo:info };
+          }
+
+          // slotTableMap 一旦已刷新成完整頁資料但沒有目標，就不再傻等。
+          const snap = ctrl ? slotTableControllerSnapshot(ctrl) : null;
+          const mapSize = Math.trunc(finiteNumber(snap?.mapSize) || 0);
+          if (pageReady && mapSize >= Math.min(100, perPage)) {
+            await roomWait(120);
+            ctrl = findSlotTableController();
+            info = ctrl ? findRoomInfoInSlotTableMap(ctrl, wantedId) : null;
+            if (ctrl && info) {
+              return { page, controller:ctrl, nativeInfo:info };
+            }
             break;
           }
-          await roomWait(80);
+
+          await roomWait(60);
         }
 
-        if (targetPage !== null) break;
+        return null;
+      };
+
+      // 第一優先：和賽特2一樣直接跳房號對應頁。
+      let found = await tryTigerPage(likelyPage, 1200);
+
+      // 保險：只有快速頁沒找到才查其他頁，且每頁縮短等待時間。
+      if (!found) {
+        const fallbackPages = [];
+        for (let page = 1; page <= totalPages; page += 1) {
+          if (page !== likelyPage) fallbackPages.push(page);
+        }
+
+        for (const page of fallbackPages) {
+          found = await tryTigerPage(page, 700);
+          if (found) break;
+        }
+      }
+
+      if (found) {
+        targetPage = found.page;
+        controller = found.controller;
+        nativeInfo = found.nativeInfo;
       }
 
       if (!controller) throw new Error('虎小妹：找不到 SlotTableView 選房控制器');
