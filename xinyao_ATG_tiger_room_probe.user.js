@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 虎小妹進房探測器 DEV
 // @namespace    xinyao-atg-tiger-room-probe
-// @version      0.1.2
+// @version      0.1.3
 // @description  虎小妹專屬只讀探測器：只觀察 roomId / getSlotTableDetail / SlotTableView，不修改 test142、不自動進房。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -262,6 +262,19 @@
         return;
       }
 
+      if (action === 'clear') {
+        state.targetRoomNumber = null;
+        state.targetRoomId = null;
+        state.lastRawFrame = '';
+        state.lastRawAt = 0;
+        state.lastDirectRoomId = null;
+        state.lastDirectAt = 0;
+        state.note = '已清除舊目標，請重新點排行榜的「進入此房」。';
+        saveState();
+        render();
+        return;
+      }
+
       if (action === 'copy') {
         const text = JSON.stringify(resultObject(), null, 2);
         try {
@@ -308,25 +321,40 @@
       </div>
       <div style="display:flex;gap:6px;margin-top:7px;">
         <button data-tiger-probe-action="refresh" type="button" style="flex:1;border:0;border-radius:8px;padding:7px;background:#ff5f9e;color:#fff;font-weight:900;cursor:pointer;">更新資料</button>
+        <button data-tiger-probe-action="clear" type="button" style="flex:1;border:1px solid rgba(255,180,212,.35);border-radius:8px;padding:7px;background:rgba(255,255,255,.06);color:#fff;font-weight:900;cursor:pointer;">清除目標</button>
         <button data-tiger-probe-action="copy" type="button" style="flex:1;border:1px solid rgba(255,180,212,.35);border-radius:8px;padding:7px;background:rgba(255,255,255,.06);color:#fff;font-weight:900;cursor:pointer;">複製結果</button>
       </div>
     `;
   }
 
-  document.addEventListener('click', event => {
+  function captureRankingTarget(event) {
     if (!isTigerMode()) return;
     const btn = event.target?.closest?.('.xinyao-enter-room');
     if (!btn) return;
 
     const roomNumber = num(btn.dataset.roomNumber);
     const roomId = num(btn.dataset.roomId);
+    if (roomNumber === null && roomId === null) return;
+
     state.targetRoomNumber = roomNumber === null ? null : Math.trunc(roomNumber);
     state.targetRoomId = roomId === null ? null : Math.trunc(roomId);
-    state.note = '① 已記錄排行榜目標。現在請到 ATG 原生「選擇機台」手動選同一個房號，再回來按「更新資料」。';
+    state.note =
+      '✅ 已更新排行榜目標：' +
+      (state.targetRoomNumber ?? '—') +
+      ' 房｜roomId=' +
+      (state.targetRoomId ?? '—') +
+      '。現在請手動選同一房，再按「更新資料」。';
     saveState();
     readStableCaptures();
     render();
-  }, true);
+  }
+
+  // pointerdown 會比主程式 click handler 更早發生；
+  // 即使右上面板接著被重建，目標也已經先保存。
+  document.addEventListener('pointerdown', captureRankingTarget, true);
+  document.addEventListener('mousedown', captureRankingTarget, true);
+  document.addEventListener('touchstart', captureRankingTarget, { capture:true, passive:true });
+  document.addEventListener('click', captureRankingTarget, true);
 
   function tick() {
     if (!document.body) return;
