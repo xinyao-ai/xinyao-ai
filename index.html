@@ -2510,6 +2510,165 @@
   @media(max-width:560px){.atg-live-grid{grid-template-columns:1fr}.atg-live-card{padding:15px;border-radius:20px}}
 </style>
 
+<style id="xinyao-game-launcher-style">
+  .game-launcher-card{
+    margin:16px 0;
+    padding:18px;
+    border:1px solid #f2cede;
+    border-radius:24px;
+    background:linear-gradient(135deg,#fff,#fff3f8);
+    box-shadow:0 12px 32px rgba(226,86,145,.12);
+  }
+  .game-launcher-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:14px;
+  }
+  .game-launcher-title{
+    color:#4f4149;
+    font-size:18px;
+    font-weight:950;
+  }
+  .game-launcher-sub{
+    margin-top:4px;
+    color:#8d7480;
+    font-size:12px;
+    font-weight:700;
+    line-height:1.55;
+  }
+  .game-launcher-badge{
+    flex:0 0 auto;
+    padding:6px 10px;
+    border-radius:999px;
+    color:#cf3776;
+    background:#fff0f6;
+    font-size:11px;
+    font-weight:950;
+  }
+  .game-launcher-grid{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:12px;
+  }
+  .game-launcher-item{
+    position:relative;
+    min-height:0;
+    padding:0;
+    overflow:hidden;
+    border:1.5px solid #f0c6d8;
+    border-radius:20px;
+    background:#fff;
+    box-shadow:0 10px 25px rgba(226,86,145,.10);
+    text-align:left;
+    cursor:pointer;
+    transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease;
+  }
+  .game-launcher-item:hover{
+    transform:translateY(-2px);
+    border-color:#f08bb6;
+    box-shadow:0 14px 32px rgba(226,86,145,.16);
+  }
+  .game-launcher-item:active{transform:scale(.985)}
+  .game-launcher-item.is-disabled{
+    cursor:not-allowed;
+    opacity:.62;
+    filter:saturate(.72);
+  }
+  .game-launcher-item.is-disabled:hover{
+    transform:none;
+    border-color:#f0c6d8;
+    box-shadow:0 10px 25px rgba(226,86,145,.10);
+  }
+  .game-launcher-cover{
+    position:relative;
+    height:150px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+  }
+  .game-launcher-cover.seth{
+    background:
+      radial-gradient(circle at 50% 34%,rgba(255,214,122,.40),transparent 24%),
+      linear-gradient(145deg,#1a1029 0%,#4a234d 42%,#151229 100%);
+  }
+  .game-launcher-cover.tiger{
+    background:
+      radial-gradient(circle at 50% 34%,rgba(255,194,112,.34),transparent 25%),
+      linear-gradient(145deg,#2b1a14 0%,#5a302d 46%,#17151f 100%);
+  }
+  .game-launcher-symbol{
+    position:relative;
+    z-index:2;
+    font-size:64px;
+    filter:drop-shadow(0 8px 18px rgba(0,0,0,.25));
+  }
+  .game-launcher-cover::before,
+  .game-launcher-cover::after{
+    content:"";
+    position:absolute;
+    width:110px;
+    height:110px;
+    border:1px solid rgba(255,223,148,.28);
+    transform:rotate(45deg);
+  }
+  .game-launcher-cover::after{
+    width:72px;
+    height:72px;
+    border-color:rgba(255,255,255,.16);
+    transform:rotate(45deg);
+  }
+  .game-launcher-status{
+    position:absolute;
+    top:10px;
+    right:10px;
+    z-index:3;
+    padding:5px 8px;
+    border-radius:999px;
+    background:rgba(255,255,255,.90);
+    color:#df4c88;
+    font-size:10px;
+    font-weight:950;
+  }
+  .game-launcher-info{padding:13px 14px 14px}
+  .game-launcher-name{
+    color:#493840;
+    font-size:15px;
+    font-weight:950;
+  }
+  .game-launcher-provider{
+    margin-top:4px;
+    color:#a1818f;
+    font-size:11px;
+    font-weight:800;
+  }
+  .game-launcher-enter{
+    margin-top:10px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    color:#e54d87;
+    font-size:12px;
+    font-weight:950;
+  }
+  .game-launcher-item.launching{
+    pointer-events:none;
+    opacity:.72;
+  }
+  @media(max-width:560px){
+    .game-launcher-card{padding:15px;border-radius:20px}
+    .game-launcher-grid{grid-template-columns:1fr 1fr;gap:9px}
+    .game-launcher-cover{height:122px}
+    .game-launcher-symbol{font-size:52px}
+    .game-launcher-info{padding:11px 11px 12px}
+    .game-launcher-name{font-size:13px}
+    .game-launcher-provider{font-size:10px}
+    .game-launcher-enter{font-size:11px}
+  }
+</style>
+
 </head>
 
 <body>
@@ -2638,6 +2797,43 @@
         </div>
       </div>
     </section>
+
+
+<section id="xinyaoGameLauncher" class="game-launcher-card" aria-label="選擇 ATG 遊戲">
+  <div class="game-launcher-head">
+    <div>
+      <div class="game-launcher-title">🎮 選擇遊戲</div>
+      <div class="game-launcher-sub">點選遊戲後直接進入皇鼎對應遊戲，芯瑤助手會固定使用該遊戲的專屬機制。</div>
+    </div>
+    <span class="game-launcher-badge">ATG</span>
+  </div>
+
+  <div class="game-launcher-grid">
+    <button id="xinyaoLaunchSeth" class="game-launcher-item" type="button">
+      <div class="game-launcher-cover seth">
+        <span class="game-launcher-status">可進入</span>
+        <span class="game-launcher-symbol">👁️</span>
+      </div>
+      <div class="game-launcher-info">
+        <div class="game-launcher-name">戰神賽特2・覺醒之力</div>
+        <div class="game-launcher-provider">ATG｜賽特2專屬機制</div>
+        <div class="game-launcher-enter"><span>進入皇鼎賽特2</span><span>›</span></div>
+      </div>
+    </button>
+
+    <button class="game-launcher-item is-disabled" type="button" disabled aria-disabled="true">
+      <div class="game-launcher-cover tiger">
+        <span class="game-launcher-status">準備中</span>
+        <span class="game-launcher-symbol">🐯</span>
+      </div>
+      <div class="game-launcher-info">
+        <div class="game-launcher-name">虎小妹</div>
+        <div class="game-launcher-provider">ATG｜專屬機制開發中</div>
+        <div class="game-launcher-enter"><span>尚未開放</span><span>—</span></div>
+      </div>
+    </button>
+  </div>
+</section>
 
 <section id="xinyaoLiveDataPanel" class="atg-live-card">
       <div class="atg-live-head">
@@ -3778,6 +3974,6 @@
 
 
   </script>
-<script src="./xinyao_site_live_v2.js?v=341"></script>
+<script src="./xinyao_site_live_v2.js?v=342"></script>
 </body>
 </html>
