@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.154
-// @description  test154：虎小妹切房 reload 前於 pagehide/beforeunload 立即結算並保存原生進房模板；掃描核心與賽特2進房流程不動。
+// @version      4.0.0-test.155
+// @description  test155：虎小妹切房改以轉輪畫面實際目前房號作最終驗證，跨 reload 後才判成功；掃描核心與賽特2進房流程不動。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -4581,6 +4581,10 @@ try {
 
   document.addEventListener('pointerdown', captureCalibrationPointer, true);
 
+  setInterval(() => {
+    try { verifyTigerPendingActualRoom(); } catch (_) {}
+  }, 250);
+
   function scheduleRender() {
     if (state.renderTimer) return;
     state.renderTimer = setTimeout(() => {
@@ -8954,6 +8958,143 @@ try {
     }
   }
 
+  const TIGER_PENDING_VERIFY_KEY = 'xinyao_tiger_pending_room_verify_v1';
+
+  function tigerSavePendingVerify(roomNumber, roomId) {
+    try {
+      sessionStorage.setItem(TIGER_PENDING_VERIFY_KEY, JSON.stringify({
+        roomNumber:Math.trunc(Number(roomNumber)),
+        roomId:Math.trunc(Number(roomId)),
+        startedAt:Date.now()
+      }));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function tigerLoadPendingVerify() {
+    try {
+      const raw = sessionStorage.getItem(TIGER_PENDING_VERIFY_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (!parsed || typeof parsed !== 'object') return null;
+      const roomNumber = finiteNumber(parsed.roomNumber);
+      const roomId = finiteNumber(parsed.roomId);
+      const startedAt = finiteNumber(parsed.startedAt);
+      if (roomNumber === null || roomId === null || startedAt === null) return null;
+      return {
+        roomNumber:Math.trunc(roomNumber),
+        roomId:Math.trunc(roomId),
+        startedAt
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function tigerClearPendingVerify() {
+    try { sessionStorage.removeItem(TIGER_PENDING_VERIFY_KEY); } catch (_) {}
+  }
+
+  function tigerActualCurrentRoomNumber() {
+    // 只讀「轉輪畫面上的目前機台徽章」，不讀 scanner selectRoomId、
+    // getSlotTableDetail 或 LIVE_SNAPSHOT，避免只是選中房卡就被誤判成已進房。
+    for (const w of sameOriginRoomWindows()) {
+      try {
+        const cocos = w.cc || w.legacyCC || w._cc;
+        const scene = cocos?.director?.getScene?.();
+        const Label = cocos?.Label;
+        if (!scene || !Label || typeof scene.getComponentsInChildren !== 'function') continue;
+
+        const candidates = [];
+        for (const label of (scene.getComponentsInChildren(Label) || [])) {
+          const node = label?.node;
+          if (!node || node.activeInHierarchy === false) continue;
+
+          const text = String(label?.string ?? label?._string ?? '').trim();
+          if (!/^\d{1,4}$/.test(text)) continue;
+
+          const path = roomLabelPath(label);
+          if (/spincontent/i.test(path)) continue;
+
+          let score = 0;
+          if (/slottable2btn/i.test(path)) score += 120;
+          if (/(?:current|selected|playing).*(?:room|table|machine)/i.test(path)) score += 100;
+          if (/(?:buttons|control|bottom|spinbar)/i.test(path)) score += 30;
+          if (/(?:room|table|machine|slot.*table)/i.test(path)) score += 20;
+
+          // 只有強證據才接受，避免把押注、彩金、轉數等其他數字當房號。
+          if (score < 80) continue;
+
+          candidates.push({
+            roomNumber:Number(text),
+            score,
+            path
+          });
+        }
+
+        if (candidates.length) {
+          candidates.sort((a,b) => b.score - a.score);
+          return Math.trunc(candidates[0].roomNumber);
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  function verifyTigerPendingActualRoom() {
+    const pending = tigerLoadPendingVerify();
+    if (!pending) return false;
+
+    const age = Date.now() - pending.startedAt;
+    const targetText = String(pending.roomNumber).padStart(4,'0');
+
+    // 選機台畫面開著時不判定，因為此時只能看到候選房，還不是真正進房。
+    if (machineSelectionLooksOpen()) {
+      if (age > 20000) {
+        state.enterRoomStatus =
+          `⚠️ 🐯 切房逾時：仍停在選擇機台｜目標 ${targetText}`;
+        tigerClearPendingVerify();
+        scheduleRender();
+      }
+      return false;
+    }
+
+    const actual = tigerActualCurrentRoomNumber();
+
+    if (actual === pending.roomNumber) {
+      state.enterRoomStatus =
+        `✅ 🐯 已驗證真正進入 ${targetText} 房｜實際目前房號=${String(actual).padStart(4,'0')}`;
+      tigerClearPendingVerify();
+      scheduleRender();
+      return true;
+    }
+
+    // 讓 reload / Cocos 重建有足夠時間。只有真的讀到另一個目前房號，或超時，才判失敗。
+    if (age > 12000 && actual !== null) {
+      state.enterRoomStatus =
+        `❌ 🐯 切房失敗｜目標 ${targetText}｜實際目前房號=${String(actual).padStart(4,'0')}`;
+      tigerClearPendingVerify();
+      scheduleRender();
+      return false;
+    }
+
+    if (age > 18000 && actual === null) {
+      state.enterRoomStatus =
+        `❌ 🐯 無法驗證切房結果｜目標 ${targetText}｜未讀到實際目前房號`;
+      tigerClearPendingVerify();
+      scheduleRender();
+      return false;
+    }
+
+    state.enterRoomStatus =
+      actual === null
+        ? `⏳ 🐯 已送出 ${targetText}｜等待轉輪目前房號出現…`
+        : `⏳ 🐯 已送出 ${targetText}｜目前仍是 ${String(actual).padStart(4,'0')}，等待切房完成…`;
+    scheduleRender();
+    return false;
+  }
+
   function tigerNativeTemplateStorageKey() {
     return 'xinyao_atg_native_room_templates_v1:tiger';
   }
@@ -9459,6 +9600,7 @@ try {
 
       state.enterRoomStatus =
         `🐯 已取得 ATG 原生模板｜送出 ${roomText}｜roomId=${wantedId}…`;
+      tigerSavePendingVerify(roomNo, wantedId);
       scheduleRender();
 
       let replay = hasCurrentTemplates
@@ -9472,6 +9614,7 @@ try {
       }
 
       if (!replay?.ok) {
+        tigerClearPendingVerify();
         throw new Error(
           `虎小妹原生進房事件送出失敗｜${replay?.reason || 'unknown'}`
         );
@@ -9501,8 +9644,9 @@ try {
         // 沒有確認視窗；一旦 selector 已命中就不再送任何 Cocos/Canvas 操作。
         if (selectedSeen && !machineSelectionLooksOpen()) {
           state.enterRoomStatus =
-            `✅ 🐯 已用 ATG 原生事件進入 ${roomText} 房｜roomId=${wantedId}`;
+            `⏳ 🐯 原生事件已送出 ${roomText}｜等待實際目前房號驗證…`;
           scheduleRender();
+          verifyTigerPendingActualRoom();
           return;
         }
 
@@ -9522,8 +9666,9 @@ try {
         }
 
         state.enterRoomStatus =
-          `✅ 🐯 已用 ATG 原生事件確認進入 ${roomText} 房｜roomId=${wantedId}`;
+          `⏳ 🐯 已確認切換到 ${roomText}｜等待轉輪實際房號驗證…`;
         scheduleRender();
+        verifyTigerPendingActualRoom();
         return;
       }
 
@@ -9541,8 +9686,9 @@ try {
       }
 
       state.enterRoomStatus =
-        `✅ 🐯 原生事件已鎖定 ${roomText}｜等待 ATG 完成切房…`;
+        `⏳ 🐯 原生事件已鎖定 ${roomText}｜尚未驗證真正進房…`;
       scheduleRender();
+      verifyTigerPendingActualRoom();
 
     } catch (error) {
       state.enterRoomStatus =
