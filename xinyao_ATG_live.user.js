@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.151
-// @description  test151：虎小妹改走已學習的 ATG 原生 Socket 選房＋進房事件；不再模擬頁碼/房卡/Canvas；掃描核心與賽特2進房流程不動。
+// @version      4.0.0-test.152
+// @description  test152：虎小妹原生 Socket 選房＋進房模板跨重新載入保留；一次學習後持續使用；掃描核心與賽特2進房流程不動。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -2890,6 +2890,80 @@ try {
     } catch (_) {}
   }
 
+  const XIANYAO_NATIVE_ROOM_TEMPLATE_KEY = 'xinyao_atg_native_room_templates_v1';
+
+  function nativeRoomTemplateScope() {
+    try {
+      const direct = String(window.__XIANYAO_ATG_ACTIVE_GAME_MODULE__ || '').toLowerCase();
+      if (direct === 'tiger' || direct === 'seth') return direct;
+    } catch (_) {}
+    try {
+      const stored = String(localStorage.getItem('xinyao_atg_active_game_module_v1') || '').toLowerCase();
+      if (stored === 'tiger' || stored === 'seth') return stored;
+    } catch (_) {}
+    try {
+      if (/xinyao-hd-launch:tiger:/i.test(String(window.name || ''))) return 'tiger';
+      if (/xinyao-hd-launch:seth:/i.test(String(window.name || ''))) return 'seth';
+    } catch (_) {}
+    return 'unknown';
+  }
+
+  function nativeRoomTemplateStorageKey() {
+    return XIANYAO_NATIVE_ROOM_TEMPLATE_KEY + ':' + nativeRoomTemplateScope();
+  }
+
+  function serializableRoomTemplateValue(value, depth = 0, seen = new WeakSet()) {
+    if (depth > 12) return null;
+    if (value == null) return value;
+
+    const type = typeof value;
+    if (type === 'string' || type === 'number' || type === 'boolean') return value;
+    if (type === 'function' || type === 'symbol' || type === 'bigint') return undefined;
+    if (type !== 'object') return null;
+
+    if (seen.has(value)) return undefined;
+    seen.add(value);
+
+    if (Array.isArray(value)) {
+      return value
+        .map(item => serializableRoomTemplateValue(item, depth + 1, seen))
+        .filter(item => item !== undefined);
+    }
+
+    const out = {};
+    for (const [key, child] of Object.entries(value)) {
+      const next = serializableRoomTemplateValue(child, depth + 1, seen);
+      if (next !== undefined) out[key] = next;
+    }
+    return out;
+  }
+
+  function loadPersistedNativeRoomTemplates() {
+    try {
+      const raw = sessionStorage.getItem(nativeRoomTemplateStorageKey());
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function persistNativeRoomTemplate(kind, eventName, args, extra = {}) {
+    try {
+      const store = loadPersistedNativeRoomTemplates();
+      store[kind] = {
+        event:String(eventName || ''),
+        args:serializableRoomTemplateValue(Array.isArray(args) ? args.slice(1) : []),
+        capturedAt:Date.now(),
+        ...extra
+      };
+      sessionStorage.setItem(nativeRoomTemplateStorageKey(), JSON.stringify(store));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   function patchSocketIO() {
     for (const gameWindow of collectSameOriginLiveWindows()) {
       try {
@@ -2910,6 +2984,7 @@ try {
           const nativeEmit = proto.emit;
           const wrappedEmit = function(...args) {
             try {
+              try { window.__XIANYAO_ATG_LATEST_SOCKET__ = this; } catch (_) {}
               const eventHint = typeof args[0] === 'string' ? args[0] : '';
               applyOutboundRoomFromTransport(args, eventHint);
 
@@ -2922,14 +2997,24 @@ try {
                   args: args.slice(),
                   capturedAt: nowAt
                 };
+
+                const learnedRoomId = (() => {
+                  try { return findNamedNumber(args, new Set(['roomid','tableid','slottableid','machineid'])); }
+                  catch (_) { return null; }
+                })();
+
                 window.__XIANYAO_ATG_ENTER_LEARN_WINDOW__ = {
                   socket: this,
                   startedAt: nowAt,
-                  roomId: (() => {
-                    try { return findNamedNumber(args, new Set(['roomid','tableid','slottableid','machineid'])); }
-                    catch (_) { return null; }
-                  })()
+                  roomId: learnedRoomId
                 };
+
+                persistNativeRoomTemplate(
+                  'selector',
+                  eventHint,
+                  args,
+                  { sourceRoomId: learnedRoomId }
+                );
               }
 
               // 2) 自動學習「按選取後真正進房」的 Socket 事件。
@@ -2947,6 +3032,13 @@ try {
                   capturedAt: nowAt,
                   sourceRoomId: learn.roomId
                 };
+
+                persistNativeRoomTemplate(
+                  'enter',
+                  eventHint,
+                  args,
+                  { sourceRoomId: learn.roomId }
+                );
               }
             } catch (_) {}
             return nativeEmit.apply(this, args);
@@ -8654,6 +8746,87 @@ try {
     }
   }
 
+  function tigerNativeTemplateStorageKey() {
+    return 'xinyao_atg_native_room_templates_v1:tiger';
+  }
+
+  function tigerPersistedNativeTemplates() {
+    try {
+      const raw = sessionStorage.getItem(tigerNativeTemplateStorageKey());
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function tigerLatestLiveSocket() {
+    try {
+      const socket = window.__XIANYAO_ATG_LATEST_SOCKET__;
+      if (!socket) return null;
+      if (socket.disconnected === true || socket.connected === false) return null;
+      return socket;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function waitForTigerLiveSocket(timeout = 2600) {
+    const started = Date.now();
+    while (Date.now() - started < timeout) {
+      const socket = tigerLatestLiveSocket();
+      if (socket) return socket;
+      await roomWait(80);
+    }
+    return tigerLatestLiveSocket();
+  }
+
+  async function replayTigerPersistedNativeEnter(roomId, roomNumber) {
+    const id = finiteNumber(roomId);
+    const number = finiteNumber(roomNumber);
+    if (id === null || number === null) {
+      return { ok:false, reason:'missing-room-identity' };
+    }
+
+    const templates = tigerPersistedNativeTemplates();
+    const selector = templates?.selector;
+    const enter = templates?.enter;
+
+    if (!selector?.event || !Array.isArray(selector?.args)) {
+      return { ok:false, reason:'persisted-selector-not-learned' };
+    }
+    if (!enter?.event || !Array.isArray(enter?.args)) {
+      return { ok:false, reason:'persisted-enter-not-learned' };
+    }
+
+    const socket = await waitForTigerLiveSocket(2600);
+    if (!socket) return { ok:false, reason:'live-socket-not-ready' };
+
+    try {
+      const selectorArgs = selector.args.map(arg =>
+        cloneWithTargetIdentifiers(arg, id, number)
+      );
+      const enterArgs = enter.args.map(arg =>
+        cloneWithTargetIdentifiers(arg, id, number)
+      );
+
+      socket.emit(selector.event, ...selectorArgs);
+
+      await roomWait(180);
+
+      socket.emit(enter.event, ...enterArgs);
+
+      return {
+        ok:true,
+        selectEvent:String(selector.event || ''),
+        enterEvent:String(enter.event || ''),
+        persisted:true
+      };
+    } catch (error) {
+      return { ok:false, reason:String(error?.message || error) };
+    }
+  }
+
   function tigerStoredScanPage(roomNumber, roomId) {
     const wantedRoom = Math.trunc(finiteNumber(roomNumber) || 0);
     const wantedId = Math.trunc(finiteNumber(roomId) || 0);
@@ -9061,15 +9234,18 @@ try {
       // 此函式只存在虎小妹分流，不會呼叫賽特2 enterRoomFromRanking()。
       const selector = directRoomSelectorSnapshot();
       const enterTemplate = directEnterTemplateSnapshot();
+      const persisted = tigerPersistedNativeTemplates();
 
-      if (!selector || !enterTemplate) {
-        const missing = [
-          !selector ? '選房模板' : '',
-          !enterTemplate ? '進房模板' : ''
-        ].filter(Boolean).join('＋');
+      const hasCurrentTemplates = !!selector && !!enterTemplate;
+      const hasPersistedTemplates =
+        !!persisted?.selector?.event &&
+        Array.isArray(persisted?.selector?.args) &&
+        !!persisted?.enter?.event &&
+        Array.isArray(persisted?.enter?.args);
 
+      if (!hasCurrentTemplates && !hasPersistedTemplates) {
         throw new Error(
-          `虎小妹原生 ${missing} 尚未學習｜請先手動選任一虎小妹房並完成進房一次，再回排行榜按「進入此房」`
+          '虎小妹原生選房＋進房模板尚未學習｜只要手動進任一虎小妹房一次，之後同分頁重新載入都會自動保留'
         );
       }
 
@@ -9077,7 +9253,16 @@ try {
         `🐯 已取得 ATG 原生模板｜送出 ${roomText}｜roomId=${wantedId}…`;
       scheduleRender();
 
-      const replay = replayNativeEnterTemplate(wantedId, roomNo);
+      let replay = hasCurrentTemplates
+        ? replayNativeEnterTemplate(wantedId, roomNo)
+        : await replayTigerPersistedNativeEnter(wantedId, roomNo);
+
+      // 記憶體模板若剛好失效，允許同一虎小妹流程退回「已保存模板」，
+      // 但絕不 fallback 到賽特2進房。
+      if (!replay?.ok && hasPersistedTemplates) {
+        replay = await replayTigerPersistedNativeEnter(wantedId, roomNo);
+      }
+
       if (!replay?.ok) {
         throw new Error(
           `虎小妹原生進房事件送出失敗｜${replay?.reason || 'unknown'}`
