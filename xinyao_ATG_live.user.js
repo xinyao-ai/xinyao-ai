@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.149
-// @description  test149：虎小妹只認螢幕內真正可見房卡，自動捲到目標後再 Canvas 點擊；掃描流程與賽特2進房流程不動。
+// @version      4.0.0-test.150
+// @description  test150：虎小妹以 roomId 逐頁查原生 slotTableMap 定位真實頁碼；不再相信掃描頁碼；掃描核心與賽特2進房流程不動。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -3104,7 +3104,6 @@ try {
       status: typeof obj.status === 'string' ? obj.status : null,
       bet: finiteNumber(obj.bet),
       win: finiteNumber(obj.win),
-      scanPage: finiteNumber(obj.scanPage),
       today: {
         bet: finiteNumber(obj.today?.bet),
         win: finiteNumber(obj.today?.win)
@@ -4388,7 +4387,6 @@ try {
       status: room.status ?? prev.status ?? null,
       bet: room.bet ?? prev.bet ?? null,
       win: room.win ?? prev.win ?? null,
-      scanPage: room.scanPage ?? prev.scanPage ?? null,
       today: {
         bet: room.today?.bet ?? prev.today?.bet ?? null,
         win: room.today?.win ?? prev.today?.win ?? null
@@ -4528,29 +4526,14 @@ try {
     if (tables) {
       let count = 0;
       const tableNumbers = [];
-      const ingestIntent = freshPageIntent();
-      const metaPage =
-        finiteNumber(value?.tableMeta?.currentPage) ??
-        finiteNumber(value?.data?.tableMeta?.currentPage);
-      const packetPage =
-        finiteNumber(ingestIntent?.page) ??
-        metaPage ??
-        finiteNumber(state.currentPage);
-
-      for (const rawRoom of tables) {
-        const n = finiteNumber(rawRoom?.number);
+      for (const room of tables) {
+        const n = finiteNumber(room?.number);
         if (n !== null) tableNumbers.push(n);
-
-        const room =
-          packetPage !== null && rawRoom && typeof rawRoom === 'object'
-            ? { ...rawRoom, scanPage: Math.trunc(packetPage) }
-            : rawRoom;
-
         if (upsertRoom(room, `${source}:tables`)) count++;
       }
 
       if (count || tableNumbers.length) {
-        const intent = ingestIntent || freshPageIntent();
+        const intent = freshPageIntent();
         const inferredPage = inferPageFromRoomNumbers(tableNumbers);
 
         state.latestTableNumbers = tableNumbers.slice();
@@ -9071,23 +9054,48 @@ try {
       if (!opened) throw new Error('虎小妹：無法打開選擇機台');
       await roomWait(180);
 
-      const targetPage = tigerStoredScanPage(roomNo, wantedId);
-      if (!targetPage) {
+      const totalPages = Math.max(1, Math.trunc(finiteNumber(state.totalPages) || 1));
+
+      // test150：虎小妹不再相信 scanner 的 currentPage / scanPage。
+      // 實機已確認 scanner 顯示頁碼可能與 ATG 原生頁碼不同。
+      // 改成逐頁切換 ATG 原生頁碼，直接用 roomId 查該頁 slotTableMap；
+      // 找到目標 roomId 的頁才算真正定位成功。
+      let targetPage = null;
+      let nativeInfo = null;
+      let targetController = null;
+
+      for (let page = 1; page <= totalPages; page += 1) {
+        state.enterRoomStatus =
+          `🐯 正在找 ${roomText}｜檢查 ATG 原生第 ${page}/${totalPages} 頁…`;
+        scheduleRender();
+
+        let moved = await forceSemanticPageForEnter(page, totalPages);
+        if (!moved) moved = await navigateToPageForEnter(page);
+
+        const started = Date.now();
+        while (Date.now() - started < 2200) {
+          const ctrl = findSlotTableController();
+          const info = ctrl ? findRoomInfoInSlotTableMap(ctrl, wantedId) : null;
+          if (ctrl && info) {
+            targetPage = page;
+            nativeInfo = info;
+            targetController = ctrl;
+            break;
+          }
+          await roomWait(80);
+        }
+
+        if (targetPage !== null) break;
+      }
+
+      if (targetPage === null || !nativeInfo || !targetController) {
         throw new Error(
-          `虎小妹：${roomText} 尚無掃描頁碼紀錄｜請重新執行一次完整掃描後再進房`
+          `虎小妹：1～${totalPages} 頁原生 slotTableMap 都找不到 ${roomText}｜roomId=${wantedId}`
         );
       }
 
-      const totalPages = Math.max(1, Math.trunc(finiteNumber(state.totalPages) || 1));
       state.enterRoomStatus =
-        `🐯 ${roomText} 掃描紀錄在第 ${targetPage}/${totalPages} 頁｜直接切原始頁面…`;
-      scheduleRender();
-
-      let moved = await forceSemanticPageForEnter(targetPage, totalPages);
-      if (!moved) moved = await navigateToPageForEnter(targetPage);
-
-      state.enterRoomStatus =
-        `🐯 已到掃描頁碼第 ${targetPage} 頁｜正在把 ${roomText} 捲到螢幕內…`;
+        `✅ 🐯 已用 roomId 找到 ${roomText} 真正位於 ATG 第 ${targetPage} 頁｜正在捲到房卡…`;
       scheduleRender();
 
       const visibleTarget = await tigerBringRoomIntoVisibleGrid(roomNo, 110);
