@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.141
-// @description  test141：以 test137 為穩定底版；掃描核心不動，遊戲由會員頁入口固定，盤面監測 / 進房依遊戲模組隔離。
+// @version      4.0.0-test.142
+// @description  test142：修正會員頁→皇鼎→ATG 的授權接力；掃描核心不動，遊戲仍由會員頁入口固定。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -29,6 +29,40 @@ function xinyaoResolveHuangDingAccess() {
 
   const currentHost = String(location.hostname || '').toLowerCase();
   const externalReferrer = Boolean(refHost && refHost !== currentHost);
+
+  // test142：會員頁先選遊戲，再經皇鼎轉進 ATG 時，中間轉址可能讓 document.referrer
+  // 不再是 hd5577.com。此時改用同一分頁 window.name 的短效接力標記確認來源流程。
+  try {
+    const launch = String(window.name || '').match(/^xinyao-hd-launch:(seth|tiger):(\d+):([a-z0-9]+)$/i);
+    if (launch) {
+      const launchedAt = Number(launch[2] || 0);
+      const fresh = Number.isFinite(launchedAt) && launchedAt > 0 &&
+        Math.abs(Date.now() - launchedAt) <= 10 * 60 * 1000;
+      if (fresh) {
+        sessionStorage.setItem(XIANYAO_HD_SESSION_KEY, JSON.stringify({
+          ok:true,
+          source:'xinyao-member-launcher',
+          game:String(launch[1] || '').toLowerCase(),
+          at:Date.now()
+        }));
+        sessionStorage.removeItem(XIANYAO_HD_BLOCK_KEY);
+        return true;
+      }
+    }
+
+    // 相容 test141 已經留下的舊標記，升級後第一次仍可順利進入。
+    const legacy = String(window.name || '').match(/^xinyao-game:(seth|tiger)$/i);
+    if (legacy) {
+      sessionStorage.setItem(XIANYAO_HD_SESSION_KEY, JSON.stringify({
+        ok:true,
+        source:'xinyao-member-launcher-legacy',
+        game:String(legacy[1] || '').toLowerCase(),
+        at:Date.now()
+      }));
+      sessionStorage.removeItem(XIANYAO_HD_BLOCK_KEY);
+      return true;
+    }
+  } catch (_) {}
 
   // 從皇鼎頁面正式開啟 ATG：建立 / 更新本分頁授權，並解除「本次其他來源停用」標記。
   if (xinyaoIsHuangDingHost(refHost)) {
@@ -133,7 +167,10 @@ function xinyaoLoadActiveGameModule() {
   // 從芯瑤會員頁點遊戲進皇鼎時，會員頁會把選擇寫在同一 browsing context 的 window.name。
   // 優先使用這個入口標記，再保存到 ATG 自己的 localStorage，確保進房重載後仍維持同一遊戲機制。
   try {
-    const launchMatch = String(window.name || '').match(/^xinyao-game:(seth|tiger)$/i);
+    const launchName = String(window.name || '');
+    const launchMatch =
+      launchName.match(/^xinyao-hd-launch:(seth|tiger):\d+:[a-z0-9]+$/i) ||
+      launchName.match(/^xinyao-game:(seth|tiger)$/i);
     const launched = xinyaoNormalizeGameModule(launchMatch?.[1] || '');
     if (launched) {
       try { localStorage.setItem(XIANYAO_GAME_MODULE_KEY, launched); } catch (_) {}
