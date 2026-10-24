@@ -60,7 +60,7 @@
   setInterval(checkMaintenance, 10000);
 
   const SCRIPT_URL =
-    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=141';
+    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=142';
 
   const GUIDE_IMAGES = {
     ios: './xinyao_guide_ios.png?v=203',
@@ -318,7 +318,7 @@
     // 使用同一分頁跨站導向時 window.name 會跟著 browsing context 保留；
     // ATG userscript 會讀取這個標記並固定對應遊戲機制。
     try {
-      window.name = 'xinyao-game:' + id;
+      window.name = 'xinyao-hd-launch:' + id + ':' + Date.now() + ':' + Math.random().toString(36).slice(2, 10);
     } catch (_) {}
 
     const button = $('xinyaoLaunchSeth');
