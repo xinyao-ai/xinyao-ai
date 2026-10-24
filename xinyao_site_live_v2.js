@@ -60,7 +60,7 @@
   setInterval(checkMaintenance, 10000);
 
   const SCRIPT_URL =
-    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=341';
+    'https://xinyao-ai.github.io/xinyao-ai/xinyao_ATG_live.user.js?v=141';
 
   const GUIDE_IMAGES = {
     ios: './xinyao_guide_ios.png?v=203',
@@ -303,6 +303,49 @@
 
   const $ = id =>
     document.getElementById(id);
+
+
+  // ===== 會員頁遊戲入口：只負責選定遊戲並前往皇鼎 =====
+  const XIANYAO_HUANGDING_GAME_LINKS = Object.freeze({
+    seth: 'https://hd5577.com/GameLobby?g=ATG&c=golden-seth'
+  });
+
+  function launchHuangDingGame(gameId) {
+    const id = String(gameId || '').toLowerCase();
+    const url = XIANYAO_HUANGDING_GAME_LINKS[id];
+    if (!url) return;
+
+    // 使用同一分頁跨站導向時 window.name 會跟著 browsing context 保留；
+    // ATG userscript 會讀取這個標記並固定對應遊戲機制。
+    try {
+      window.name = 'xinyao-game:' + id;
+    } catch (_) {}
+
+    const button = $('xinyaoLaunchSeth');
+    if (button) {
+      button.classList.add('launching');
+      button.setAttribute('aria-busy', 'true');
+      const enter = button.querySelector('.game-launcher-enter span');
+      if (enter) enter.textContent = '正在前往皇鼎…';
+    }
+
+    window.setTimeout(() => {
+      window.location.assign(url);
+    }, 120);
+  }
+
+  function bindGameLauncher() {
+    const sethButton = $('xinyaoLaunchSeth');
+    if (!sethButton || sethButton.dataset.bound === '1') return;
+    sethButton.dataset.bound = '1';
+    sethButton.addEventListener('click', () => launchHuangDingGame('seth'));
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bindGameLauncher, { once:true });
+  } else {
+    bindGameLauncher();
+  }
 
   function money(value) {
     if (
