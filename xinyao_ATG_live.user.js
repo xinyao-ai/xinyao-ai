@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.162
-// @description  test162：新增後台全域「僅限皇鼎」開關；關閉後任一娛樂城 ATG 可使用，重新開啟即恢復皇鼎限制。
+// @version      4.0.0-test.163
+// @description  test163：修正後台「僅限皇鼎」遠端開關判斷，關閉後可於其他娛樂城正常啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -16,7 +16,7 @@ const XIANYAO_HD_SESSION_KEY = 'xinyao_atg_hd_access_v1';
 const XIANYAO_HD_BLOCK_KEY = 'xinyao_atg_hd_block_v1';
 const XIANYAO_HD_ONLY_CACHE_KEY = 'xinyao_atg_hd_only_remote_v1';
 const XIANYAO_HD_CONTROL_ENDPOINT = 'https://xinyao-atg-live.love06130430.workers.dev/maintenance';
-const XIANYAO_HD_ONLY_MARK_RE = /\\[\\[XIANYAO_HD_ONLY=(0|1)\\]\\]/i;
+const XIANYAO_HD_ONLY_MARK_RE = /\[\[XIANYAO_HD_ONLY=(0|1)\]\]/i;
 const XIANYAO_HD_ALLOWED_HOSTS = ['hd5577.com'];
 
 function xinyaoHdOnlyFromMessage(message) {
