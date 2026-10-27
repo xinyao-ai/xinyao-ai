@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.167
-// @description  test167：移除會讓免遊看似卡住的全畫面結算遮罩；改為純讀取、不阻擋遊戲流程，只在免遊面板顯示結算狀態。
+// @version      4.0.0-test.168
+// @description  test168：免遊純讀取不阻擋；新增免遊期間 WebSocket/Socket.IO 封包摘要記錄，供定位真正結算/跳過流程。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -15398,13 +15398,15 @@ try {
       try {
         const latest = freeRuntimeDiagnostics();
         payload = JSON.stringify({
-          version:'test166',
+          version:'test168',
           at:Date.now(),
           href:location.href,
           freeGameActive:Boolean(window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameActive),
           freeGameCount:window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameCount ?? null,
           startFreeGame:window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.startFreeGame ?? null,
-          rows:latest
+          rows:latest,
+          packets:window.__XIANYAO_ATG_FREE_PACKET_TRACE__?.getState?.() || null,
+          settlement:window.__XIANYAO_ATG_FREE_RESULT_PROBE__?.getState?.() || null
         }, null, 2);
       } catch (_) {}
 
@@ -15539,6 +15541,181 @@ try {
 
 
 
+
+
+/* ===== 芯瑤 ATG Free Packet Trace v1.0｜test168 ===== */
+(() => {
+  'use strict';
+
+  if (window.__XIANYAO_ATG_FREE_PACKET_TRACE__) return;
+
+  const state = {
+    active:false,
+    startedAt:0,
+    inbound:[],
+    outbound:[],
+    max:80
+  };
+
+  function freeActive(){
+    const live=window.__XIANYAO_ATG_LIVE_SNAPSHOT__||{};
+    return Boolean(live.freeGameActive)||Number(live.freeGameCount||0)>0;
+  }
+
+  function summarize(raw){
+    const text=String(raw??'').trim();
+    if(!text)return '';
+
+    let event='';
+    try{
+      const m=text.match(/(?:^|\d)(?:\d)?\s*\[\s*["']([^"']+)["']/);
+      if(m)event=m[1];
+    }catch(_){}
+
+    const keys=[];
+    const re=/"([^"]{1,48})"\s*:/g;
+    let mm;
+    while((mm=re.exec(text)) && keys.length<18){
+      const k=mm[1];
+      if(!keys.includes(k))keys.push(k);
+    }
+
+    return JSON.stringify({
+      event,
+      keys,
+      sample:text.slice(0,900)
+    });
+  }
+
+  function push(kind,raw){
+    if(!freeActive() && !state.active)return;
+    if(freeActive() && !state.active){
+      state.active=true;
+      state.startedAt=Date.now();
+      state.inbound=[];
+      state.outbound=[];
+    }
+
+    const row={
+      at:Date.now(),
+      summary:summarize(raw)
+    };
+
+    const arr=kind==='out'?state.outbound:state.inbound;
+    arr.push(row);
+    if(arr.length>state.max)arr.splice(0,arr.length-state.max);
+
+    try{
+      window.__XIANYAO_ATG_FREE_PACKET_TRACE_STATE__={
+        active:state.active,
+        startedAt:state.startedAt,
+        inbound:[...state.inbound],
+        outbound:[...state.outbound]
+      };
+    }catch(_){}
+  }
+
+  function patchWindow(w){
+    try{
+      const WS=w?.WebSocket;
+      const proto=WS?.prototype;
+      if(proto && typeof proto.send==='function' && !proto.send.__xinyaoFreeTrace168){
+        const native=proto.send;
+        const wrapped=function(data){
+          try{ if(freeActive()||state.active)push('out',data); }catch(_){}
+          return native.call(this,data);
+        };
+        try{Object.defineProperty(wrapped,'__xinyaoFreeTrace168',{value:true})}catch(_){wrapped.__xinyaoFreeTrace168=true}
+        proto.send=wrapped;
+      }
+    }catch(_){}
+  }
+
+  function windows(){
+    const out=[],seen=new Set();
+    const visit=w=>{
+      if(!w||seen.has(w))return;
+      seen.add(w);
+      try{
+        void w.location.href;
+        out.push(w);
+        for(let i=0;i<w.frames.length;i++)visit(w.frames[i]);
+      }catch(_){}
+    };
+    visit(window);
+    return out;
+  }
+
+  function patchMessages(w){
+    try{
+      const WS=w?.WebSocket;
+      if(!WS||WS.__xinyaoFreeTraceCtor168)return;
+      const Native=WS;
+      const Wrapped=new Proxy(Native,{
+        construct(Target,args,NewTarget){
+          const ws=Reflect.construct(Target,args,NewTarget);
+          try{
+            ws.addEventListener('message',e=>{
+              try{ if(freeActive()||state.active)push('in',e.data); }catch(_){}
+            },true);
+          }catch(_){}
+          return ws;
+        }
+      });
+      try{
+        Object.defineProperties(Wrapped,{
+          CONNECTING:{value:Native.CONNECTING},
+          OPEN:{value:Native.OPEN},
+          CLOSING:{value:Native.CLOSING},
+          CLOSED:{value:Native.CLOSED},
+          __xinyaoFreeTraceCtor168:{value:true}
+        });
+      }catch(_){}
+      w.WebSocket=Wrapped;
+    }catch(_){}
+  }
+
+  setInterval(()=>{
+    for(const w of windows()){
+      patchWindow(w);
+      patchMessages(w);
+    }
+
+    const nowFree=freeActive();
+    if(!nowFree && state.active && Date.now()-state.startedAt>1200){
+      state.active=false;
+      try{
+        window.__XIANYAO_ATG_FREE_PACKET_TRACE_STATE__={
+          active:false,
+          startedAt:state.startedAt,
+          inbound:[...state.inbound],
+          outbound:[...state.outbound]
+        };
+        localStorage.setItem(
+          'xinyao_atg_free_packet_trace_v1',
+          JSON.stringify(window.__XIANYAO_ATG_FREE_PACKET_TRACE_STATE__)
+        );
+      }catch(_){}
+    }
+  },500);
+
+  window.__XIANYAO_ATG_FREE_PACKET_TRACE__={
+    version:'1.0.0-test168',
+    push,
+    getState:()=>({
+      active:state.active,
+      startedAt:state.startedAt,
+      inbound:[...state.inbound],
+      outbound:[...state.outbound]
+    }),
+    reset:()=>{
+      state.active=false;
+      state.startedAt=0;
+      state.inbound=[];
+      state.outbound=[];
+    }
+  };
+})();
 
 /* ===== 芯瑤 ATG Free Result Probe v1.0｜test166 ===== */
 (() => {
