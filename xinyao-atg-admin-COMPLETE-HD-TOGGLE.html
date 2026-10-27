@@ -1,0 +1,1465 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>芯瑤💕ATG 管理後台</title>
+<style>
+:root{--p:#ef4d91;--bg:#fff6fa;--line:#f2dbe6;--muted:#8b7882;--red:#e84c69}*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei",sans-serif;background:var(--bg);color:#302830}.app{display:grid;grid-template-columns:235px 1fr;min-height:100vh}.side{background:#fff;padding:20px 14px;border-right:1px solid var(--line)}.brand{font-size:19px;font-weight:900;padding:10px}.nav{display:grid;gap:7px}.nav button{border:0;background:transparent;padding:12px;text-align:left;border-radius:12px;font-weight:800}.nav button.active{background:linear-gradient(135deg,#ff91bc,var(--p));color:#fff}.main{padding:22px}.top{display:flex;justify-content:space-between;align-items:center}.panel{display:none}.panel.active{display:block}.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px;margin:14px 0;box-shadow:0 10px 30px #d9548b10}.stat b{display:block;font-size:28px;margin-top:6px}.muted{font-size:12px;color:var(--muted)}.row{display:flex;gap:8px;flex-wrap:wrap}.input,select,textarea{border:1px solid var(--line);border-radius:11px;padding:10px;background:#fffafd}.btn{border:0;border-radius:11px;padding:10px 12px;font-weight:850;cursor:pointer}.primary{background:var(--p);color:#fff}.soft{background:#fff0f6;color:#d83d7d}.danger{background:var(--red);color:#fff}.table{overflow:auto;border:1px solid var(--line);border-radius:13px;margin-top:12px}table{width:100%;border-collapse:collapse;min-width:720px}th,td{padding:10px;border-bottom:1px solid #f6e8ee;text-align:left;font-size:13px}.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}.win{border:1px solid var(--line);border-radius:12px;padding:10px;margin:8px 0}.win img{max-width:180px;max-height:130px;border-radius:9px;display:block;margin-top:8px}@media(max-width:850px){.app{grid-template-columns:1fr}.nav{grid-template-columns:repeat(3,1fr)}.stats{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}.main{padding:14px}}
+</style>
+<style id="admin-auth-style">
+#adminLogin{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#fff7fb,#ffeaf3)}
+.loginCard{width:min(390px,100%);background:#fff;border:1px solid #f2dbe6;border-radius:24px;padding:28px;box-shadow:0 22px 70px #c93e7a22;text-align:center}
+.loginLogo{font-size:42px;margin-bottom:5px}.loginCard h2{margin:4px 0 5px}.loginCard p{margin:0 0 18px;color:#8b7882;font-size:13px}
+.loginCard input{width:100%;margin:6px 0;padding:13px;border:1px solid #f2dbe6;border-radius:13px;background:#fffafd;font-size:15px}
+.loginCard button{width:100%;margin-top:10px;padding:13px;border:0;border-radius:13px;background:linear-gradient(135deg,#ff91bc,#ef4d91);color:#fff;font-weight:900;cursor:pointer}
+#loginError{min-height:20px;margin-top:10px;color:#e84c69;font-size:12px;font-weight:800}
+#logoutBtn{display:none}
+</style>
+
+<style id="mobile-admin-layout">
+@media (max-width: 700px){
+  body{background:#fff7fb}
+  .app{display:block;min-height:100vh}
+  .side{
+    position:sticky;top:0;z-index:50;height:auto;
+    padding:10px 10px 8px;
+    border-right:0;border-bottom:1px solid var(--line);
+    background:rgba(255,255,255,.96);
+    backdrop-filter:blur(12px);
+  }
+  .brand{
+    padding:5px 4px 9px;
+    font-size:17px;
+    text-align:center;
+  }
+  .nav{
+    display:flex;
+    gap:7px;
+    overflow-x:auto;
+    padding-bottom:3px;
+    scrollbar-width:none;
+  }
+  .nav::-webkit-scrollbar{display:none}
+  .nav button{
+    flex:0 0 auto;
+    white-space:nowrap;
+    padding:9px 11px;
+    border-radius:999px;
+    font-size:12px;
+  }
+
+  .main{padding:12px 10px 28px}
+  .top{
+    position:sticky;top:86px;z-index:35;
+    background:rgba(255,247,251,.94);
+    backdrop-filter:blur(10px);
+    margin:-2px -2px 10px;
+    padding:8px 2px;
+    gap:8px;
+  }
+  .top h2{font-size:20px;margin:0}
+  .top .row{gap:6px;flex-wrap:nowrap}
+  .top .btn{padding:8px 10px;font-size:12px}
+
+  .stats{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:9px;
+  }
+  .card{
+    border-radius:16px;
+    padding:13px;
+    margin:10px 0;
+  }
+  .stat b{font-size:25px}
+  .muted{font-size:12px}
+
+  .row{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:8px;
+  }
+  .row .input,
+  .row select,
+  .row textarea,
+  .row .btn{
+    width:100%;
+    min-width:0;
+  }
+  .input,select,textarea{
+    width:100%;
+    font-size:16px;
+  }
+  .btn{min-height:42px}
+
+  .two{grid-template-columns:1fr}
+
+  /* 手機版把會員表格改成卡片，不再左右拖 */
+  #members .table,
+  #logs .table,
+  #activity .table{
+    overflow:visible;
+    border:0;
+  }
+  #members table,
+  #logs table,
+  #activity table{
+    min-width:0;
+    width:100%;
+  }
+  #members thead,
+  #logs thead,
+  #activity thead{display:none}
+
+  #members tbody,
+  #logs tbody,
+  #activity tbody{
+    display:grid;
+    gap:10px;
+  }
+  #members tr,
+  #logs tr,
+  #activity tr{
+    display:block;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:15px;
+    padding:10px 12px;
+    box-shadow:0 8px 22px #d9548b0c;
+  }
+  #members td,
+  #logs td,
+  #activity td{
+    display:grid;
+    grid-template-columns:82px 1fr;
+    gap:8px;
+    align-items:start;
+    padding:7px 0;
+    border-bottom:1px dashed #f3e5ec;
+    font-size:13px;
+    word-break:break-word;
+  }
+  #members td:last-child,
+  #logs td:last-child,
+  #activity td:last-child{border-bottom:0}
+
+  #members td:nth-child(1)::before{content:"ID"}
+  #members td:nth-child(2)::before{content:"帳號"}
+  #members td:nth-child(3)::before{content:"狀態"}
+  #members td:nth-child(4)::before{content:"最後登入"}
+  #members td:nth-child(5)::before{content:"最後活動"}
+  #members td:nth-child(6)::before{content:"到期日"}
+  #members td:nth-child(7)::before{content:"操作"}
+
+  #logs td:nth-child(1)::before{content:"時間"}
+  #logs td:nth-child(2)::before{content:"管理員"}
+  #logs td:nth-child(3)::before{content:"操作"}
+  #logs td:nth-child(4)::before{content:"對象"}
+  #logs td:nth-child(5)::before{content:"內容"}
+
+  #activity td:nth-child(1)::before{content:"時間"}
+  #activity td:nth-child(2)::before{content:"會員"}
+  #activity td:nth-child(3)::before{content:"操作"}
+  #activity td:nth-child(4)::before{content:"內容"}
+  #activity td:nth-child(5)::before{content:"裝置"}
+
+  #members td::before,
+  #logs td::before,
+  #activity td::before{
+    color:#9b7f8d;
+    font-weight:800;
+    font-size:12px;
+  }
+
+  #members td:last-child{
+    display:flex;
+    gap:7px;
+    flex-wrap:wrap;
+  }
+  #members td:last-child::before{
+    width:82px;
+    flex:0 0 82px;
+  }
+  #members td:last-child .btn{
+    width:auto;
+    min-height:36px;
+    padding:8px 10px;
+  }
+
+  #detailBox .input,
+  #detailBox select,
+  #detailBox .btn{
+    width:100%;
+    margin:5px 0;
+  }
+
+  .win img{
+    max-width:100%;
+    width:100%;
+    height:auto;
+  }
+
+  #adminLogin{padding:14px}
+  .loginCard{
+    width:100%;
+    max-width:420px;
+    padding:24px 18px;
+    border-radius:22px;
+  }
+}
+
+@media (max-width: 420px){
+  .stats{grid-template-columns:1fr 1fr}
+  .stat{padding:12px}
+  .stat b{font-size:22px}
+  .top{top:84px}
+}
+</style>
+
+
+<style id="win-record-style">
+.win-record-text{font-size:17px;line-height:1.7;font-weight:700;color:#332832}
+.win-record-text .amount{font-size:20px;font-weight:1000;color:#e93f83}
+.win-record-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+#winFile{padding:10px}
+@media(max-width:700px){
+  .win-record-text{font-size:16px}
+  .win-record-text .amount{font-size:19px}
+}
+</style>
+
+
+<style id="win-edit-style">
+.win-edit-modal{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+  background:rgba(35,20,28,.46);
+  backdrop-filter:blur(4px);
+}
+.win-edit-modal.show{display:flex}
+.win-edit-card{
+  width:min(560px,100%);
+  max-height:90vh;
+  overflow:auto;
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:20px;
+  padding:20px;
+  box-shadow:0 24px 80px rgba(95,42,67,.22);
+}
+.win-edit-card h3{margin:0 0 14px}
+.win-edit-grid{display:grid;gap:10px}
+.win-edit-old-images{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:9px;
+}
+.win-edit-image{
+  position:relative;
+  border:1px solid var(--line);
+  border-radius:12px;
+  overflow:hidden;
+  background:#fff7fb;
+}
+.win-edit-image img{
+  display:block;
+  width:100%;
+  height:120px;
+  object-fit:cover;
+}
+.win-edit-image label{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:7px 9px;
+  font-size:12px;
+  font-weight:800;
+  color:#d83f7f;
+}
+.win-edit-actions{
+  display:flex;
+  gap:8px;
+  margin-top:14px;
+}
+.win-edit-actions .btn{flex:1}
+</style>
+
+
+<style id="win-image-order-style">
+.win-image-order-actions{
+  display:flex;
+  gap:6px;
+  padding:7px 8px 0;
+}
+.win-image-order-actions button{
+  flex:1;
+  border:1px solid #f1c8d8;
+  border-radius:9px;
+  background:#fff7fb;
+  color:#d83f7f;
+  padding:6px 8px;
+  font-size:12px;
+  font-weight:900;
+  cursor:pointer;
+}
+.win-image-order-actions button:disabled{
+  opacity:.35;
+  cursor:default;
+}
+.win-image-index{
+  padding:5px 8px 0;
+  color:#9d7c89;
+  font-size:11px;
+  font-weight:800;
+}
+</style>
+
+</head><body>
+<div id="adminLogin">
+  <div class="loginCard">
+    <div class="loginLogo">💕</div>
+    <h2>芯瑤 ATG 管理後台</h2>
+    <p>管理員登入</p>
+    <input id="adminUser" autocomplete="username" placeholder="管理員帳號">
+    <input id="adminPass" type="password" autocomplete="current-password" placeholder="管理員密碼">
+    <button id="adminLoginBtn" type="button">登入後台</button>
+    <div id="loginError"></div>
+  </div>
+</div>
+<div class="app"><aside class="side"><div class="brand">💕 芯瑤 ATG 後台</div><nav class="nav">
+<button class="active" data-tab="overview">📊 總覽</button><button data-tab="members">👥 會員管理</button><button data-tab="detail">🪪 會員詳細</button><button data-tab="kick">🚪 強制登出</button><button data-tab="batch">➕ 批次新增</button><button data-tab="wins">🎉 恭喜會員</button><button data-tab="system">🟢 系統狀態</button><button data-tab="logs">🧾 操作紀錄</button><button data-tab="activity">👀 上線／操作</button></nav></aside>
+<main class="main"><div class="top"><h2 id="title">總覽儀表板</h2><div class="row"><button class="btn soft" onclick="refreshAll()">↻ 更新</button><button id="logoutBtn" class="btn danger" onclick="adminLogout()">登出</button></div></div>
+<section id="overview" class="panel active"><div class="stats"><div class="card stat"><span class="muted">會員總數</span><b id="total">—</b></div><div class="card stat"><span class="muted">正常會員</span><b id="active">—</b></div><div class="card stat"><span class="muted">停用會員</span><b id="disabled">—</b></div><div class="card stat"><span class="muted">目前上線</span><b id="online">—</b></div><div class="card stat"><span class="muted">今日新增</span><b id="today_new">—</b></div></div><div class="card"><b>最近會員操作</b><div id="recent" class="muted">載入中...</div></div></section>
+<section id="members" class="panel"><div class="card"><div class="row"><input id="search" class="input" placeholder="搜尋會員"><button class="btn soft" onclick="loadMembers()">搜尋</button><input id="newAccount" class="input" placeholder="新增會員帳號"><button class="btn primary" onclick="addMember()">新增會員</button></div><div id="memberMsg"></div><div class="table"><table><thead><tr><th>ID</th><th>帳號</th><th>狀態</th><th>最後登入</th><th>最後活動</th><th>到期日</th><th>操作</th></tr></thead><tbody id="memberRows"></tbody></table></div></div></section>
+<section id="detail" class="panel"><div class="card"><div class="row"><input id="detailId" class="input" placeholder="會員 ID"><button class="btn primary" onclick="loadDetail()">讀取</button></div><div id="detailBox" class="muted">請選會員。</div></div></section>
+<section id="kick" class="panel"><div class="card"><div class="row"><input id="kickId" class="input" placeholder="會員 ID"><button class="btn danger" onclick="kick()">強制登出</button></div><div id="kickMsg"></div><p class="muted">ATG 前台需同步檢查 force_logout，才能真正踢下線。</p></div></section>
+<section id="batch" class="panel"><div class="card"><textarea id="batchText" rows="10" style="width:100%" placeholder="每行一個會員帳號"></textarea><button class="btn primary" onclick="batchAdd()">批次新增</button><div id="batchMsg"></div></div></section>
+<section id="wins" class="panel">
+<div class="two">
+  <div class="card">
+    <b>新增恭喜會員紀錄</b>
+    <div style="display:grid;gap:9px;margin-top:12px">
+      <input id="wm" class="input" placeholder="會員顯示，例如 m*****16">
+      <input id="wa" class="input" type="number" placeholder="贏得金額，例如 24270">
+      <label class="muted" for="winFile">上傳照片／圖片檔案（同一筆喜報最多 5 張）</label>
+      <input id="winFile" class="input" type="file" accept="image/*" multiple>
+      <div id="winPreviewWrap" style="display:none">
+        <div id="winPreviewGrid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px"></div>
+      </div>
+      <button class="btn primary" onclick="addWin()">新增喜報</button>
+      <div id="winMsg"></div>
+    </div>
+  </div>
+  <div class="card">
+    <b>目前喜報</b>
+    <div id="winList" style="margin-top:10px"></div>
+  </div>
+</div>
+</section>
+<section id="system" class="panel"><div class="card" id="systemBox">檢查中...</div></section>
+<section id="logs" class="panel"><div class="card"><div class="table"><table><thead><tr><th>時間</th><th>管理員</th><th>操作</th><th>對象</th><th>內容</th></tr></thead><tbody id="logRows"></tbody></table></div></div></section>
+<section id="activity" class="panel"><div class="card"><div class="table"><table><thead><tr><th>時間</th><th>會員</th><th>操作</th><th>內容</th><th>裝置</th></tr></thead><tbody id="activityRows"></tbody></table></div></div></section>
+</main></div>
+
+<script>
+const API="https://xinyao-atg-admin-api.love06130430.workers.dev";
+const LIVE_API="https://xinyao-atg-live.love06130430.workers.dev";
+const $=id=>document.getElementById(id);
+const E=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const F=s=>s?new Date(s+"Z").toLocaleString("zh-TW",{hour12:false}):"—";
+
+async function A(p,o={}){
+  const token=sessionStorage.getItem("atg_admin_token")||"";
+  const r=await fetch(API+p,{
+    cache:"no-store",
+    ...o,
+    headers:{
+      "Content-Type":"application/json",
+      ...(token?{"Authorization":"Bearer "+token}:{}),
+      ...(o.headers||{})
+    }
+  });
+
+  let d={};
+  try{ d=await r.json(); }catch{}
+
+  if(r.status===401 && p!=="/admin/login"){
+    adminLogout(false);
+    throw new Error(d.message||"登入已失效");
+  }
+
+  if(!r.ok||!d.ok) throw new Error(d.message||d.error||"操作失敗");
+  return d;
+}
+
+const titles={
+  overview:"總覽儀表板",
+  members:"會員管理",
+  detail:"會員詳細資料",
+  kick:"強制登出",
+  batch:"批次新增會員",
+  wins:"恭喜會員紀錄",
+  system:"系統狀態",
+  logs:"操作紀錄",
+  activity:"會員上線／操作紀錄"
+};
+
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-tab]");
+  if(!b)return;
+
+  document.querySelectorAll("[data-tab]").forEach(x=>x.classList.toggle("active",x===b));
+  document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));
+
+  const panel=$(b.dataset.tab);
+  if(panel)panel.classList.add("active");
+
+  const titleEl=$("title");
+  if(titleEl)titleEl.textContent=titles[b.dataset.tab]||"";
+
+  if(b.dataset.tab==="members")loadMembers();
+  if(b.dataset.tab==="wins")loadWins();
+  if(b.dataset.tab==="logs")loadLogs();
+  if(b.dataset.tab==="activity")loadActivity();
+  if(b.dataset.tab==="system")health();
+});
+
+async function stats(){
+  try{
+    const s=(await A("/stats")).stats;
+    for(const k of ["total","active","disabled","online","today_new"]){
+      const el=$(k);
+      if(el)el.textContent=s[k]??0;
+    }
+  }catch(e){
+    console.error("stats",e);
+  }
+}
+
+async function loadMembers(){
+  const msg=$("memberMsg");
+  try{
+    const q=$("search")?.value.trim()||"";
+    const d=await A("/members"+(q?"?q="+encodeURIComponent(q):""));
+    const rows=$("memberRows");
+    if(rows){
+      rows.innerHTML=d.members.map(m=>`
+        <tr>
+          <td>${m.id}</td>
+          <td>${E(m.account)}</td>
+          <td>${E(m.status)}</td>
+          <td>${F(m.last_login_at)}</td>
+          <td>${F(m.last_seen_at)}</td>
+          <td>${E(m.expires_at||"永久")}</td>
+          <td>
+            <button class="btn soft" onclick="openDetail(${m.id})">詳細</button>
+            <button class="btn danger" onclick="quickKick(${m.id})">登出</button>
+          </td>
+        </tr>`).join("")||'<tr><td colspan="7">沒有會員</td></tr>';
+    }
+    if(msg)msg.textContent="";
+  }catch(e){
+    if(msg)msg.textContent=e.message;
+  }
+}
+
+async function addMember(){
+  const msg=$("memberMsg");
+  try{
+    const input=$("newAccount");
+    const account=input?.value.trim()||"";
+    const d=await A("/members",{method:"POST",body:JSON.stringify({account})});
+    if(msg)msg.textContent=d.message;
+    if(input)input.value="";
+    await loadMembers();
+    await stats();
+  }catch(e){
+    if(msg)msg.textContent=e.message;
+  }
+}
+
+async function batchAdd(){
+  const msg=$("batchMsg");
+  try{
+    const accounts=($("batchText")?.value||"").split(/\n|,/).map(x=>x.trim()).filter(Boolean);
+    const d=await A("/members/batch",{method:"POST",body:JSON.stringify({accounts})});
+    if(msg)msg.textContent=`新增 ${d.added}，略過 ${d.skipped}`;
+    await stats();
+  }catch(e){
+    if(msg)msg.textContent=e.message;
+  }
+}
+
+function openDetail(id){
+  const input=$("detailId");
+  if(input)input.value=id;
+  document.querySelector('[data-tab="detail"]')?.click();
+  loadDetail();
+}
+
+async function loadDetail(){
+  const box=$("detailBox");
+  try{
+    const id=$("detailId")?.value.trim()||"";
+    if(!id)throw new Error("請輸入會員 ID");
+
+    const d=await A("/members/"+id);
+    const m=d.member;
+
+    box.innerHTML=`
+      <p><b>帳號：</b>${E(m.account)}</p>
+      <p>建立：${F(m.created_at)}</p>
+
+      <select id="es">
+        <option value="active" ${m.status==="active"?"selected":""}>active</option>
+        <option value="disabled" ${m.status!=="active"?"selected":""}>disabled</option>
+      </select>
+
+      <input id="ee" class="input" placeholder="到期日" value="${E(m.expires_at||"")}">
+      <input id="en" class="input" placeholder="備註" value="${E(m.note||"")}">
+
+      <button class="btn primary" onclick="saveDetail(${m.id})">儲存</button>
+
+      <hr>
+      ${(d.activity||[]).map(a=>`<p>${F(a.created_at)}｜${E(a.action)}｜${E(a.detail||"")}</p>`).join("")||"尚無操作"}
+    `;
+  }catch(e){
+    if(box)box.textContent=e.message;
+  }
+}
+
+async function saveDetail(id){
+  try{
+    await A("/members/"+id,{
+      method:"PATCH",
+      body:JSON.stringify({
+        status:$("es")?.value||"active",
+        expires_at:$("ee")?.value.trim()||null,
+        note:$("en")?.value||""
+      })
+    });
+    alert("已儲存");
+    await loadDetail();
+    await stats();
+  }catch(e){
+    alert(e.message);
+  }
+}
+
+async function kick(){
+  const msg=$("kickMsg");
+  try{
+    const id=$("kickId")?.value.trim()||"";
+    const d=await A("/members/"+id+"/force-logout",{method:"POST"});
+    if(msg)msg.textContent=d.message;
+  }catch(e){
+    if(msg)msg.textContent=e.message;
+  }
+}
+
+async function quickKick(id){
+  if(!confirm("確定強制登出？"))return;
+  try{
+    await A("/members/"+id+"/force-logout",{method:"POST"});
+    alert("完成");
+    await loadMembers();
+  }catch(e){
+    alert(e.message);
+  }
+}
+
+async function loadActivity(){
+  try{
+    const d=await A("/activity");
+    const rows=$("activityRows");
+    if(rows){
+      rows.innerHTML=d.activity.map(a=>`
+        <tr>
+          <td>${F(a.created_at)}</td>
+          <td>${E(a.account)}</td>
+          <td>${E(a.action)}</td>
+          <td>${E(a.detail||"")}</td>
+          <td>${E(a.device||"")}</td>
+        </tr>`).join("")||'<tr><td colspan="5">尚無紀錄</td></tr>';
+    }
+
+    const recent=$("recent");
+    if(recent){
+      recent.innerHTML=d.activity.slice(0,8).map(a=>`<p>${E(a.account)}｜${E(a.action)}｜${F(a.created_at)}</p>`).join("")||"尚無紀錄";
+    }
+  }catch(e){
+    console.error("activity",e);
+  }
+}
+
+async function loadLogs(){
+  try{
+    const d=await A("/admin-logs");
+    const rows=$("logRows");
+    if(rows){
+      rows.innerHTML=d.logs.map(x=>`
+        <tr>
+          <td>${F(x.created_at)}</td>
+          <td>${E(x.admin)}</td>
+          <td>${E(x.action)}</td>
+          <td>${E(x.target||"")}</td>
+          <td>${E(x.detail||"")}</td>
+        </tr>`).join("")||'<tr><td colspan="5">尚無紀錄</td></tr>';
+    }
+  }catch(e){
+    console.error("logs",e);
+  }
+}
+
+function parseWinImages(value){
+  if(!value)return[];
+
+  try{
+    const parsed=JSON.parse(value);
+
+    return Array.isArray(parsed)
+      ? parsed.filter(Boolean)
+      : [value];
+  }catch{
+    return [value];
+  }
+}
+
+let currentWins=[];
+
+async function loadWins(){
+  const list=$("winList");
+  try{
+    const d=await A("/wins");
+    currentWins=d.wins||[];
+    if(list){
+      list.innerHTML=d.wins.map(w=>`
+        <div class="win">
+          <div class="win-record-text">
+            恭喜${E(w.member_display)}使用此程式贏得 <span class="amount">${Number(w.amount||0).toLocaleString()}</span>
+          </div>
+          <div class="muted" style="margin-top:4px">顯示順序：${Number(w.sort_order||0)}（數字越大越前面）</div>
+          ${parseWinImages(w.image_url).length
+  ? `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px">
+      ${parseWinImages(w.image_url).map(src=>`<img src="${E(src)}" alt="會員喜報照片" style="width:100%;height:120px;object-fit:cover;border-radius:10px">`).join("")}
+    </div>`
+  : ""}
+          <div class="win-record-actions">
+            <button class="btn soft" onclick="editWin(${w.id})">編輯</button>
+            <button class="btn soft" onclick="moveWin(${w.id},1)">↑ 上移</button>
+            <button class="btn soft" onclick="moveWin(${w.id},-1)">↓ 下移</button>
+            <button class="btn soft" onclick="toggleWin(${w.id},${w.is_visible?0:1})">${w.is_visible?"隱藏":"顯示"}</button>
+            <button class="btn danger" onclick="delWin(${w.id})">刪除</button>
+          </div>
+        </div>`).join("")||"尚無喜報";
+    }
+  }catch(e){
+    if(list)list.textContent=e.message;
+  }
+}
+
+async function imageFileToDataURL(file){
+  if(!file) return "";
+
+  if(!file.type.startsWith("image/")){
+    throw new Error("請上傳圖片檔案");
+  }
+
+  const rawDataURL = await new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=()=>reject(new Error("照片讀取失敗"));
+    reader.readAsDataURL(file);
+  });
+
+  const img = await new Promise((resolve,reject)=>{
+    const image=new Image();
+    image.onload=()=>resolve(image);
+    image.onerror=()=>reject(new Error("照片格式無法讀取"));
+    image.src=rawDataURL;
+  });
+
+  const maxSize=900;
+  let width=img.width;
+  let height=img.height;
+
+  if(width>maxSize || height>maxSize){
+    const scale=Math.min(maxSize/width,maxSize/height);
+    width=Math.round(width*scale);
+    height=Math.round(height*scale);
+  }
+
+  const canvas=document.createElement("canvas");
+  canvas.width=width;
+  canvas.height=height;
+
+  const ctx=canvas.getContext("2d");
+  ctx.drawImage(img,0,0,width,height);
+
+  return canvas.toDataURL("image/jpeg",0.70);
+}
+
+async function addWin(){
+  const msg=$("winMsg");
+  const btn=document.querySelector('#wins button[onclick="addWin()"]');
+
+  try{
+    const member=$("wm")?.value.trim()||"";
+    const amount=Number($("wa")?.value||0);
+    const files=[...($("winFile")?.files||[])];
+
+    if(!member) throw new Error("請輸入會員顯示帳號");
+    if(!amount) throw new Error("請輸入贏得金額");
+    if(files.length>5) throw new Error("一次最多上傳 5 張照片");
+
+    if(btn){
+      btn.disabled=true;
+      btn.textContent=files.length?"照片處理中…":"新增中…";
+    }
+    if(msg) msg.textContent="";
+
+    const images=[];
+    for(const file of files){
+      images.push(await imageFileToDataURL(file));
+    }
+
+    const imagePayload=
+      images.length
+        ? JSON.stringify(images)
+        : "";
+
+    const d=await A("/wins",{
+      method:"POST",
+      body:JSON.stringify({
+        member_display:member,
+        amount,
+        message:"使用此程式贏得",
+        image_url:imagePayload
+      })
+    });
+
+    if(msg)msg.textContent=d.message;
+    if($("wm"))$("wm").value="";
+    if($("wa"))$("wa").value="";
+    if($("winFile"))$("winFile").value="";
+    if($("winPreviewWrap"))$("winPreviewWrap").style.display="none";
+    if($("winPreviewGrid"))$("winPreviewGrid").innerHTML="";
+
+    await loadWins();
+  }catch(e){
+    if(msg)msg.textContent=e.message;
+  }finally{
+    if(btn){
+      btn.disabled=false;
+      btn.textContent="新增喜報";
+    }
+  }
+}
+
+
+let editingWinId=null;
+let editingWinImages=[];
+
+function renderEditWinImages(){
+  const box=$("editWinOldImages");
+
+  if(!box)return;
+
+  box.innerHTML=editingWinImages.length
+    ? editingWinImages.map((src,i)=>`
+        <div class="win-edit-image">
+          <img src="${E(src)}" alt="目前照片">
+
+          <div class="win-image-index">
+            第 ${i+1} 張
+          </div>
+
+          <div class="win-image-order-actions">
+            <button
+              type="button"
+              onclick="moveEditWinImage(${i},-1)"
+              ${i===0?"disabled":""}
+            >
+              ← 前移
+            </button>
+
+            <button
+              type="button"
+              onclick="moveEditWinImage(${i},1)"
+              ${i===editingWinImages.length-1?"disabled":""}
+            >
+              後移 →
+            </button>
+          </div>
+
+          <label>
+            <input
+              type="checkbox"
+              class="edit-remove-image"
+              value="${i}"
+            >
+            刪除此照片
+          </label>
+        </div>
+      `).join("")
+    : '<div class="muted">目前沒有照片</div>';
+}
+
+function moveEditWinImage(index,direction){
+  const target=index+Number(direction||0);
+
+  if(
+    target<0 ||
+    target>=editingWinImages.length
+  ){
+    return;
+  }
+
+  const copy=[...editingWinImages];
+
+  [
+    copy[index],
+    copy[target]
+  ]=[
+    copy[target],
+    copy[index]
+  ];
+
+  editingWinImages=copy;
+  renderEditWinImages();
+}
+
+function editWin(id){
+  const win=currentWins.find(
+    x=>Number(x.id)===Number(id)
+  );
+
+  if(!win){
+    alert("找不到這筆喜報");
+    return;
+  }
+
+  editingWinId=id;
+  editingWinImages=[
+    ...parseWinImages(
+      win.image_url
+    )
+  ];
+
+  $("editWinMember").value=
+    win.member_display||"";
+
+  $("editWinAmount").value=
+    win.amount||"";
+
+  $("editWinSortOrder").value=
+    Number(win.sort_order||0);
+
+  $("editWinFiles").value="";
+  $("editWinMsg").textContent="";
+
+  renderEditWinImages();
+
+  $("winEditModal")
+    .classList.add("show");
+}
+
+function closeWinEdit(){
+  editingWinId=null;
+  editingWinImages=[];
+
+  $("winEditModal")
+    .classList.remove("show");
+}
+
+async function saveWinEdit(){
+  const msg=$("editWinMsg");
+
+  try{
+    if(!editingWinId){
+      throw new Error(
+        "找不到要編輯的紀錄"
+      );
+    }
+
+    const member=
+      $("editWinMember")
+        .value
+        .trim();
+
+    const amount=
+      Number(
+        $("editWinAmount").value||0
+      );
+
+    const sortOrder=
+      Number(
+        $("editWinSortOrder").value||0
+      );
+
+    if(!member){
+      throw new Error(
+        "請輸入會員顯示帳號"
+      );
+    }
+
+    if(!amount){
+      throw new Error(
+        "請輸入贏得金額"
+      );
+    }
+
+    const removeIndexes=[
+      ...document.querySelectorAll(
+        ".edit-remove-image:checked"
+      )
+    ].map(
+      x=>Number(x.value)
+    );
+
+    const keptImages=
+      editingWinImages.filter(
+        (_,i)=>
+          !removeIndexes.includes(i)
+      );
+
+    const newFiles=[
+      ...(
+        $("editWinFiles").files||[]
+      )
+    ];
+
+    if(
+      keptImages.length+
+      newFiles.length>5
+    ){
+      throw new Error(
+        "同一筆喜報最多 5 張照片"
+      );
+    }
+
+    msg.textContent=
+      newFiles.length
+        ? "照片處理中…"
+        : "儲存中…";
+
+    const newImages=[];
+
+    for(const file of newFiles){
+      newImages.push(
+        await imageFileToDataURL(file)
+      );
+    }
+
+    const finalImages=[
+      ...keptImages,
+      ...newImages
+    ];
+
+    await A(
+      "/wins/"+editingWinId,
+      {
+        method:"PATCH",
+        body:JSON.stringify({
+          member_display:member,
+          amount,
+          message:
+            "使用此程式贏得",
+          sort_order:sortOrder,
+          image_url:
+            finalImages.length
+              ? JSON.stringify(
+                  finalImages
+                )
+              : ""
+        })
+      }
+    );
+
+    closeWinEdit();
+    await loadWins();
+
+  }catch(e){
+    msg.textContent=e.message;
+  }
+}
+
+document.addEventListener(
+  "click",
+  (e)=>{
+    const modal=
+      $("winEditModal");
+
+    if(e.target===modal){
+      closeWinEdit();
+    }
+  }
+);
+
+
+async function moveWin(id,direction){
+  try{
+    const win=currentWins.find(
+      x=>Number(x.id)===Number(id)
+    );
+
+    if(!win){
+      throw new Error("找不到這筆喜報");
+    }
+
+    const current=Number(win.sort_order||0);
+
+    await A("/wins/"+id,{
+      method:"PATCH",
+      body:JSON.stringify({
+        sort_order:
+          current + Number(direction||0)
+      })
+    });
+
+    await loadWins();
+
+  }catch(e){
+    alert(e.message);
+  }
+}
+
+async function toggleWin(id,v){
+  try{
+    await A("/wins/"+id,{method:"PATCH",body:JSON.stringify({is_visible:v})});
+    await loadWins();
+  }catch(e){
+    alert(e.message);
+  }
+}
+
+async function delWin(id){
+  if(!confirm("確定刪除？"))return;
+  try{
+    await A("/wins/"+id,{method:"DELETE"});
+    await loadWins();
+  }catch(e){
+    alert(e.message);
+  }
+}
+
+let maintenanceBusy=false;
+let hdOnlyBusy=false;
+
+let maintenanceStateCache={
+  enabled:false,
+  message:"芯瑤 ATG 系統升級維護中，完成後將立即開放使用。",
+  updatedAt:null
+};
+
+const HD_ONLY_MARK_RE=new RegExp("\\[\\[XIANYAO_HD_ONLY=(0|1)\\]\\]","i");
+
+function maintenanceHdOnly(message){
+  const match=String(message||"").match(HD_ONLY_MARK_RE);
+  return match?match[1]!=="0":true;
+}
+
+function maintenanceVisibleMessage(message){
+  const cleaned=String(message||"")
+    .replace(HD_ONLY_MARK_RE,"")
+    .replace(new RegExp("\\n{3,}","g"),"\n\n")
+    .trim();
+
+  return cleaned||"芯瑤 ATG 系統升級維護中，完成後將立即開放使用。";
+}
+
+function maintenanceMessageWithHdOnly(message,enabled){
+  return maintenanceVisibleMessage(message)+"\n[[XIANYAO_HD_ONLY="+(enabled?"1":"0")+"]]";
+}
+
+function maintenanceTime(value){
+  const n=Number(value||0);
+  if(!Number.isFinite(n)||n<=0)return "—";
+  return new Date(n).toLocaleString("zh-TW",{hour12:false});
+}
+
+function renderMaintenanceControl(state={},error=""){
+  const box=$("maintenanceControl");
+  if(!box)return;
+
+  if(error){
+    box.innerHTML=`
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line)">
+        <b>🛠️ 全站維護模式</b>
+        <div style="margin-top:10px;color:#e84c69;font-weight:800">讀取失敗：${E(error)}</div>
+      </div>`;
+    return;
+  }
+
+  const enabled=Boolean(state.enabled);
+  const hdOnly=maintenanceHdOnly(state.message);
+  const message=maintenanceVisibleMessage(state.message);
+
+  box.innerHTML=`
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line)">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:16px;font-weight:900">🛠️ 全站維護模式</div>
+          <div style="margin-top:5px;font-size:13px;font-weight:900;color:${enabled?'#e84c69':'#24945b'}">
+            ${enabled?'🔴 目前：維護中':'🟢 目前：正常開放'}
+          </div>
+        </div>
+        <button class="btn ${enabled?'soft':'danger'}" type="button" onclick="setMaintenance(${enabled?'false':'true'})" ${maintenanceBusy?'disabled':''}>
+          ${maintenanceBusy?'處理中…':(enabled?'✅ 恢復正常使用':'🛠️ 開啟維護模式')}
+        </button>
+      </div>
+
+      <div style="margin-top:14px">
+        <div class="muted" style="margin-bottom:6px">會員看到的維護訊息</div>
+        <textarea id="maintenanceMessage" class="input" rows="4" style="width:100%;resize:vertical" maxlength="500">${E(message)}</textarea>
+      </div>
+
+      <div class="muted" style="margin-top:8px;line-height:1.6">
+        開啟後，會員網站與 ATG 即時助手會自動套用維護狀態；目前程式約每 10 秒檢查一次。<br>
+        最後更新：${maintenanceTime(state.updatedAt)}
+      </div>
+
+      <div style="margin-top:20px;padding-top:18px;border-top:1px solid var(--line)">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:16px;font-weight:900">👑 僅限皇鼎使用</div>
+            <div style="margin-top:5px;font-size:13px;font-weight:900;color:${hdOnly?'#d88b14':'#24945b'}">
+              ${hdOnly?'🔒 目前：只允許皇鼎':'🌐 目前：任一娛樂城皆可使用'}
+            </div>
+            <div class="muted" style="margin-top:6px;line-height:1.6">
+              關閉後，可從其他娛樂城進入 ATG 使用芯瑤助手進行測試。<br>
+              再次開啟後，就會恢復只允許皇鼎來源。
+            </div>
+          </div>
+
+          <button
+            class="btn ${hdOnly?'soft':'primary'}"
+            type="button"
+            onclick="setHuangDingOnly(${hdOnly?'false':'true'})"
+            ${hdOnlyBusy?'disabled':''}
+          >
+            ${hdOnlyBusy?'處理中…':(hdOnly?'🌐 關閉皇鼎限制':'👑 開啟皇鼎限制')}
+          </button>
+        </div>
+
+        <div class="muted" style="margin-top:10px;line-height:1.6">
+          Tampermonkey test162 會每 10 秒同步一次這個設定。
+        </div>
+      </div>
+    </div>`;
+}
+
+async function maintenanceRequest(method="GET",body=null){
+  const token=sessionStorage.getItem("atg_admin_token")||"";
+  const headers={"Content-Type":"application/json"};
+  if(token)headers.Authorization="Bearer "+token;
+
+  const response=await fetch(LIVE_API+"/maintenance?t="+Date.now(),{
+    method,
+    cache:"no-store",
+    headers,
+    ...(body?{body:JSON.stringify(body)}:{})
+  });
+
+  const data=await response.json().catch(()=>({}));
+
+  if(response.status===401){
+    adminLogout(false);
+    throw new Error(data.message||"管理員登入已失效");
+  }
+
+  if(!response.ok||!data?.ok){
+    throw new Error(data.message||data.error||"維護狀態操作失敗");
+  }
+
+  return data;
+}
+
+async function loadMaintenance(){
+  try{
+    const data=await maintenanceRequest("GET");
+
+    maintenanceStateCache={
+      enabled:Boolean(data.enabled),
+      message:String(data.message||""),
+      updatedAt:data.updatedAt??null
+    };
+
+    renderMaintenanceControl(maintenanceStateCache);
+  }catch(e){
+    renderMaintenanceControl({},e.message||"讀取失敗");
+  }
+}
+
+async function setMaintenance(enabled){
+  if(maintenanceBusy)return;
+
+  const action=enabled?"開啟全站維護模式":"恢復正常使用";
+  if(!confirm(`確定要${action}？`))return;
+
+  const visibleMessage=
+    $("maintenanceMessage")?.value.trim()
+    || maintenanceVisibleMessage(maintenanceStateCache.message);
+
+  const hdOnly=maintenanceHdOnly(maintenanceStateCache.message);
+  const message=maintenanceMessageWithHdOnly(visibleMessage,hdOnly);
+
+  maintenanceBusy=true;
+
+  try{
+    await maintenanceRequest("POST",{enabled,message});
+    await loadMaintenance();
+    alert(enabled?"已開啟全站維護模式":"已恢復正常使用");
+  }catch(e){
+    alert(e.message||"操作失敗");
+    await loadMaintenance();
+  }finally{
+    maintenanceBusy=false;
+    await loadMaintenance();
+  }
+}
+
+async function setHuangDingOnly(enabled){
+  if(hdOnlyBusy)return;
+
+  const actionText=enabled
+    ?"開啟後只允許從皇鼎娛樂城使用芯瑤 ATG。\n\n確定開啟？"
+    :"關閉後，其他娛樂城進入 ATG 也可以使用芯瑤助手。\n\n確定暫時關閉皇鼎限制？";
+
+  if(!confirm(actionText))return;
+
+  hdOnlyBusy=true;
+
+  try{
+    const maintenanceEnabled=Boolean(maintenanceStateCache.enabled);
+
+    const visibleMessage=
+      $("maintenanceMessage")?.value.trim()
+      || maintenanceVisibleMessage(maintenanceStateCache.message);
+
+    const message=maintenanceMessageWithHdOnly(
+      visibleMessage,
+      Boolean(enabled)
+    );
+
+    await maintenanceRequest("POST",{
+      enabled:maintenanceEnabled,
+      message
+    });
+
+    await loadMaintenance();
+
+    alert(
+      enabled
+        ?"✅ 已開啟「僅限皇鼎使用」"
+        :"🌐 已關閉皇鼎限制，現在任一娛樂城皆可使用"
+    );
+  }catch(e){
+    alert(e.message||"操作失敗");
+  }finally{
+    hdOnlyBusy=false;
+    await loadMaintenance();
+  }
+}
+
+async function health(){
+  const box=$("systemBox");
+  if(!box)return;
+
+  let healthHtml="";
+  try{
+    await A("/health");
+    healthHtml="🟢 Worker：正常<br>🟢 D1：正常";
+  }catch(e){
+    healthHtml=`🔴 ${E(e.message||"系統狀態讀取失敗")}`;
+  }
+
+  box.innerHTML=healthHtml+'<div id="maintenanceControl"><div class="muted" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line)">維護狀態讀取中...</div></div>';
+  await loadMaintenance();
+}
+
+async function refreshAll(){
+  const btn=document.querySelector('.top button[onclick="refreshAll()"]');
+  const old=btn?.textContent;
+  if(btn){
+    btn.disabled=true;
+    btn.textContent="更新中…";
+  }
+
+  await Promise.allSettled([
+    stats(),
+    loadMembers(),
+    loadActivity(),
+    loadLogs(),
+    loadWins(),
+    health()
+  ]);
+
+  if(btn){
+    btn.disabled=false;
+    btn.textContent=old||"↻ 更新";
+  }
+}
+
+async function adminLogin(){
+  const err=$("loginError");
+  if(err)err.textContent="";
+
+  try{
+    const r=await fetch(API+"/admin/login",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        username:$("adminUser")?.value.trim()||"",
+        password:$("adminPass")?.value||""
+      })
+    });
+
+    const d=await r.json();
+
+    if(!r.ok||!d.ok)throw new Error(d.message||"登入失敗");
+
+    sessionStorage.setItem("atg_admin_token",d.token);
+
+    if($("adminPass"))$("adminPass").value="";
+
+    adminLoginScreen(false);
+    await refreshAll();
+
+  }catch(e){
+    if(err)err.textContent=e.message;
+  }
+}
+
+function adminLoginScreen(show){
+  const screen=$("adminLogin");
+  const logout=$("logoutBtn");
+
+  if(screen)screen.style.display=show?"flex":"none";
+  if(logout)logout.style.display=show?"none":"inline-block";
+}
+
+function adminLogout(show=true){
+  sessionStorage.removeItem("atg_admin_token");
+  adminLoginScreen(true);
+
+  if(show && $("loginError")){
+    $("loginError").textContent="已登出";
+  }
+}
+
+async function checkAdminSession(){
+  const token=sessionStorage.getItem("atg_admin_token");
+
+  if(!token){
+    adminLoginScreen(true);
+    return;
+  }
+
+  try{
+    await A("/admin/session");
+    adminLoginScreen(false);
+    await refreshAll();
+  }catch{
+    adminLoginScreen(true);
+  }
+}
+
+
+document.addEventListener("DOMContentLoaded",()=>{
+  const loginBtn=$("adminLoginBtn");
+  const userInput=$("adminUser");
+  const passInput=$("adminPass");
+  const winFileInput=$("winFile");
+
+  if(winFileInput){
+    winFileInput.addEventListener("change",()=>{
+      const files=[...(winFileInput.files||[])];
+      const wrap=$("winPreviewWrap");
+      const grid=$("winPreviewGrid");
+
+      if(!files.length || !wrap || !grid){
+        if(wrap)wrap.style.display="none";
+        return;
+      }
+
+      grid.innerHTML="";
+
+      files.slice(0,5).forEach(file=>{
+        const reader=new FileReader();
+
+        reader.onload=()=>{
+          const img=document.createElement("img");
+          img.src=reader.result;
+          img.alt="照片預覽";
+          img.style.cssText="width:100%;height:120px;object-fit:cover;border-radius:10px;border:1px solid var(--line)";
+          grid.appendChild(img);
+        };
+
+        reader.readAsDataURL(file);
+      });
+
+      wrap.style.display="block";
+    });
+  }
+
+  if(loginBtn){
+    loginBtn.addEventListener("click",()=>{
+      adminLogin();
+    });
+  }
+
+  if(passInput){
+    passInput.addEventListener("keydown",e=>{
+      if(e.key==="Enter") adminLogin();
+    });
+  }
+
+  if(userInput){
+    userInput.addEventListener("keydown",e=>{
+      if(e.key==="Enter") adminLogin();
+    });
+  }
+
+  checkAdminSession();
+
+  setInterval(()=>{
+    if(sessionStorage.getItem("atg_admin_token")){
+      stats();
+      loadActivity();
+    }
+  },60000);
+});
+
+</script>
+
+<div id="winEditModal" class="win-edit-modal">
+  <div class="win-edit-card">
+    <h3>✏️ 編輯恭喜會員紀錄</h3>
+
+    <div class="win-edit-grid">
+      <input id="editWinMember" class="input" placeholder="會員顯示帳號">
+      <input id="editWinAmount" class="input" type="number" placeholder="贏得金額">
+      <input id="editWinSortOrder" class="input" type="number" placeholder="顯示順序，數字越大越前面">
+
+      <div>
+        <div class="muted" style="margin-bottom:7px">目前照片（勾選要刪除的照片）</div>
+        <div id="editWinOldImages" class="win-edit-old-images"></div>
+      </div>
+
+      <div>
+        <label class="muted" for="editWinFiles">新增照片（可多選，總數最多 5 張）</label>
+        <input id="editWinFiles" class="input" type="file" accept="image/*" multiple>
+      </div>
+
+      <div id="editWinMsg" class="muted"></div>
+    </div>
+
+    <div class="win-edit-actions">
+      <button class="btn soft" type="button" onclick="closeWinEdit()">取消</button>
+      <button class="btn primary" type="button" onclick="saveWinEdit()">儲存修改</button>
+    </div>
+  </div>
+</div>
+
+</body></html>
