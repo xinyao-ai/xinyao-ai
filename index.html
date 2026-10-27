@@ -3976,5 +3976,146 @@
 
   </script>
 <script src="./xinyao_site_live_v2.js?v=347"></script>
+
+<script>
+/* ===== 芯瑤 ATG 系統控制內嵌頁 v1 ===== */
+(() => {
+  if (!new URLSearchParams(location.search).has('control')) return;
+
+  const ADMIN_API="https://xinyao-atg-admin-api.love06130430.workers.dev";
+  const LIVE_API="https://xinyao-atg-live.love06130430.workers.dev";
+  const TOKEN_KEY="atg_admin_token";
+  const MARK_RE=/\[\[XIANYAO_HD_ONLY=(0|1)\]\]/i;
+
+  function run(){
+    if(!document.body) return setTimeout(run,20);
+
+    const overlay=document.createElement('div');
+    overlay.id='xinyao-atg-control-overlay';
+    overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;overflow:auto;background:linear-gradient(135deg,#fff7fb,#fdeaf3);font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif;color:#3c2b35;padding:24px 14px';
+    overlay.innerHTML=`
+      <style>
+        #xinyao-atg-control-overlay *{box-sizing:border-box}
+        #xinyao-atg-control-overlay .xac-wrap{width:min(620px,100%);margin:0 auto}
+        #xinyao-atg-control-overlay .xac-card{margin-top:14px;background:#fff;border:1px solid #f4bfd4;border-radius:22px;padding:20px;box-shadow:0 12px 32px rgba(190,81,127,.10)}
+        #xinyao-atg-control-overlay .xac-brand{background:#fff;border:1px solid #f4bfd4;border-radius:22px;padding:20px}
+        #xinyao-atg-control-overlay h1{margin:0;font-size:24px}
+        #xinyao-atg-control-overlay .xac-muted{color:#927c88;font-size:12px;line-height:1.55}
+        #xinyao-atg-control-overlay .xac-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:17px 0;border-top:1px solid #f6dce7}
+        #xinyao-atg-control-overlay .xac-row:first-child{border-top:0}
+        #xinyao-atg-control-overlay .xac-title{font-size:17px;font-weight:900}
+        #xinyao-atg-control-overlay .xac-status{margin-top:5px;font-size:13px;font-weight:900}
+        #xinyao-atg-control-overlay .xac-input{width:100%;border:1px solid #f4bfd4;border-radius:12px;padding:11px 12px;background:#fff;color:#3c2b35;outline:none}
+        #xinyao-atg-control-overlay label{display:block;margin:12px 0 6px;font-size:12px;font-weight:800;color:#927c88}
+        #xinyao-atg-control-overlay button{border:0;border-radius:12px;padding:10px 13px;font-weight:900;cursor:pointer;background:#ff5f9e;color:#fff}
+        #xinyao-atg-control-overlay button.soft{background:#fff0f6;color:#cf4e82;border:1px solid #f4bfd4}
+        #xinyao-atg-control-overlay button:disabled{opacity:.5}
+        #xinyao-atg-control-overlay .hidden{display:none!important}
+        #xinyao-atg-control-overlay .xac-error{color:#d94c68;font-size:12px;font-weight:800;margin-top:9px}
+        @media(max-width:560px){#xinyao-atg-control-overlay .xac-row{align-items:flex-start;flex-direction:column}#xinyao-atg-control-overlay .xac-row button{width:100%}}
+      </style>
+      <div class="xac-wrap">
+        <div class="xac-brand">
+          <h1>🌸 芯瑤 ATG｜系統控制</h1>
+          <div class="xac-muted" style="margin-top:6px">全站維護＋皇鼎來源限制</div>
+        </div>
+
+        <div id="xacLogin" class="xac-card">
+          <div class="xac-title">🔐 管理員登入</div>
+          <label>帳號</label><input id="xacUser" class="xac-input" autocomplete="username">
+          <label>密碼</label><input id="xacPass" class="xac-input" type="password" autocomplete="current-password">
+          <button id="xacLoginBtn" style="margin-top:14px">登入後台</button>
+          <div id="xacLoginErr" class="xac-error"></div>
+        </div>
+
+        <div id="xacControl" class="xac-card hidden">
+          <div class="xac-row">
+            <div><div class="xac-title">🛠️ 全站維護模式</div><div id="xacMaintStatus" class="xac-status">讀取中…</div></div>
+            <button id="xacMaintBtn">讀取中…</button>
+          </div>
+          <label>會員看到的維護訊息</label>
+          <textarea id="xacMessage" class="xac-input" rows="4"></textarea>
+
+          <div class="xac-row" style="margin-top:14px">
+            <div>
+              <div class="xac-title">👑 僅限皇鼎使用</div>
+              <div id="xacHdStatus" class="xac-status">讀取中…</div>
+              <div class="xac-muted" style="margin-top:5px">關閉後，其他娛樂城進 ATG 也能使用芯瑤助手。</div>
+            </div>
+            <button id="xacHdBtn">讀取中…</button>
+          </div>
+          <div class="xac-muted" style="margin-top:14px">Tampermonkey test162 每 10 秒同步一次設定。</div>
+          <button id="xacLogout" class="soft" style="margin-top:14px">登出</button>
+          <div id="xacErr" class="xac-error"></div>
+        </div>
+      </div>`;
+
+    const $=id=>overlay.querySelector('#'+id);
+    let current={enabled:false,message:''},busy=false;
+
+    function token(){return sessionStorage.getItem(TOKEN_KEY)||''}
+    function visibleMessage(v){return String(v||'').replace(MARK_RE,'').replace(/\n{3,}/g,'\n\n').trim()||'芯瑤 ATG 系統升級維護中，完成後將立即開放使用。'}
+    function hdOnly(v){const m=String(v||'').match(MARK_RE);return m?m[1]!=='0':true}
+    function compose(v,only){return visibleMessage(v)+'\n[[XIANYAO_HD_ONLY='+(only?'1':'0')+']]'}
+    function showLogin(show){$('xacLogin').classList.toggle('hidden',!show);$('xacControl').classList.toggle('hidden',show)}
+    function render(){
+      const only=hdOnly(current.message);
+      $('xacMessage').value=visibleMessage(current.message);
+      $('xacMaintStatus').textContent=current.enabled?'🔴 目前：維護中':'🟢 目前：正常開放';
+      $('xacMaintStatus').style.color=current.enabled?'#d94c68':'#24945b';
+      $('xacMaintBtn').textContent=current.enabled?'✅ 恢復正常使用':'🛠️ 開啟維護模式';
+      $('xacMaintBtn').className=current.enabled?'soft':'';
+      $('xacHdStatus').textContent=only?'🔒 目前：只允許皇鼎':'🌐 目前：任一娛樂城皆可使用';
+      $('xacHdStatus').style.color=only?'#d88b14':'#24945b';
+      $('xacHdBtn').textContent=only?'🌐 關閉皇鼎限制':'👑 開啟皇鼎限制';
+      $('xacHdBtn').className=only?'soft':'';
+      $('xacMaintBtn').disabled=busy;$('xacHdBtn').disabled=busy;
+    }
+    async function live(method='GET',body=null){
+      const headers={'Content-Type':'application/json'};if(token())headers.Authorization='Bearer '+token();
+      const res=await fetch(LIVE_API+'/maintenance?t='+Date.now(),{method,headers,cache:'no-store',...(body?{body:JSON.stringify(body)}:{})});
+      const d=await res.json().catch(()=>({}));
+      if(!res.ok||!d?.ok)throw new Error(d.message||d.error||'操作失敗');
+      return d;
+    }
+    async function load(){
+      const d=await live('GET');
+      current={enabled:Boolean(d.enabled),message:String(d.message||'')};
+      render();
+    }
+    async function login(){
+      $('xacLoginErr').textContent='';
+      try{
+        const res=await fetch(ADMIN_API+'/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:$('xacUser').value.trim(),password:$('xacPass').value})});
+        const d=await res.json().catch(()=>({}));
+        if(!res.ok||!d?.ok||!d.token)throw new Error(d.message||'登入失敗');
+        sessionStorage.setItem(TOKEN_KEY,d.token);$('xacPass').value='';showLogin(false);await load();
+      }catch(e){$('xacLoginErr').textContent=e.message||'登入失敗'}
+    }
+    async function save(nextEnabled,nextHd){
+      if(busy)return;busy=true;render();$('xacErr').textContent='';
+      try{await live('POST',{enabled:nextEnabled,message:compose($('xacMessage').value,nextHd)});await load()}
+      catch(e){$('xacErr').textContent=e.message||'操作失敗'}
+      finally{busy=false;render()}
+    }
+
+    $('xacLoginBtn').onclick=login;
+    $('xacPass').addEventListener('keydown',e=>{if(e.key==='Enter')login()});
+    $('xacMaintBtn').onclick=()=>save(!current.enabled,hdOnly(current.message));
+    $('xacHdBtn').onclick=()=>save(current.enabled,!hdOnly(current.message));
+    $('xacLogout').onclick=()=>{sessionStorage.removeItem(TOKEN_KEY);showLogin(true)};
+
+    document.body.appendChild(overlay);
+
+    if(token()){
+      fetch(ADMIN_API+'/admin/session',{headers:{Authorization:'Bearer '+token()},cache:'no-store'})
+        .then(r=>{if(!r.ok)throw 0;showLogin(false);return load()})
+        .catch(()=>{sessionStorage.removeItem(TOKEN_KEY);showLogin(true)});
+    }else showLogin(true);
+  }
+
+  run();
+})();
+</script>
 </body>
 </html>
