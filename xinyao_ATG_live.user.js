@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.176
-// @description  test176：移除自製免遊結算卡；完整免遊結果第一包出現時，僅加速 Cocos 本地播放時間軸，讓 ATG 自己快速進入原生「贏得獎金／關閉」結算畫面。
+// @version      4.0.0-test.177
+// @description  test177：免遊開始後隱藏中間動畫，背景照常快速播放；偵測 ATG 原生「贏得獎金／關閉」視窗出現後才解除遮罩。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -15434,7 +15434,7 @@ try {
     panel.innerHTML = `
       <button type="button" class="fg-close" aria-label="關閉">×</button>
       <div class="fg-title">🎁 遇到免費遊戲</div>
-      <div style="font-size:10px;opacity:.65;margin:-2px 0 8px;">版本 test176</div>
+      <div style="font-size:10px;opacity:.65;margin:-2px 0 8px;">版本 test177</div>
       <div class="fg-row">
         <div class="fg-text">免遊：直接看結算</div>
         <button type="button" class="fg-switch ${settings.auto ? 'on' : ''}" data-fg-toggle="auto" aria-label="免遊直接看結算"></button>
@@ -15473,7 +15473,7 @@ try {
       try {
         const latest = freeRuntimeDiagnostics();
         payload = JSON.stringify({
-          version:'test176',
+          version:'test177',
           at:Date.now(),
           href:location.href,
           freeGameActive:Boolean(window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameActive),
@@ -15991,7 +15991,7 @@ try {
   }
 
   window.__XIANYAO_ATG_FREE_PACKET_TRACE__={
-    version:'1.4.3-test176',
+    version:'1.4.4-test177',
     push,
     beginFromDetail,
     getState:()=>({
@@ -16008,6 +16008,168 @@ try {
       state.inbound=[];
       state.outbound=[];
     }
+  };
+})();
+
+
+/* ===== 芯瑤 ATG Native Free Result Curtain v1.0｜test177 ===== */
+(() => {
+  'use strict';
+
+  if(window.__XIANYAO_ATG_NATIVE_FREE_CURTAIN__)return;
+
+  const ID='xinyao-atg-native-free-curtain';
+  const state={
+    active:false,
+    startedAt:0,
+    nativeResultSeen:false,
+    lastDetectedText:'',
+    pollTimer:0
+  };
+
+  function gameWindows(){
+    const out=[],seen=new Set();
+    const visit=w=>{
+      if(!w||seen.has(w))return;
+      seen.add(w);
+      try{
+        void w.document;
+        out.push(w);
+        for(const frame of [...w.document.querySelectorAll('iframe')]){
+          try{ visit(frame.contentWindow); }catch(_){}
+        }
+      }catch(_){}
+    };
+    visit(window);
+    return out;
+  }
+
+  function ensureCurtain(){
+    let el=document.getElementById(ID);
+    if(el)return el;
+
+    el=document.createElement('div');
+    el.id=ID;
+    el.style.cssText=[
+      'position:fixed',
+      'inset:0',
+      'z-index:2147483646',
+      'display:none',
+      'pointer-events:none',
+      'background:#09070d'
+    ].join(';');
+
+    (document.body||document.documentElement).appendChild(el);
+    return el;
+  }
+
+  function show(){
+    const el=ensureCurtain();
+    el.style.display='block';
+    state.active=true;
+    state.nativeResultSeen=false;
+    state.startedAt=Date.now();
+  }
+
+  function hide(){
+    const el=document.getElementById(ID);
+    if(el)el.style.display='none';
+    state.active=false;
+  }
+
+  function collectVisibleLabels(){
+    const texts=[];
+    for(const w of gameWindows()){
+      try{
+        const cc=w.cc||w.legacyCC||w._cc;
+        const scene=cc?.director?.getScene?.();
+        const Label=cc?.Label;
+        if(!scene||!Label||typeof scene.getComponentsInChildren!=='function')continue;
+
+        const labels=scene.getComponentsInChildren(Label)||[];
+        for(const label of labels){
+          const node=label?.node;
+          if(!node||node.activeInHierarchy===false)continue;
+          const text=String(label?.string??'').trim();
+          if(text)texts.push(text);
+        }
+      }catch(_){}
+    }
+    return texts;
+  }
+
+  function nativeResultVisible(){
+    try{
+      const texts=collectVisibleLabels();
+      if(!texts.length)return false;
+
+      const joined=texts.join('|');
+      state.lastDetectedText=joined.slice(0,1200);
+
+      const hasWinTitle=texts.some(t=>/贏得獎金|獲得獎金|總贏分|總獎金/i.test(t));
+      const hasClose=texts.some(t=>/^關閉$|^关闭$/i.test(t));
+
+      return hasWinTitle && hasClose;
+    }catch(_){
+      return false;
+    }
+  }
+
+  function begin(){
+    show();
+
+    try{
+      window.__XIANYAO_ATG_UNIFIED_SPEED__?.startFreeSkipBoost?.(6500);
+    }catch(_){}
+
+    if(state.pollTimer)clearInterval(state.pollTimer);
+    state.pollTimer=setInterval(()=>{
+      if(!state.active){
+        clearInterval(state.pollTimer);
+        state.pollTimer=0;
+        return;
+      }
+
+      if(nativeResultVisible()){
+        state.nativeResultSeen=true;
+        hide();
+        try{
+          window.__XIANYAO_ATG_UNIFIED_SPEED__?.stopFreeSkipBoost?.();
+        }catch(_){}
+        clearInterval(state.pollTimer);
+        state.pollTimer=0;
+        return;
+      }
+
+      // fail-safe：不能無限黑屏。
+      if(Date.now()-state.startedAt>12000){
+        hide();
+        try{
+          window.__XIANYAO_ATG_UNIFIED_SPEED__?.stopFreeSkipBoost?.();
+        }catch(_){}
+        clearInterval(state.pollTimer);
+        state.pollTimer=0;
+      }
+    },40);
+  }
+
+  function stop(){
+    hide();
+    if(state.pollTimer){
+      clearInterval(state.pollTimer);
+      state.pollTimer=0;
+    }
+    try{
+      window.__XIANYAO_ATG_UNIFIED_SPEED__?.stopFreeSkipBoost?.();
+    }catch(_){}
+  }
+
+  window.__XIANYAO_ATG_NATIVE_FREE_CURTAIN__={
+    version:'1.0.0-test177',
+    begin,
+    stop,
+    nativeResultVisible,
+    getState:()=>({...state})
   };
 })();
 
@@ -16166,10 +16328,6 @@ try {
   function finishSession() {
     if (!state.active) return;
 
-    try{
-      window.__XIANYAO_ATG_UNIFIED_SPEED__?.stopFreeSkipBoost?.();
-    }catch(_){}
-
     state.active = false;
     state.mode = 'finished';
 
@@ -16323,9 +16481,9 @@ try {
             state.finalPath='packets.freeStart.engineSnapshot.gameState[last].totalWinnings';
             state.updatedAt=Date.now();
             try{
-              const speedApi=window.__XIANYAO_ATG_UNIFIED_SPEED__;
-              if(!speedApi?.getState?.()?.freeSkipActive){
-                speedApi?.startFreeSkipBoost?.(5000);
+              const curtain=window.__XIANYAO_ATG_NATIVE_FREE_CURTAIN__;
+              if(!curtain?.getState?.()?.active){
+                curtain?.begin?.();
               }
             }catch(_){}
           }
@@ -16356,7 +16514,7 @@ try {
     state.packetCount=0;
     state.updatedAt=Date.now();
     try{
-      window.__XIANYAO_ATG_UNIFIED_SPEED__?.stopFreeSkipBoost?.();
+      window.__XIANYAO_ATG_NATIVE_FREE_CURTAIN__?.stop?.();
     }catch(_){}
     publish();
   }
@@ -16442,14 +16600,14 @@ try {
 
     if(preloaded){
       try{
-        window.__XIANYAO_ATG_UNIFIED_SPEED__?.startFreeSkipBoost?.(5000);
+        window.__XIANYAO_ATG_NATIVE_FREE_CURTAIN__?.begin?.();
         window.__XIANYAO_ATG_FREE_NATIVE_SKIP_STATE__={
           at:Date.now(),
           amount:preloaded.amount,
           totalViews:preloaded.totalViews,
           currentView:preloaded.currentView,
           spinId,
-          mode:'native-fast-forward'
+          mode:'hide-process-until-native-result'
         };
       }catch(_){}
     }
@@ -16458,7 +16616,7 @@ try {
   }
 
   window.__XIANYAO_ATG_FREE_RESULT_PROBE__ = {
-    version:'1.6.0-test176',
+    version:'1.7.0-test177',
     observe,
     beginFromDetail,
     getState:() => ({...state,spinIds:[...state.spinIds],payoutBySpin:{...state.payoutBySpin}}),
