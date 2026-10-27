@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.164
-// @description  test164：停用會誤觸遊戲離開/恢復流程的 Hard Skip，新增安全免遊 Runtime 診斷；不修改遊戲狀態。
+// @version      4.0.0-test.165
+// @description  test165：停用危險 Hard Skip，新增安全免遊 Runtime 診斷與一鍵複製診斷資料。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -15365,6 +15365,7 @@ try {
       </div>
       <div class="fg-sub">安全診斷＝只讀取 ATG/Cocos 免遊元件與事件，不再執行任何 Skip／Finish／Close，避免誤觸離開遊戲。</div>
       <div class="fg-status">${nativeStatus}${lastNativeVia ? '｜' + lastNativeVia : ''}${lastSpoilerValue !== null ? '｜劇透 ' + money(lastSpoilerValue) : ''}</div>
+      <button type="button" data-fg-copy-diag style="margin-top:10px;width:100%;border:1px solid rgba(255,185,215,.5);border-radius:10px;background:rgba(255,95,158,.12);color:#fff;padding:8px 10px;font-size:11px;font-weight:800;cursor:pointer;">📋 複製免遊診斷</button>
     `;
 
     panel.querySelector('.fg-close')?.addEventListener('click', () => {
@@ -15377,6 +15378,37 @@ try {
         if (key === 'spoiler') settings.spoiler = !settings.spoiler;
         saveSettings();
       });
+    });
+
+    panel.querySelector('[data-fg-copy-diag]')?.addEventListener('click', async () => {
+      let payload = '';
+      try {
+        const latest = freeRuntimeDiagnostics();
+        payload = JSON.stringify({
+          version:'test165',
+          at:Date.now(),
+          href:location.href,
+          freeGameActive:Boolean(window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameActive),
+          freeGameCount:window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameCount ?? null,
+          startFreeGame:window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.startFreeGame ?? null,
+          rows:latest
+        }, null, 2);
+      } catch (_) {}
+
+      if (!payload) payload = '尚未抓到免遊診斷資料';
+
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(payload);
+        copied = true;
+      } catch (_) {}
+
+      nativeStatus = copied ? '✅ 診斷已複製' : '📋 請複製跳出的診斷內容';
+      renderPanel();
+
+      if (!copied) {
+        try { window.prompt('複製下面診斷資料', payload); } catch (_) {}
+      }
     });
   }
 
