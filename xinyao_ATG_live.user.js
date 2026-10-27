@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.174
-// @description  test174：免遊第一包若已含完整 Views，立即讀取最後 View 的 totalWinnings 並顯示最終結算畫面；不送額外 spin/closeSpin、不改伺服器結果。
+// @version      4.0.0-test.175
+// @description  test175：完整免遊結果一旦在第一包出現就強制顯示最終結算，不再依賴免遊開關狀態；只做畫面覆蓋，不改伺服器流程。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -15364,7 +15364,7 @@ try {
     panel.innerHTML = `
       <button type="button" class="fg-close" aria-label="關閉">×</button>
       <div class="fg-title">🎁 遇到免費遊戲</div>
-      <div style="font-size:10px;opacity:.65;margin:-2px 0 8px;">版本 test174</div>
+      <div style="font-size:10px;opacity:.65;margin:-2px 0 8px;">版本 test175</div>
       <div class="fg-row">
         <div class="fg-text">免遊：直接看結算</div>
         <button type="button" class="fg-switch ${settings.auto ? 'on' : ''}" data-fg-toggle="auto" aria-label="免遊直接看結算"></button>
@@ -15403,7 +15403,7 @@ try {
       try {
         const latest = freeRuntimeDiagnostics();
         payload = JSON.stringify({
-          version:'test174',
+          version:'test175',
           at:Date.now(),
           href:location.href,
           freeGameActive:Boolean(window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameActive),
@@ -15921,7 +15921,7 @@ try {
   }
 
   window.__XIANYAO_ATG_FREE_PACKET_TRACE__={
-    version:'1.4.1-test174',
+    version:'1.4.2-test175',
     push,
     beginFromDetail,
     getState:()=>({
@@ -16120,7 +16120,6 @@ try {
   function observe(root) {
     try {
       if (!root || typeof root !== 'object') return;
-      if (!enabled()) return;
 
       const live = currentSnapshot();
       const freeNow = Boolean(live.freeGameActive) || Number(live.freeGameCount || 0) > 0;
@@ -16256,7 +16255,7 @@ try {
 
     const el=ensureOverlay();
     const amount=num(state.finalAmount);
-    const shouldShow=enabled() && amount!==null && (state.active || forceFinal);
+    const shouldShow=amount!==null && (state.active || forceFinal);
 
     if(!shouldShow){
       if(!state.active && !forceFinal)el.style.display='none';
@@ -16306,6 +16305,40 @@ try {
 
     const live = currentSnapshot();
     const freeNow = Boolean(live.freeGameActive) || Number(live.freeGameCount || 0) > 0;
+
+    // test175 fallback：若第一包已被 tracer 保留但 result probe 尚未吃到，
+    // 直接從 pinned freeStart 最後一個 gameState 取最終 totalWinnings。
+    if(freeNow && state.finalAmount===null){
+      try{
+        const pinned=window.__XIANYAO_ATG_FREE_PACKET_TRACE__?.getState?.()?.freeStart;
+        const snaps=Array.isArray(pinned?.engineSnapshot)?pinned.engineSnapshot:[];
+        let states=[];
+        for(const snap of snaps){
+          if(Array.isArray(snap?.gameState) && snap.gameState.length>states.length){
+            states=snap.gameState;
+          }
+        }
+        if(states.length){
+          const last=states
+            .slice()
+            .sort((a,b)=>(Number(b?.currentView)||0)-(Number(a?.currentView)||0))[0];
+          const total=num(last?.totalWinnings);
+          const hasFree=states.some(s=>
+            s?.startFreeGame===true ||
+            String(s?.action||'').toLowerCase()==='freespin' ||
+            Number(s?.freeGameCount||0)>0
+          );
+          if(hasFree && total!==null){
+            state.active=true;
+            state.mode='preloaded';
+            state.finalAmount=Math.round(total*100)/100;
+            state.finalPath='packets.freeStart.engineSnapshot.gameState[last].totalWinnings';
+            state.updatedAt=Date.now();
+            renderOverlay();
+          }
+        }
+      }catch(_){}
+    }
 
     if (freeNow && !state.active) startSession();
     if (!freeNow && state.active && Date.now() - state.startedAt > 700) finishSession();
@@ -16414,12 +16447,25 @@ try {
 
     state.packetCount=1;
     observe(engine);
-    renderOverlay();
+
+    if(preloaded){
+      renderOverlay();
+      try{
+        window.__XIANYAO_ATG_FREE_FORCE_RESULT__={
+          at:Date.now(),
+          amount:preloaded.amount,
+          totalViews:preloaded.totalViews,
+          currentView:preloaded.currentView,
+          spinId
+        };
+      }catch(_){}
+    }
+
     publish();
   }
 
   window.__XIANYAO_ATG_FREE_RESULT_PROBE__ = {
-    version:'1.4.0-test174',
+    version:'1.5.0-test175',
     observe,
     beginFromDetail,
     getState:() => ({...state,spinIds:[...state.spinIds],payoutBySpin:{...state.payoutBySpin}}),
