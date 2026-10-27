@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.171
-// @description  test171：修正免遊開始包被 reset 清掉；新免遊開始時清空舊紀錄後，立即保存觸發 spin 的安全 engine/gameState 快照。
+// @version      4.0.0-test.172
+// @description  test172：沿用 test171 免遊第一包保留修正，並在免遊面板顯示目前版本，方便確認瀏覽器實際執行最新版。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -15364,6 +15364,7 @@ try {
     panel.innerHTML = `
       <button type="button" class="fg-close" aria-label="關閉">×</button>
       <div class="fg-title">🎁 遇到免費遊戲</div>
+      <div style="font-size:10px;opacity:.65;margin:-2px 0 8px;">版本 test172</div>
       <div class="fg-row">
         <div class="fg-text">免遊：直接看結算</div>
         <button type="button" class="fg-switch ${settings.auto ? 'on' : ''}" data-fg-toggle="auto" aria-label="免遊直接看結算"></button>
@@ -15402,7 +15403,7 @@ try {
       try {
         const latest = freeRuntimeDiagnostics();
         payload = JSON.stringify({
-          version:'test171',
+          version:'test172',
           at:Date.now(),
           href:location.href,
           freeGameActive:Boolean(window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameActive),
@@ -15894,7 +15895,7 @@ try {
   }
 
   window.__XIANYAO_ATG_FREE_PACKET_TRACE__={
-    version:'1.3.0-test171',
+    version:'1.3.1-test172',
     push,
     beginFromDetail,
     getState:()=>({
@@ -16248,7 +16249,7 @@ try {
   }
 
   window.__XIANYAO_ATG_FREE_RESULT_PROBE__ = {
-    version:'1.2.0-test171',
+    version:'1.2.1-test172',
     observe,
     beginFromDetail,
     getState:() => ({...state,spinIds:[...state.spinIds],payoutBySpin:{...state.payoutBySpin}}),
