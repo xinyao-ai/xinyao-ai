@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.169
-// @description  test169：每次新免遊自動清空診斷紀錄，並從既有解析流程記錄安全的 inbound 事件摘要；不記憑證、不改遊戲流程。
+// @version      4.0.0-test.170
+// @description  test170：免遊診斷加入安全 engine/gameState 結構快照，記錄 currentView/totalViews/totalWinnings/freeGameCount/startFreeGame 等實際值，不保存 token。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -15402,7 +15402,7 @@ try {
       try {
         const latest = freeRuntimeDiagnostics();
         payload = JSON.stringify({
-          version:'test169',
+          version:'test170',
           at:Date.now(),
           href:location.href,
           freeGameActive:Boolean(window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameActive),
@@ -15600,6 +15600,85 @@ try {
     });
   }
 
+  function safeEngineSnapshot(raw){
+    try{
+      const text=String(raw??'').trim();
+      const positions=[text.indexOf('['),text.indexOf('{')].filter(i=>i>=0);
+      if(!positions.length)return null;
+      const start=Math.min(...positions);
+
+      let parsed;
+      try{ parsed=JSON.parse(text.slice(start)); }catch(_){ return null; }
+
+      const found=[];
+      const seen=new WeakSet();
+
+      const pickState=s=>{
+        if(!s || typeof s!=='object')return null;
+        const keys=[
+          'currentView','totalViews','totalWinnings','roundWinnings',
+          'startFreeGame','startFreeSpin','freeGameCount','freeSpinCount',
+          'freeGamesLeft','freeSpinsLeft','remainingFreeGame','remainingFreeSpin',
+          'action','view','buyFeatureType'
+        ];
+        const out={};
+        for(const key of keys){
+          if(Object.prototype.hasOwnProperty.call(s,key)){
+            const v=s[key];
+            if(
+              v===null ||
+              typeof v==='string' ||
+              typeof v==='number' ||
+              typeof v==='boolean'
+            ){
+              out[key]=v;
+            }
+          }
+        }
+        return Object.keys(out).length?out:null;
+      };
+
+      const visit=(value,depth=0)=>{
+        if(!value || typeof value!=='object' || depth>8 || seen.has(value))return;
+        seen.add(value);
+
+        if(!Array.isArray(value)){
+          const obj={};
+
+          if(value.eventName!==undefined) obj.eventName=value.eventName;
+          if(value.spinId!==undefined) obj.spinId=String(value.spinId);
+          if(value.action!==undefined) obj.action=value.action;
+          if(value.buyFeatureType!==undefined) obj.buyFeatureType=value.buyFeatureType;
+
+          if(Array.isArray(value.gameState)){
+            obj.gameState=value.gameState
+              .map(pickState)
+              .filter(Boolean)
+              .slice(0,30);
+          }
+
+          if(Object.keys(obj).length && (obj.gameState?.length || obj.spinId || obj.eventName)){
+            found.push(obj);
+          }
+
+          for(const [key,child] of Object.entries(value)){
+            if(/^token$/i.test(key))continue;
+            if(child && typeof child==='object')visit(child,depth+1);
+          }
+        }else{
+          for(const child of value){
+            if(child && typeof child==='object')visit(child,depth+1);
+          }
+        }
+      };
+
+      visit(parsed);
+      return found.length?found.slice(0,12):null;
+    }catch(_){
+      return null;
+    }
+  }
+
   function push(kind,raw){
     if(!freeActive() && !state.active)return;
     if(freeActive() && !state.active){
@@ -15613,6 +15692,11 @@ try {
       at:Date.now(),
       summary:summarize(raw)
     };
+
+    if(kind==='in'){
+      const engineSnapshot=safeEngineSnapshot(raw);
+      if(engineSnapshot)row.engineSnapshot=engineSnapshot;
+    }
 
     const arr=kind==='out'?state.outbound:state.inbound;
     arr.push(row);
@@ -15713,7 +15797,7 @@ try {
   },500);
 
   window.__XIANYAO_ATG_FREE_PACKET_TRACE__={
-    version:'1.1.0-test169',
+    version:'1.2.0-test170',
     push,
     getState:()=>({
       active:state.active,
