@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.158
-// @description  test158：排行榜改以 slotTableUpdated 最新 roomId 狀態優先剔除非空房；虎小妹/賽特2進房與掃描流程不動。
+// @version      4.0.0-test.159
+// @description  test159：新增免遊助手（自動開始＋跳過、進免遊前顯示 ATG 已回傳得分）；不動選房/掃描/進房核心。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -2405,6 +2405,9 @@ try {
         roomProfit:state.roomProfit,
         stake:state.stake,
         latestPayout:state.latestPayout,
+        freeGameCount:state.freeGameCount,
+        freeGameActive:Boolean(state.freeGameActive),
+        startFreeGame:state.startFreeGame,
         roomFreeGameEntries:state.roomFreeGameEntries,
         completedSpins:state.completedSpins,
         paired:Boolean(deviceToken),
@@ -14711,3 +14714,453 @@ try {
 })();
 
 }
+
+/* ===== 芯瑤 ATG Free Game Helper v1.0｜test159 ===== */
+(() => {
+  'use strict';
+
+  if (window.__XIANYAO_ATG_FREE_GAME_HELPER_V1__) return;
+  window.__XIANYAO_ATG_FREE_GAME_HELPER_V1__ = true;
+
+  const SETTINGS_KEY = 'xinyao_atg_free_helper_v1';
+  const PANEL_ID = 'xinyao-atg-free-helper-panel';
+  const STYLE_ID = 'xinyao-atg-free-helper-style';
+  const TOAST_ID = 'xinyao-atg-free-spoiler-toast';
+  const DESKTOP_BTN_ID = 'xinyao-atg-free-helper-desktop-btn';
+  const HUD_ID = 'xinyao-atg-mobile-quick-hud';
+
+  let settings = { auto:false, spoiler:false };
+  let lastSpoilerSpinId = '';
+  let lastSpoilerValue = null;
+  let lastClickAt = 0;
+  let freeWasActive = false;
+  let restoreSpeed = null;
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+    settings.auto = Boolean(saved.auto);
+    settings.spoiler = Boolean(saved.spoiler);
+  } catch (_) {}
+
+  function saveSettings() {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (_) {}
+    renderPanel();
+    updateButtons();
+  }
+
+  function ensureStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+      #${PANEL_ID}{
+        position:fixed;
+        top:72px;
+        left:112px;
+        z-index:2147483647;
+        width:min(360px,calc(100vw - 132px));
+        box-sizing:border-box;
+        padding:15px 16px;
+        border:1px solid rgba(255,183,214,.58);
+        border-radius:17px;
+        background:rgba(18,17,23,.95);
+        color:#fff;
+        box-shadow:0 16px 42px rgba(0,0,0,.42),0 0 18px rgba(255,111,166,.08);
+        backdrop-filter:blur(12px);
+        -webkit-backdrop-filter:blur(12px);
+        font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif;
+      }
+      #${PANEL_ID}.right{left:auto;right:112px}
+      #${PANEL_ID} .fg-title{
+        font-size:18px;font-weight:950;color:#ffd0e2;margin-bottom:12px;
+      }
+      #${PANEL_ID} .fg-row{
+        display:flex;align-items:center;justify-content:space-between;gap:14px;
+        min-height:58px;padding:4px 0;border-top:1px solid rgba(255,255,255,.09);
+      }
+      #${PANEL_ID} .fg-row:first-of-type{border-top:0}
+      #${PANEL_ID} .fg-text{font-size:14px;font-weight:850;line-height:1.45}
+      #${PANEL_ID} .fg-sub{
+        margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.09);
+        font-size:11px;line-height:1.55;color:rgba(255,255,255,.64);
+      }
+      #${PANEL_ID} .fg-status{
+        margin-top:8px;font-size:11px;font-weight:800;color:#ffb4d2;
+      }
+      #${PANEL_ID} .fg-switch{
+        position:relative;flex:0 0 54px;width:54px;height:30px;border:0;border-radius:999px;
+        background:rgba(255,255,255,.13);cursor:pointer;padding:0;
+      }
+      #${PANEL_ID} .fg-switch::after{
+        content:"";position:absolute;top:4px;left:4px;width:22px;height:22px;border-radius:50%;
+        background:#d7ccd1;transition:transform .18s ease,background .18s ease;
+      }
+      #${PANEL_ID} .fg-switch.on{background:linear-gradient(135deg,#ff8fba,#ff5f9e)}
+      #${PANEL_ID} .fg-switch.on::after{transform:translateX(24px);background:#fff}
+      #${PANEL_ID} .fg-close{
+        position:absolute;top:8px;right:10px;border:0;background:transparent;color:rgba(255,255,255,.62);
+        font-size:20px;line-height:1;cursor:pointer;
+      }
+      #${TOAST_ID}{
+        position:fixed;top:74px;left:50%;transform:translateX(-50%);z-index:2147483647;
+        width:min(340px,calc(100vw - 24px));box-sizing:border-box;padding:13px 16px;
+        border:1px solid rgba(255,178,211,.62);border-radius:15px;
+        background:rgba(20,17,26,.97);color:#fff;text-align:center;
+        box-shadow:0 14px 40px rgba(0,0,0,.44);
+        font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif;
+        pointer-events:none;
+      }
+      #${TOAST_ID} b{display:block;font-size:13px;color:#ffb6d3}
+      #${TOAST_ID} strong{display:block;margin-top:4px;font-size:25px;color:#fff}
+      #${DESKTOP_BTN_ID}{
+        position:fixed;left:8px;top:220px;z-index:2147483646;
+        border:1px solid rgba(255,185,215,.55);border-radius:12px;
+        background:rgba(16,15,20,.86);color:#fff;padding:8px 10px;
+        font:900 11px -apple-system,BlinkMacSystemFont,"PingFang TC",sans-serif;
+        cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.28);
+      }
+      html.xinyao-phone-ui #${DESKTOP_BTN_ID}{display:none!important}
+      #${HUD_ID} [data-qh="free"] .qh-icon{transform:scale(.92)}
+      @media(max-width:760px){
+        #${PANEL_ID}{top:58px;left:104px;width:min(300px,calc(100vw - 114px));padding:13px}
+        #${PANEL_ID}.right{left:auto;right:104px}
+        #${PANEL_ID} .fg-title{font-size:15px}
+        #${PANEL_ID} .fg-text{font-size:12px}
+      }
+    `;
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  function money(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '—';
+    return n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
+
+  function readFreeStartSignal(root) {
+    let start = false;
+    let count = null;
+    const seen = new WeakSet();
+
+    function visit(value, path = '', depth = 0) {
+      if (start || value == null || depth > 14) return;
+      if (typeof value !== 'object') return;
+      if (seen.has(value)) return;
+      seen.add(value);
+
+      const entries = Array.isArray(value) ? value.entries() : Object.entries(value);
+      for (const [rawKey, rawValue] of entries) {
+        const key = String(rawKey || '').replace(/[^a-z0-9]/gi,'').toLowerCase();
+        const nextPath = path ? path + '.' + key : key;
+        const freePath = /freegame|freespin/.test(nextPath);
+
+        if (['startfreegame','startfreespin','triggerfreegame','triggerfreespin'].includes(key)) {
+          if (rawValue === true || Number(rawValue) > 0) start = true;
+        }
+        if (freePath && ['start','trigger','triggered'].includes(key) && rawValue === true) start = true;
+        if (freePath && ['count','left','remaining','remain','spins','times'].includes(key)) {
+          const n = Number(rawValue);
+          if (Number.isFinite(n)) count = Math.max(count == null ? 0 : count, n);
+        }
+        if (rawValue && typeof rawValue === 'object') visit(rawValue, nextPath, depth + 1);
+      }
+    }
+
+    visit(root);
+    return { start, count };
+  }
+
+  function extractSpoilerPayout(detail) {
+    const values = [];
+    const push = value => {
+      const n = Number(value);
+      if (Number.isFinite(n)) values.push(n);
+    };
+
+    push(detail?.finalState?.totalWinnings);
+    push(detail?.finalState?.roundWinnings);
+
+    const states = Array.isArray(detail?.engine?.gameState) ? detail.engine.gameState : [];
+    for (const row of states) {
+      push(row?.totalWinnings);
+    }
+    if (!values.length) return null;
+    return Math.max(...values);
+  }
+
+  function showSpoiler(value) {
+    lastSpoilerValue = value;
+    let toast = document.getElementById(TOAST_ID);
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = TOAST_ID;
+      (document.body || document.documentElement).appendChild(toast);
+    }
+    toast.innerHTML = `<b>👁 免遊劇透｜ATG 已回傳</b><strong>${money(value)}</strong><div style="margin-top:4px;font-size:10px;opacity:.66;">本次免遊得分</div>`;
+    clearTimeout(showSpoiler._timer);
+    showSpoiler._timer = setTimeout(() => toast?.remove(), 6500);
+    renderPanel();
+  }
+
+  function visible(el) {
+    if (!el?.isConnected) return false;
+    try {
+      const s = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      return s.display !== 'none' && s.visibility !== 'hidden' && Number(s.opacity || 1) > 0 && r.width > 3 && r.height > 3;
+    } catch (_) { return false; }
+  }
+
+  function roots() {
+    const out = [document];
+    const seen = new Set();
+    function walk(root) {
+      if (!root || seen.has(root)) return;
+      seen.add(root);
+      let nodes = [];
+      try { nodes = root.querySelectorAll('*'); } catch (_) {}
+      for (const node of nodes) {
+        if (node?.shadowRoot) {
+          out.push(node.shadowRoot);
+          walk(node.shadowRoot);
+        }
+        if (node?.tagName === 'IFRAME') {
+          try {
+            if (node.contentDocument) {
+              out.push(node.contentDocument);
+              walk(node.contentDocument);
+            }
+          } catch (_) {}
+        }
+      }
+    }
+    walk(document);
+    return out;
+  }
+
+  function clickByTexts(texts) {
+    const wanted = new Set(texts.map(x => String(x).trim().toLowerCase()));
+    for (const root of roots()) {
+      let nodes = [];
+      try { nodes = [...root.querySelectorAll('button,[role="button"],a,[aria-label],[title],div,span')]; } catch (_) {}
+      for (const el of nodes) {
+        if (!visible(el)) continue;
+        if (el.closest?.('#' + PANEL_ID + ',#' + HUD_ID + ',#xinyaoATGLiveV200,#xinyao-atg-room-scanner,#xinyao-atg-board-probe-v01')) continue;
+        const raw = [
+          String(el.textContent || '').trim(),
+          String(el.getAttribute?.('aria-label') || '').trim(),
+          String(el.getAttribute?.('title') || '').trim()
+        ].filter(Boolean);
+        if (!raw.some(t => wanted.has(t.toLowerCase()))) continue;
+        const target = el.closest?.('button,[role="button"],a') || el;
+        try {
+          target.click();
+          lastClickAt = Date.now();
+          return true;
+        } catch (_) {}
+      }
+    }
+    return false;
+  }
+
+  function currentSpeed() {
+    const api = window.__XIANYAO_ATG_UNIFIED_SPEED__;
+    const n = Number(api?.speed ?? api?.getState?.()?.speed);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function setSpeed(value) {
+    try { return Boolean(window.__XIANYAO_ATG_UNIFIED_SPEED__?.setSpeed?.(value)); } catch (_) { return false; }
+  }
+
+  function handleAuto(active) {
+    if (!settings.auto) {
+      if (restoreSpeed !== null) {
+        setSpeed(restoreSpeed);
+        restoreSpeed = null;
+      }
+      freeWasActive = false;
+      return;
+    }
+
+    if (active) {
+      if (!freeWasActive) {
+        freeWasActive = true;
+        const nowSpeed = currentSpeed();
+        if (Number.isFinite(nowSpeed)) restoreSpeed = nowSpeed;
+        setSpeed(16);
+      }
+
+      if (Date.now() - lastClickAt > 700) {
+        const started = clickByTexts([
+          '開始免費遊戲','開始免遊','開始','進入免費遊戲','進入免遊','start','play'
+        ]);
+        if (!started) {
+          clickByTexts(['跳過','略過','skip']);
+        }
+      }
+      return;
+    }
+
+    if (freeWasActive) {
+      freeWasActive = false;
+      if (restoreSpeed !== null) {
+        setSpeed(restoreSpeed);
+        restoreSpeed = null;
+      }
+    }
+  }
+
+  function ensurePanel() {
+    ensureStyle();
+    let panel = document.getElementById(PANEL_ID);
+    if (panel) return panel;
+    panel = document.createElement('div');
+    panel.id = PANEL_ID;
+    panel.style.display = 'none';
+    (document.body || document.documentElement).appendChild(panel);
+    return panel;
+  }
+
+  function renderPanel() {
+    const panel = ensurePanel();
+    if (!panel || panel.style.display === 'none') return;
+    const live = window.__XIANYAO_ATG_LIVE_SNAPSHOT__ || {};
+    panel.innerHTML = `
+      <button type="button" class="fg-close" aria-label="關閉">×</button>
+      <div class="fg-title">🎁 遇到免費遊戲</div>
+      <div class="fg-row">
+        <div class="fg-text">免遊：自動開始＋跳過</div>
+        <button type="button" class="fg-switch ${settings.auto ? 'on' : ''}" data-fg-toggle="auto" aria-label="自動開始與跳過"></button>
+      </div>
+      <div class="fg-row">
+        <div class="fg-text">👁 免遊劇透（進免遊前報得分）</div>
+        <button type="button" class="fg-switch ${settings.spoiler ? 'on' : ''}" data-fg-toggle="spoiler" aria-label="免遊劇透"></button>
+      </div>
+      <div class="fg-sub">劇透＝ATG 已先回傳本次免遊得分時，提前顯示該數值；不是自行預測。</div>
+      <div class="fg-status">${Boolean(live.freeGameActive) ? '🟢 免遊進行中' : '⚪ 等待免遊'}${lastSpoilerValue !== null ? '｜最近劇透 ' + money(lastSpoilerValue) : ''}</div>
+    `;
+
+    panel.querySelector('.fg-close')?.addEventListener('click', () => {
+      panel.style.display = 'none';
+    });
+    panel.querySelectorAll('[data-fg-toggle]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = String(btn.dataset.fgToggle || '');
+        if (key === 'auto') settings.auto = !settings.auto;
+        if (key === 'spoiler') settings.spoiler = !settings.spoiler;
+        saveSettings();
+      });
+    });
+  }
+
+  function openPanel() {
+    const panel = ensurePanel();
+    panel.style.display = 'block';
+    const hud = document.getElementById(HUD_ID);
+    panel.classList.toggle('right', Boolean(hud?.classList.contains('right')));
+    renderPanel();
+  }
+
+  function ensureButtons() {
+    ensureStyle();
+
+    // Desktop: small floating launcher beside existing live panel.
+    if (!document.documentElement.classList.contains('xinyao-phone-ui')) {
+      let btn = document.getElementById(DESKTOP_BTN_ID);
+      if (!btn) {
+        btn = document.createElement('button');
+        btn.id = DESKTOP_BTN_ID;
+        btn.type = 'button';
+        btn.textContent = '🎁 免遊';
+        btn.addEventListener('click', openPanel);
+        (document.body || document.documentElement).appendChild(btn);
+      }
+    } else {
+      document.getElementById(DESKTOP_BTN_ID)?.remove();
+    }
+
+    // Mobile quick HUD: add one more button without touching the existing six.
+    const hud = document.getElementById(HUD_ID);
+    const grid = hud?.querySelector('.qh-grid');
+    if (grid && !grid.querySelector('[data-qh="free"]')) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'qh-btn free';
+      btn.dataset.qh = 'free';
+      btn.title = '免遊助手';
+      btn.setAttribute('aria-label','免遊助手');
+      btn.innerHTML = '<span class="qh-icon">🎁</span><span class="qh-label">免遊</span>';
+      btn.addEventListener('click', event => {
+        event.stopPropagation();
+        openPanel();
+      });
+      grid.appendChild(btn);
+    }
+    updateButtons();
+  }
+
+  function updateButtons() {
+    const active = settings.auto || settings.spoiler;
+    const btn = document.getElementById(DESKTOP_BTN_ID);
+    if (btn) {
+      btn.textContent = active ? '🎁 免遊 ON' : '🎁 免遊';
+      btn.style.borderColor = active ? 'rgba(255,126,178,.92)' : 'rgba(255,185,215,.55)';
+    }
+    const hudBtn = document.querySelector('#' + HUD_ID + ' [data-qh="free"]');
+    if (hudBtn) {
+      hudBtn.style.borderColor = active ? 'rgba(255,126,178,.92)' : '';
+      hudBtn.style.background = active ? 'rgba(255,95,158,.13)' : '';
+    }
+  }
+
+  window.addEventListener('xinyao:spin-final-observed', event => {
+    try {
+      const detail = event?.detail || {};
+      const spinId = String(detail.spinId || '');
+      const sig = readFreeStartSignal(detail.engine || detail.finalState || {});
+      if (!sig.start) return;
+
+      if (settings.auto) {
+        handleAuto(true);
+      }
+
+      if (settings.spoiler && spinId !== lastSpoilerSpinId) {
+        const payout = extractSpoilerPayout(detail);
+        if (payout !== null) {
+          lastSpoilerSpinId = spinId;
+          showSpoiler(payout);
+        }
+      }
+    } catch (_) {}
+  });
+
+  const timer = setInterval(() => {
+    if (window.__XIANYAO_MAINTENANCE_STATE__?.enabled) {
+      document.getElementById(PANEL_ID)?.remove();
+      document.getElementById(DESKTOP_BTN_ID)?.remove();
+      document.getElementById(TOAST_ID)?.remove();
+      return;
+    }
+    ensureButtons();
+    const live = window.__XIANYAO_ATG_LIVE_SNAPSHOT__ || {};
+    const active = Boolean(live.freeGameActive) || Number(live.freeGameCount || 0) > 0;
+    handleAuto(active);
+    if (document.getElementById(PANEL_ID)?.style.display !== 'none') renderPanel();
+  }, 500);
+
+  window.__XIANYAO_ATG_FREE_HELPER__ = {
+    version:'1.0.0-test159',
+    getState:() => ({...settings,lastSpoilerValue}),
+    setAuto:value => { settings.auto = Boolean(value); saveSettings(); },
+    setSpoiler:value => { settings.spoiler = Boolean(value); saveSettings(); },
+    open:openPanel,
+    close:() => { const p = document.getElementById(PANEL_ID); if (p) p.style.display = 'none'; }
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ensureButtons, {once:true});
+  } else {
+    ensureButtons();
+  }
+})();
