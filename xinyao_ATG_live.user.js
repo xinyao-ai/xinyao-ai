@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.160
-// @description  test160：免遊助手改為 ATG/Cocos 原生開始與真正 Skip handler；移除 16× 假跳過，不動選房/掃描/進房核心。
+// @version      4.0.0-test.161
+// @description  test161：免遊 Hard Skip：免遊期間將 Cocos 動畫/等待壓到零並推進 finish/result/next 流程；不使用倍速。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -15333,4 +15333,366 @@ try {
   } else {
     ensureButtons();
   }
+})();
+
+
+/* ===== 芯瑤 ATG Free Game Hard Skip Engine v1.0｜test161 ===== */
+(() => {
+  'use strict';
+
+  if (window.__XIANYAO_ATG_FREE_HARD_SKIP_V1__) return;
+  window.__XIANYAO_ATG_FREE_HARD_SKIP_V1__ = true;
+
+  const SETTINGS_KEY = 'xinyao_atg_free_helper_v1';
+  const PATCH_MARK = '__xinyaoFreeHardSkip161';
+  const TINY = 0.001;
+
+  const state = {
+    active:false,
+    patchedTween:0,
+    patchedSchedule:0,
+    pulses:0,
+    methodsCalled:0,
+    lastMethod:'',
+    lastContext:'',
+    lastAt:0
+  };
+
+  function enabled() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+      return Boolean(saved.auto);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function windows() {
+    const out = [];
+    const seen = new Set();
+    const visit = win => {
+      if (!win || seen.has(win)) return;
+      seen.add(win);
+      try {
+        void win.location.href;
+        out.push(win);
+        for (let i = 0; i < win.frames.length; i += 1) visit(win.frames[i]);
+      } catch (_) {}
+    };
+    visit(window);
+    return out;
+  }
+
+  function nameOf(component) {
+    try {
+      return String(
+        component?.__classname__ ||
+        component?.constructor?.__classname__ ||
+        component?.constructor?.name ||
+        ''
+      );
+    } catch (_) { return ''; }
+  }
+
+  function pathOf(node) {
+    const names = [];
+    let cur = node;
+    for (let i = 0; cur && i < 14; i += 1) {
+      try {
+        if (cur.name) names.push(String(cur.name));
+      } catch (_) {}
+      cur = cur?.parent || cur?._parent || null;
+    }
+    return names.reverse().join('/');
+  }
+
+  function contextOf(componentOrTarget) {
+    try {
+      const node = componentOrTarget?.node || (componentOrTarget?.name ? componentOrTarget : null);
+      return [
+        nameOf(componentOrTarget),
+        componentOrTarget?.name,
+        pathOf(node)
+      ].filter(Boolean).join(' ');
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function freeFlowContext(value) {
+    const s = contextOf(value);
+    return /(freegame|free.?game|freespin|free.?spin|bonus|feature|bigwin|winview|result|summary|settlement|currenttimes|gameview|reel|symbol|slot|cascade)/i.test(s);
+  }
+
+  function collapseActionTree(root) {
+    if (!root || (typeof root !== 'object' && typeof root !== 'function')) return;
+    const seen = new WeakSet();
+
+    function visit(value, depth = 0) {
+      if (!value || depth > 10 || seen.has(value)) return;
+      if (typeof value !== 'object' && typeof value !== 'function') return;
+      seen.add(value);
+
+      try {
+        if (Number.isFinite(Number(value._duration)) && Number(value._duration) > TINY) {
+          value._duration = TINY;
+        }
+      } catch (_) {}
+
+      try {
+        if (Number.isFinite(Number(value._delay)) && Number(value._delay) > TINY) {
+          value._delay = TINY;
+        }
+      } catch (_) {}
+
+      let entries = [];
+      try { entries = Object.entries(value); } catch (_) { return; }
+
+      for (const [key, child] of entries) {
+        if (
+          key === '_target' || key === 'target' || key === '_owner' || key === 'owner' ||
+          key === '_node' || key === 'node' || key === '_eventTargets' || key === '_listeners'
+        ) continue;
+
+        if (Array.isArray(child)) {
+          for (const item of child) visit(item, depth + 1);
+        } else if (child && (typeof child === 'object' || typeof child === 'function')) {
+          visit(child, depth + 1);
+        }
+      }
+    }
+
+    visit(root, 0);
+  }
+
+  function patchWindow(win) {
+    try {
+      const cc = win.cc || win.legacyCC || win._cc;
+      if (!cc) return;
+
+      const tweenProto = cc?.Tween?.prototype;
+      if (tweenProto && typeof tweenProto.start === 'function' && !tweenProto.start[PATCH_MARK]) {
+        const native = tweenProto.start;
+        const wrapped = function (...args) {
+          try {
+            if (state.active && enabled()) {
+              const target = this?._target || this?.target || null;
+              if (!target || freeFlowContext(target)) collapseActionTree(this);
+            }
+          } catch (_) {}
+          return native.apply(this, args);
+        };
+        try { Object.defineProperty(wrapped, PATCH_MARK, {value:true}); } catch (_) { wrapped[PATCH_MARK] = true; }
+        tweenProto.start = wrapped;
+        state.patchedTween += 1;
+      }
+
+      const compProto = cc?.Component?.prototype;
+      if (compProto && typeof compProto.scheduleOnce === 'function' && !compProto.scheduleOnce[PATCH_MARK]) {
+        const nativeScheduleOnce = compProto.scheduleOnce;
+        const wrappedScheduleOnce = function (callback, delay = 0, ...rest) {
+          let next = delay;
+          try {
+            if (
+              state.active &&
+              enabled() &&
+              Number.isFinite(Number(delay)) &&
+              Number(delay) > 0 &&
+              Number(delay) <= 15 &&
+              freeFlowContext(this)
+            ) {
+              next = TINY;
+            }
+          } catch (_) {}
+          return nativeScheduleOnce.call(this, callback, next, ...rest);
+        };
+        try { Object.defineProperty(wrappedScheduleOnce, PATCH_MARK, {value:true}); } catch (_) { wrappedScheduleOnce[PATCH_MARK] = true; }
+        compProto.scheduleOnce = wrappedScheduleOnce;
+        state.patchedSchedule += 1;
+      }
+    } catch (_) {}
+  }
+
+  function methodNames(component) {
+    const out = new Set();
+    let cur = component;
+    for (let depth = 0; cur && depth < 7; depth += 1) {
+      try { Object.getOwnPropertyNames(cur).forEach(name => out.add(name)); } catch (_) {}
+      try { cur = Object.getPrototypeOf(cur); } catch (_) { cur = null; }
+    }
+    return [...out];
+  }
+
+  function scoreMethod(name) {
+    const s = String(name || '');
+    const lower = s.toLowerCase();
+
+    if (!lower || /^(constructor|onload|start|update|lateupdate|onenable|ondisable|ondestroy|reset|schedule|unschedule)$/i.test(s)) return -1;
+
+    // Never call anything that looks like a wager/network/payment/game-result mutation method.
+    if (/(bet|buy|purchase|spin|request|send|socket|http|api|claim|collect|award|reward|payout|balance|credit|wallet|settle)/i.test(lower)) return -1;
+
+    if (/skip.*(?:free|bonus|feature)|(?:free|bonus|feature).*skip/i.test(lower)) return 1200;
+    if (/fast.?forward|jump.?to.?end|goto.?result|go.?result/i.test(lower)) return 1150;
+    if (/show.*(?:final|result|summary)|open.*(?:result|summary)/i.test(lower)) return 1100;
+    if (/(finish|complete|end).*(?:free|bonus|feature|view|animation|anim)/i.test(lower)) return 1050;
+    if (/(?:free|bonus|feature|view|animation|anim).*(finish|complete|end)/i.test(lower)) return 1030;
+    if (/skip|finish|complete|showresult|showsummary/i.test(lower)) return 900;
+    if (/next.*(?:view|step|stage|page)|(?:view|step|stage|page).*next/i.test(lower)) return 780;
+    if (/continue|close.*(?:view|popup|dialog)|(?:view|popup|dialog).*close/i.test(lower)) return 650;
+    return -1;
+  }
+
+  function invokeFlowMethods() {
+    const hits = [];
+
+    for (const win of windows()) {
+      try {
+        const cc = win.cc || win.legacyCC || win._cc;
+        const scene = cc?.director?.getScene?.();
+        const Component = cc?.Component;
+        if (!scene || !Component || typeof scene.getComponentsInChildren !== 'function') continue;
+
+        const components = scene.getComponentsInChildren(Component) || [];
+        for (const component of components) {
+          const node = component?.node;
+          if (!component || !node || node.activeInHierarchy === false) continue;
+
+          const ctx = contextOf(component);
+          if (!/(freegame|free.?game|freespin|free.?spin|bonus|feature|bigwin|winview|result|summary|currenttimes|gameview)/i.test(ctx)) continue;
+
+          const methods = methodNames(component)
+            .map(name => ({name, score:scoreMethod(name)}))
+            .filter(item => item.score >= 0 && typeof component?.[item.name] === 'function')
+            .sort((a,b) => b.score - a.score);
+
+          for (const item of methods.slice(0, 3)) {
+            try {
+              const fn = component[item.name];
+              // Only zero-argument or optional-event style handlers. Avoid methods that clearly require payloads.
+              if (fn.length > 1) continue;
+              let ok = false;
+              try {
+                fn.call(component);
+                ok = true;
+              } catch (_) {}
+
+              if (ok) {
+                hits.push({
+                  score:item.score,
+                  method:nameOf(component) + '.' + item.name,
+                  context:ctx
+                });
+              }
+            } catch (_) {}
+          }
+        }
+      } catch (_) {}
+    }
+
+    hits.sort((a,b) => b.score - a.score);
+    if (hits.length) {
+      state.methodsCalled += hits.length;
+      state.lastMethod = hits[0].method;
+      state.lastContext = hits[0].context;
+      state.lastAt = Date.now();
+    }
+    return hits;
+  }
+
+  function forceAnimationEnd() {
+    let count = 0;
+    for (const win of windows()) {
+      try {
+        const cc = win.cc || win.legacyCC || win._cc;
+        const scene = cc?.director?.getScene?.();
+        const Animation = cc?.Animation;
+        if (!scene || !Animation || typeof scene.getComponentsInChildren !== 'function') continue;
+
+        const animations = scene.getComponentsInChildren(Animation) || [];
+        for (const anim of animations) {
+          try {
+            if (!anim?.node || anim.node.activeInHierarchy === false) continue;
+            const ctx = contextOf(anim);
+            if (!/(freegame|free.?game|freespin|bonus|feature|bigwin|winview|result|summary|currenttimes|gameview)/i.test(ctx)) continue;
+
+            const clips = typeof anim.getClips === 'function' ? (anim.getClips() || []) : [];
+            for (const clip of clips) {
+              const st = typeof anim.getAnimationState === 'function' ? anim.getAnimationState(clip?.name) : null;
+              if (!st || !st.isPlaying) continue;
+              const dur = Number(st.duration || clip?.duration || 0);
+              if (!(dur > 0)) continue;
+              try { st.time = Math.max(0, dur - TINY); } catch (_) {}
+              try { st.sample?.(); } catch (_) {}
+              count += 1;
+            }
+          } catch (_) {}
+        }
+      } catch (_) {}
+    }
+    return count;
+  }
+
+  function pulse() {
+    if (!state.active || !enabled()) return;
+    state.pulses += 1;
+
+    for (const win of windows()) patchWindow(win);
+    forceAnimationEnd();
+    invokeFlowMethods();
+
+    try {
+      window.__XIANYAO_ATG_FREE_HARD_SKIP_STATE__ = {
+        active:state.active,
+        patchedTween:state.patchedTween,
+        patchedSchedule:state.patchedSchedule,
+        pulses:state.pulses,
+        methodsCalled:state.methodsCalled,
+        lastMethod:state.lastMethod,
+        lastContext:state.lastContext,
+        lastAt:state.lastAt
+      };
+    } catch (_) {}
+  }
+
+  function detectLiveActive() {
+    const live = window.__XIANYAO_ATG_LIVE_SNAPSHOT__ || {};
+    return Boolean(live.freeGameActive) || Number(live.freeGameCount || 0) > 0;
+  }
+
+  window.addEventListener('xinyao:spin-final-observed', event => {
+    try {
+      const detail = event?.detail || {};
+      const raw = JSON.stringify(detail?.engine || {});
+      if (/(startfreegame|startfreespin|freegamestart|freespinstart|freegametriggered|freespinstriggered)/i.test(raw)) {
+        state.active = enabled();
+        if (state.active) {
+          pulse();
+          setTimeout(pulse, 20);
+          setTimeout(pulse, 60);
+          setTimeout(pulse, 120);
+        }
+      }
+    } catch (_) {}
+  });
+
+  setInterval(() => {
+    if (window.__XIANYAO_MAINTENANCE_STATE__?.enabled) {
+      state.active = false;
+      return;
+    }
+
+    const active = enabled() && detectLiveActive();
+    if (active !== state.active) state.active = active;
+    if (state.active) pulse();
+  }, 80);
+
+  for (const win of windows()) patchWindow(win);
+
+  window.__XIANYAO_ATG_FREE_HARD_SKIP__ = {
+    version:'1.0.0-test161',
+    getState:() => ({...state, enabled:enabled()}),
+    pulse,
+    setActive:value => { state.active = Boolean(value) && enabled(); if (state.active) pulse(); }
+  };
 })();
