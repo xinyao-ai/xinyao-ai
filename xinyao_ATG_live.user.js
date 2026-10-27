@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.165
-// @description  test165：停用危險 Hard Skip，新增安全免遊 Runtime 診斷與一鍵複製診斷資料。
+// @version      4.0.0-test.166
+// @description  test166：免遊直接看結算：優先讀取 ATG 預先回傳的免遊總贏分；若逐轉結算則遮蔽過程並於完成後顯示實際總贏分。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -2183,6 +2183,11 @@ try {
   function inspectObject(obj) {
     try {
       if (!safeObject(obj)) return;
+
+      try {
+        window.__XIANYAO_ATG_FREE_RESULT_PROBE__?.observe?.(obj);
+      } catch (_) {}
+
       let changed = false;
 
       const balance = findBalance(obj);
@@ -15356,16 +15361,24 @@ try {
       <button type="button" class="fg-close" aria-label="關閉">×</button>
       <div class="fg-title">🎁 遇到免費遊戲</div>
       <div class="fg-row">
-        <div class="fg-text">免遊：安全診斷模式</div>
-        <button type="button" class="fg-switch ${settings.auto ? 'on' : ''}" data-fg-toggle="auto" aria-label="免遊安全診斷"></button>
+        <div class="fg-text">免遊：直接看結算</div>
+        <button type="button" class="fg-switch ${settings.auto ? 'on' : ''}" data-fg-toggle="auto" aria-label="免遊直接看結算"></button>
       </div>
       <div class="fg-row">
         <div class="fg-text">👁 免遊劇透（進免遊前報得分）</div>
         <button type="button" class="fg-switch ${settings.spoiler ? 'on' : ''}" data-fg-toggle="spoiler" aria-label="免遊劇透"></button>
       </div>
-      <div class="fg-sub">安全診斷＝只讀取 ATG/Cocos 免遊元件與事件，不再執行任何 Skip／Finish／Close，避免誤觸離開遊戲。</div>
-      <div class="fg-status">${nativeStatus}${lastNativeVia ? '｜' + lastNativeVia : ''}${lastSpoilerValue !== null ? '｜劇透 ' + money(lastSpoilerValue) : ''}</div>
-      <button type="button" data-fg-copy-diag style="margin-top:10px;width:100%;border:1px solid rgba(255,185,215,.5);border-radius:10px;background:rgba(255,95,158,.12);color:#fff;padding:8px 10px;font-size:11px;font-weight:800;cursor:pointer;">📋 複製免遊診斷</button>
+      <div class="fg-sub">直接看結算＝優先讀取 ATG 已回傳的免遊總贏分；若此遊戲為逐轉伺服器結算，會遮住免遊過程並在真正完成後顯示總贏分。</div>
+      <div class="fg-status">${nativeStatus}${lastNativeVia ? '｜' + lastNativeVia : ''}${lastSpoilerValue !== null ? '｜目前回包 ' + money(lastSpoilerValue) : ''}</div>
+      <div class="fg-status" style="margin-top:7px;color:#ffd1e4;">${(() => {
+        const s = window.__XIANYAO_ATG_FREE_RESULT_STATE__;
+        if (!s) return '等待免遊資料';
+        if (s.mode === 'preloaded' && Number.isFinite(Number(s.finalAmount))) return '✅ ATG 已先回傳最終贏分：' + money(s.finalAmount);
+        if (s.mode === 'sequential') return '⏳ 此遊戲為逐轉伺服器結算';
+        if (s.mode === 'finished' && Number.isFinite(Number(s.finalAmount))) return '✅ 本次免遊總贏分：' + money(s.finalAmount);
+        return '正在判斷免遊結算方式…';
+      })()}</div>
+      <button type="button" data-fg-copy-diag style="margin-top:10px;width:100%;border:1px solid rgba(255,185,215,.5);border-radius:10px;background:rgba(255,95,158,.12);color:#fff;padding:8px 10px;font-size:11px;font-weight:800;cursor:pointer;">📋 複製免遊資料</button>
     `;
 
     panel.querySelector('.fg-close')?.addEventListener('click', () => {
@@ -15385,7 +15398,7 @@ try {
       try {
         const latest = freeRuntimeDiagnostics();
         payload = JSON.stringify({
-          version:'test165',
+          version:'test166',
           at:Date.now(),
           href:location.href,
           freeGameActive:Boolean(window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameActive),
@@ -15525,3 +15538,381 @@ try {
 
 
 
+
+
+/* ===== 芯瑤 ATG Free Result Probe v1.0｜test166 ===== */
+(() => {
+  'use strict';
+
+  if (window.__XIANYAO_ATG_FREE_RESULT_PROBE__) return;
+
+  const OVERLAY_ID = 'xinyao-atg-free-result-overlay';
+  const SETTINGS_KEY = 'xinyao_atg_free_helper_v1';
+
+  const state = {
+    active:false,
+    mode:'idle',
+    startedAt:0,
+    startBalance:null,
+    startCount:null,
+    spinIds:[],
+    payoutBySpin:{},
+    runningTotal:0,
+    finalAmount:null,
+    finalPath:'',
+    candidate:null,
+    candidatePath:'',
+    candidateScore:0,
+    packetCount:0,
+    updatedAt:0
+  };
+
+  function enabled() {
+    try {
+      return Boolean(JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')?.auto);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function num(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function normalizeKey(value) {
+    return String(value || '').replace(/[^a-z0-9]/gi,'').toLowerCase();
+  }
+
+  function candidateScore(path, key) {
+    const p = String(path || '').toLowerCase();
+    const k = normalizeKey(key);
+
+    if (/(stake|bet|balance|jackpot|multiplier|multiply|count|left|remain|remaining|times|currentview|totalviews|room|table)/i.test(p)) {
+      return -1;
+    }
+
+    let score = 0;
+
+    if (/(freegame|freegames|freespin|freespins|bonus|feature)/i.test(p)) score += 6;
+    if (/(total|final|overall|accum|accumulate|sum)/i.test(p)) score += 6;
+    if (/(win|winning|winnings|payout|prize|award|reward|credit)/i.test(p)) score += 6;
+
+    if (/^(freegame|freegames|freespin|freespins|bonus|feature)(total|final)?(win|winnings|payout|prize)$/i.test(k)) score += 14;
+    if (/^(total|final)(freegame|freegames|freespin|freespins|bonus|feature)(win|winnings|payout|prize)$/i.test(k)) score += 14;
+    if (/^(bonus|feature)(total|final)win$/i.test(k)) score += 14;
+
+    return score;
+  }
+
+  function scanCandidates(root) {
+    const found = [];
+    const seen = new WeakSet();
+
+    const visit = (value, path = '', depth = 0) => {
+      if (value == null || depth > 12) return;
+
+      if (typeof value !== 'object') return;
+      if (seen.has(value)) return;
+      seen.add(value);
+
+      let entries = [];
+      try { entries = Object.entries(value); } catch (_) { return; }
+
+      for (const [key, child] of entries) {
+        const next = path ? path + '.' + key : key;
+
+        if (child !== null && child !== undefined && typeof child !== 'object') {
+          const n = num(child);
+          if (n !== null && n >= 0) {
+            const score = candidateScore(next, key);
+            if (score >= 12) found.push({value:n,path:next,score});
+          }
+        }
+
+        if (child && typeof child === 'object') visit(child,next,depth+1);
+      }
+    };
+
+    visit(root);
+    found.sort((a,b) => b.score - a.score || b.value - a.value);
+    return found;
+  }
+
+  function collectSpinIds(root) {
+    const ids = [];
+    const seen = new WeakSet();
+
+    const visit = (value, depth = 0) => {
+      if (!value || typeof value !== 'object' || depth > 8 || seen.has(value)) return;
+      seen.add(value);
+
+      if (!Array.isArray(value)) {
+        for (const [key, child] of Object.entries(value)) {
+          if (/^spinid$/i.test(String(key)) && child !== null && child !== undefined) {
+            ids.push(String(child));
+          }
+          if (child && typeof child === 'object') visit(child,depth+1);
+        }
+      } else {
+        for (const child of value) if (child && typeof child === 'object') visit(child,depth+1);
+      }
+    };
+
+    visit(root);
+    return [...new Set(ids)];
+  }
+
+  function currentSnapshot() {
+    return window.__XIANYAO_ATG_LIVE_SNAPSHOT__ || {};
+  }
+
+  function startSession() {
+    if (state.active) return;
+    const live = currentSnapshot();
+
+    state.active = true;
+    state.mode = 'probing';
+    state.startedAt = Date.now();
+    state.startBalance = num(live.balance);
+    state.startCount = num(live.freeGameCount);
+    state.spinIds = [];
+    state.payoutBySpin = {};
+    state.runningTotal = 0;
+    state.finalAmount = null;
+    state.finalPath = '';
+    state.candidate = null;
+    state.candidatePath = '';
+    state.candidateScore = 0;
+    state.packetCount = 0;
+    state.updatedAt = Date.now();
+
+    renderOverlay();
+    publish();
+  }
+
+  function finishSession() {
+    if (!state.active) return;
+
+    state.active = false;
+    state.mode = 'finished';
+
+    const live = currentSnapshot();
+    const endBalance = num(live.balance);
+    let final = null;
+
+    if (state.finalAmount !== null) {
+      final = state.finalAmount;
+    } else if (state.runningTotal > 0) {
+      final = Math.round(state.runningTotal * 100) / 100;
+    } else if (state.startBalance !== null && endBalance !== null) {
+      final = Math.round((endBalance - state.startBalance) * 100) / 100;
+    }
+
+    state.finalAmount = final;
+    state.updatedAt = Date.now();
+    renderOverlay(true);
+    publish();
+  }
+
+  function observe(root) {
+    try {
+      if (!root || typeof root !== 'object') return;
+      if (!enabled()) return;
+
+      const live = currentSnapshot();
+      const freeNow = Boolean(live.freeGameActive) || Number(live.freeGameCount || 0) > 0;
+
+      if (freeNow && !state.active) startSession();
+      if (!state.active) return;
+
+      state.packetCount += 1;
+
+      const ids = collectSpinIds(root);
+      for (const id of ids) {
+        if (!state.spinIds.includes(id)) state.spinIds.push(id);
+      }
+
+      const candidates = scanCandidates(root);
+      const best = candidates[0];
+
+      if (best && best.score >= state.candidateScore) {
+        state.candidate = best.value;
+        state.candidatePath = best.path;
+        state.candidateScore = best.score;
+
+        // 高可信總贏分欄位：一收到就直接顯示。
+        if (best.score >= 18) {
+          state.mode = 'preloaded';
+          state.finalAmount = best.value;
+          state.finalPath = best.path;
+        }
+      }
+
+      // 已看到 2 個以上不同 spinId 且仍沒有高可信最終欄位，
+      // 視為逐轉向伺服器取結果。
+      if (state.mode !== 'preloaded' && state.spinIds.length >= 2) {
+        state.mode = 'sequential';
+      }
+
+      state.updatedAt = Date.now();
+      renderOverlay();
+      publish();
+    } catch (_) {}
+  }
+
+  function noteSpin(detail) {
+    try {
+      if (!enabled()) return;
+
+      const engine = detail?.engine || {};
+      const spinId = String(detail?.spinId || engine?.spinId || '');
+      const live = currentSnapshot();
+      const freeNow = Boolean(live.freeGameActive) || Number(live.freeGameCount || 0) > 0;
+
+      if (freeNow && !state.active) startSession();
+      if (!state.active) return;
+
+      if (spinId && !state.spinIds.includes(spinId)) state.spinIds.push(spinId);
+
+      let payout = num(detail?.finalState?.totalWinnings);
+      if (payout === null) payout = num(detail?.finalState?.roundWinnings);
+
+      if (payout !== null && spinId && !(spinId in state.payoutBySpin)) {
+        state.payoutBySpin[spinId] = payout;
+        state.runningTotal = Math.round(
+          Object.values(state.payoutBySpin).reduce((sum,v) => sum + (num(v) || 0),0) * 100
+        ) / 100;
+      }
+
+      observe(engine);
+    } catch (_) {}
+  }
+
+  function ensureOverlay() {
+    let el = document.getElementById(OVERLAY_ID);
+    if (el) return el;
+
+    el = document.createElement('div');
+    el.id = OVERLAY_ID;
+    el.style.cssText = [
+      'position:fixed','inset:0','z-index:2147483600',
+      'display:none','align-items:center','justify-content:center',
+      'background:rgba(8,6,12,.94)','backdrop-filter:blur(8px)',
+      '-webkit-backdrop-filter:blur(8px)','font-family:-apple-system,BlinkMacSystemFont,"PingFang TC",sans-serif',
+      'pointer-events:none'
+    ].join(';');
+
+    (document.body || document.documentElement).appendChild(el);
+    return el;
+  }
+
+  function renderOverlay(forceFinal = false) {
+    const el = ensureOverlay();
+
+    if (!enabled() || (!state.active && state.mode !== 'finished')) {
+      el.style.display = 'none';
+      return;
+    }
+
+    const preloaded = state.mode === 'preloaded' && state.finalAmount !== null;
+    const finished = (forceFinal || state.mode === 'finished') && state.finalAmount !== null;
+
+    // 只有免遊進行中才遮蔽遊戲過程；結束後保留結果 3 秒。
+    if (state.active || preloaded || finished) {
+      el.style.display = 'flex';
+    }
+
+    let title = '🎁 免遊結算中';
+    let main = '正在讀取 ATG 結算資料…';
+    let sub = '不顯示中間免遊畫面';
+
+    if (preloaded) {
+      title = '🎁 免遊最終結果';
+      main = '贏得 ' + Number(state.finalAmount).toLocaleString(undefined,{maximumFractionDigits:2});
+      sub = 'ATG 已在免遊進行前回傳最終總贏分';
+    } else if (state.mode === 'sequential') {
+      title = '🎁 免遊結算中';
+      main = '目前累計 ' + Number(state.runningTotal || 0).toLocaleString(undefined,{maximumFractionDigits:2});
+      sub = '此款 ATG 為逐轉伺服器結算，等待真正完成後顯示最終金額';
+    } else if (finished) {
+      title = '🎁 免遊最終結果';
+      main = '贏得 ' + Number(state.finalAmount).toLocaleString(undefined,{maximumFractionDigits:2});
+      sub = '本次免遊已完成';
+    }
+
+    el.innerHTML = `
+      <div style="width:min(430px,calc(100vw - 34px));padding:28px 24px;border:1px solid rgba(255,132,184,.55);border-radius:22px;background:rgba(31,22,36,.98);box-shadow:0 24px 70px rgba(0,0,0,.55);color:#fff;text-align:center;">
+        <div style="font-size:17px;font-weight:900;color:#ff9bc3;">${title}</div>
+        <div style="margin-top:16px;font-size:34px;font-weight:1000;letter-spacing:.5px;">${main}</div>
+        <div style="margin-top:10px;font-size:12px;line-height:1.65;opacity:.72;">${sub}</div>
+      </div>
+    `;
+
+    if (finished && !state.active) {
+      clearTimeout(renderOverlay._hideTimer);
+      renderOverlay._hideTimer = setTimeout(() => {
+        try { el.style.display = 'none'; } catch (_) {}
+        if (!state.active) state.mode = 'idle';
+        publish();
+      }, 3000);
+    }
+  }
+
+  function publish() {
+    try {
+      window.__XIANYAO_ATG_FREE_RESULT_STATE__ = {
+        ...state,
+        spinIds:[...state.spinIds],
+        payoutBySpin:{...state.payoutBySpin}
+      };
+    } catch (_) {}
+  }
+
+  window.addEventListener('xinyao:spin-final-observed', e => noteSpin(e?.detail || {}));
+
+  setInterval(() => {
+    if (!enabled()) {
+      if (state.active) state.active = false;
+      ensureOverlay().style.display = 'none';
+      publish();
+      return;
+    }
+
+    const live = currentSnapshot();
+    const freeNow = Boolean(live.freeGameActive) || Number(live.freeGameCount || 0) > 0;
+
+    if (freeNow && !state.active) startSession();
+    if (!freeNow && state.active && Date.now() - state.startedAt > 700) finishSession();
+
+    if (state.active) renderOverlay();
+  }, 120);
+
+  window.__XIANYAO_ATG_FREE_RESULT_PROBE__ = {
+    version:'1.0.0-test166',
+    observe,
+    getState:() => ({...state,spinIds:[...state.spinIds],payoutBySpin:{...state.payoutBySpin}}),
+    reset:() => {
+      state.active=false;
+      state.mode='idle';
+      state.startedAt=0;
+      state.startBalance=null;
+      state.startCount=null;
+      state.spinIds=[];
+      state.payoutBySpin={};
+      state.runningTotal=0;
+      state.finalAmount=null;
+      state.finalPath='';
+      state.candidate=null;
+      state.candidatePath='';
+      state.candidateScore=0;
+      state.packetCount=0;
+      state.updatedAt=Date.now();
+      try { ensureOverlay().style.display='none'; } catch (_) {}
+      publish();
+    }
+  };
+
+  publish();
+})();
