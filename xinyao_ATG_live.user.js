@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.161
-// @description  test161：免遊 Hard Skip：免遊期間將 Cocos 動畫/等待壓到零並推進 finish/result/next 流程；不使用倍速。
+// @version      4.0.0-test.162
+// @description  test162：新增後台全域「僅限皇鼎」開關；關閉後任一娛樂城 ATG 可使用，重新開啟即恢復皇鼎限制。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -14,7 +14,58 @@
 // ===== test135：皇鼎來源限制（不碰掃描核心） =====
 const XIANYAO_HD_SESSION_KEY = 'xinyao_atg_hd_access_v1';
 const XIANYAO_HD_BLOCK_KEY = 'xinyao_atg_hd_block_v1';
+const XIANYAO_HD_ONLY_CACHE_KEY = 'xinyao_atg_hd_only_remote_v1';
+const XIANYAO_HD_CONTROL_ENDPOINT = 'https://xinyao-atg-live.love06130430.workers.dev/maintenance';
+const XIANYAO_HD_ONLY_MARK_RE = /\\[\\[XIANYAO_HD_ONLY=(0|1)\\]\\]/i;
 const XIANYAO_HD_ALLOWED_HOSTS = ['hd5577.com'];
+
+function xinyaoHdOnlyFromMessage(message) {
+  const match = String(message || '').match(XIANYAO_HD_ONLY_MARK_RE);
+  if (!match) return true;
+  return match[1] !== '0';
+}
+
+function xinyaoLoadRemoteHdOnly() {
+  try {
+    const raw = localStorage.getItem(XIANYAO_HD_ONLY_CACHE_KEY);
+    if (raw === '0') return false;
+    if (raw === '1') return true;
+  } catch (_) {}
+  return true;
+}
+
+function xinyaoSaveRemoteHdOnly(enabled) {
+  try { localStorage.setItem(XIANYAO_HD_ONLY_CACHE_KEY, enabled ? '1' : '0'); } catch (_) {}
+}
+
+async function xinyaoSyncRemoteHdOnly() {
+  try {
+    const response = await fetch(`${XIANYAO_HD_CONTROL_ENDPOINT}?t=${Date.now()}`, {
+      method:'GET',
+      cache:'no-store',
+      credentials:'omit'
+    });
+    if (!response.ok) return;
+    const data = await response.json();
+    if (!data?.ok) return;
+
+    const next = xinyaoHdOnlyFromMessage(data.message);
+    const current = xinyaoLoadRemoteHdOnly();
+
+    if (next !== current) {
+      xinyaoSaveRemoteHdOnly(next);
+      try {
+        sessionStorage.setItem('xinyao_atg_hd_only_reload_v1', String(Date.now()));
+      } catch (_) {}
+      location.reload();
+      return;
+    }
+
+    try {
+      window.__XIANYAO_HD_ONLY_ENABLED__ = next;
+    } catch (_) {}
+  } catch (_) {}
+}
 
 function xinyaoIsHuangDingHost(hostname) {
   const host = String(hostname || '').toLowerCase().replace(/\.$/, '');
@@ -118,8 +169,17 @@ function xinyaoResolveHuangDingAccess() {
   }
 }
 
-const XIANYAO_HD_ACCESS_ALLOWED = xinyaoResolveHuangDingAccess();
-try { window.__XIANYAO_HD_ACCESS_ALLOWED__ = XIANYAO_HD_ACCESS_ALLOWED; } catch (_) {}
+const XIANYAO_HD_ONLY_ENABLED = xinyaoLoadRemoteHdOnly();
+const XIANYAO_HD_ACCESS_ALLOWED =
+  !XIANYAO_HD_ONLY_ENABLED || xinyaoResolveHuangDingAccess();
+
+try {
+  window.__XIANYAO_HD_ONLY_ENABLED__ = XIANYAO_HD_ONLY_ENABLED;
+  window.__XIANYAO_HD_ACCESS_ALLOWED__ = XIANYAO_HD_ACCESS_ALLOWED;
+} catch (_) {}
+
+xinyaoSyncRemoteHdOnly();
+setInterval(xinyaoSyncRemoteHdOnly, 10000);
 
 function xinyaoRenderHuangDingOnlyNotice() {
   const apply = () => {
@@ -219,7 +279,9 @@ window.__XIANYAO_MAINTENANCE_STATE__ = window.__XIANYAO_MAINTENANCE_STATE__ || {
 };
 
 function xinyaoMaintenanceMessage(state) {
-  return String(state?.message || '芯瑤 ATG 系統升級維護中，完成後將立即開放使用。');
+  return String(state?.message || '芯瑤 ATG 系統升級維護中，完成後將立即開放使用。')
+    .replace(XIANYAO_HD_ONLY_MARK_RE, '')
+    .trim();
 }
 
 function xinyaoRenderMaintenance(state) {
