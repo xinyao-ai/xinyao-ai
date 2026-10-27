@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.166
-// @description  test166：免遊直接看結算：優先讀取 ATG 預先回傳的免遊總贏分；若逐轉結算則遮蔽過程並於完成後顯示實際總贏分。
+// @version      4.0.0-test.167
+// @description  test167：移除會讓免遊看似卡住的全畫面結算遮罩；改為純讀取、不阻擋遊戲流程，只在免遊面板顯示結算狀態。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -15368,13 +15368,13 @@ try {
         <div class="fg-text">👁 免遊劇透（進免遊前報得分）</div>
         <button type="button" class="fg-switch ${settings.spoiler ? 'on' : ''}" data-fg-toggle="spoiler" aria-label="免遊劇透"></button>
       </div>
-      <div class="fg-sub">直接看結算＝優先讀取 ATG 已回傳的免遊總贏分；若此遊戲為逐轉伺服器結算，會遮住免遊過程並在真正完成後顯示總贏分。</div>
+      <div class="fg-sub">直接看結算＝只讀取 ATG 已回傳的免遊總贏分；不遮畫面、不加速、不強制跳過，避免卡住遊戲流程。</div>
       <div class="fg-status">${nativeStatus}${lastNativeVia ? '｜' + lastNativeVia : ''}${lastSpoilerValue !== null ? '｜目前回包 ' + money(lastSpoilerValue) : ''}</div>
       <div class="fg-status" style="margin-top:7px;color:#ffd1e4;">${(() => {
         const s = window.__XIANYAO_ATG_FREE_RESULT_STATE__;
         if (!s) return '等待免遊資料';
         if (s.mode === 'preloaded' && Number.isFinite(Number(s.finalAmount))) return '✅ ATG 已先回傳最終贏分：' + money(s.finalAmount);
-        if (s.mode === 'sequential') return '⏳ 此遊戲為逐轉伺服器結算';
+        if (s.mode === 'sequential') return '⏳ 此遊戲目前判定為逐轉伺服器結算';
         if (s.mode === 'finished' && Number.isFinite(Number(s.finalAmount))) return '✅ 本次免遊總贏分：' + money(s.finalAmount);
         return '正在判斷免遊結算方式…';
       })()}</div>
@@ -15791,73 +15791,13 @@ try {
   }
 
   function ensureOverlay() {
-    let el = document.getElementById(OVERLAY_ID);
-    if (el) return el;
-
-    el = document.createElement('div');
-    el.id = OVERLAY_ID;
-    el.style.cssText = [
-      'position:fixed','inset:0','z-index:2147483600',
-      'display:none','align-items:center','justify-content:center',
-      'background:rgba(8,6,12,.94)','backdrop-filter:blur(8px)',
-      '-webkit-backdrop-filter:blur(8px)','font-family:-apple-system,BlinkMacSystemFont,"PingFang TC",sans-serif',
-      'pointer-events:none'
-    ].join(';');
-
-    (document.body || document.documentElement).appendChild(el);
-    return el;
+    // test167：不再建立全畫面遮罩，避免遮住／干擾免遊流程。
+    return null;
   }
 
   function renderOverlay(forceFinal = false) {
-    const el = ensureOverlay();
-
-    if (!enabled() || (!state.active && state.mode !== 'finished')) {
-      el.style.display = 'none';
-      return;
-    }
-
-    const preloaded = state.mode === 'preloaded' && state.finalAmount !== null;
-    const finished = (forceFinal || state.mode === 'finished') && state.finalAmount !== null;
-
-    // 只有免遊進行中才遮蔽遊戲過程；結束後保留結果 3 秒。
-    if (state.active || preloaded || finished) {
-      el.style.display = 'flex';
-    }
-
-    let title = '🎁 免遊結算中';
-    let main = '正在讀取 ATG 結算資料…';
-    let sub = '不顯示中間免遊畫面';
-
-    if (preloaded) {
-      title = '🎁 免遊最終結果';
-      main = '贏得 ' + Number(state.finalAmount).toLocaleString(undefined,{maximumFractionDigits:2});
-      sub = 'ATG 已在免遊進行前回傳最終總贏分';
-    } else if (state.mode === 'sequential') {
-      title = '🎁 免遊結算中';
-      main = '目前累計 ' + Number(state.runningTotal || 0).toLocaleString(undefined,{maximumFractionDigits:2});
-      sub = '此款 ATG 為逐轉伺服器結算，等待真正完成後顯示最終金額';
-    } else if (finished) {
-      title = '🎁 免遊最終結果';
-      main = '贏得 ' + Number(state.finalAmount).toLocaleString(undefined,{maximumFractionDigits:2});
-      sub = '本次免遊已完成';
-    }
-
-    el.innerHTML = `
-      <div style="width:min(430px,calc(100vw - 34px));padding:28px 24px;border:1px solid rgba(255,132,184,.55);border-radius:22px;background:rgba(31,22,36,.98);box-shadow:0 24px 70px rgba(0,0,0,.55);color:#fff;text-align:center;">
-        <div style="font-size:17px;font-weight:900;color:#ff9bc3;">${title}</div>
-        <div style="margin-top:16px;font-size:34px;font-weight:1000;letter-spacing:.5px;">${main}</div>
-        <div style="margin-top:10px;font-size:12px;line-height:1.65;opacity:.72;">${sub}</div>
-      </div>
-    `;
-
-    if (finished && !state.active) {
-      clearTimeout(renderOverlay._hideTimer);
-      renderOverlay._hideTimer = setTimeout(() => {
-        try { el.style.display = 'none'; } catch (_) {}
-        if (!state.active) state.mode = 'idle';
-        publish();
-      }, 3000);
-    }
+    // 純讀取模式：不覆蓋遊戲畫面、不阻擋按鍵、不改動畫。
+    publish();
   }
 
   function publish() {
@@ -15875,7 +15815,6 @@ try {
   setInterval(() => {
     if (!enabled()) {
       if (state.active) state.active = false;
-      ensureOverlay().style.display = 'none';
       publish();
       return;
     }
@@ -15890,7 +15829,7 @@ try {
   }, 120);
 
   window.__XIANYAO_ATG_FREE_RESULT_PROBE__ = {
-    version:'1.0.0-test166',
+    version:'1.1.0-test167',
     observe,
     getState:() => ({...state,spinIds:[...state.spinIds],payoutBySpin:{...state.payoutBySpin}}),
     reset:() => {
@@ -15909,7 +15848,7 @@ try {
       state.candidateScore=0;
       state.packetCount=0;
       state.updatedAt=Date.now();
-      try { ensureOverlay().style.display='none'; } catch (_) {}
+      // test167：已取消全畫面遮罩
       publish();
     }
   };
