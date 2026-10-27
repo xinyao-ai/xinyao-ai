@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.163
-// @description  test163：修正後台「僅限皇鼎」遠端開關判斷，關閉後可於其他娛樂城正常啟用。
+// @version      4.0.0-test.164
+// @description  test164：停用會誤觸遊戲離開/恢復流程的 Hard Skip，新增安全免遊 Runtime 診斷；不修改遊戲狀態。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -15179,68 +15179,162 @@ try {
   }
 
   function tryNativeStart() {
-    if (clickByTexts(['開始免費遊戲','開始免遊','進入免費遊戲','進入免遊'])) {
-      nativeStatus = '✅ 已送出開始免遊';
-      lastNativeVia = 'DOM';
-      return true;
-    }
-
+    // test164：先只辨識，不自動送出 Cocos 事件，避免命中錯誤的開始/離開流程。
     const candidate = findCocosAction('start');
-    if (candidate && emitCocosButton(candidate)) {
-      lastClickAt = Date.now();
-      nativeStatus = '✅ 已觸發 ATG 原生開始';
-      lastNativeVia = candidate.path || candidate.handlers || 'Cocos start';
-      return true;
+    if (candidate) {
+      nativeStatus = '🔎 已辨識免遊開始候選';
+      lastNativeVia = [
+        candidate.path || '',
+        candidate.handlers || '',
+        candidate.text || ''
+      ].filter(Boolean).join(' ｜ ').slice(0, 260);
     }
-
     return false;
   }
 
   function tryNativeSkip() {
-    if (clickByTexts(['跳過','略過','skip','SKIP','Skip All'])) {
-      nativeStatus = '✅ 已送出真正跳過';
-      lastNativeVia = 'DOM Skip';
-      return true;
-    }
-
+    // test164：安全模式。禁止直接 emit/click 任意 Skip/Finish/Result，
+    // 避免誤觸 ATG「離開遊戲／恢復遊戲」流程。
     const candidate = findCocosAction('skip');
-    if (candidate && emitCocosButton(candidate)) {
-      lastClickAt = Date.now();
-      nativeStatus = '✅ 已觸發 ATG 原生 Skip';
-      lastNativeVia = candidate.path || candidate.handlers || 'Cocos Skip';
-      return true;
+
+    if (candidate) {
+      nativeStatus = '🔎 已找到候選，等待確認';
+      lastNativeVia = [
+        candidate.path || '',
+        candidate.handlers || '',
+        candidate.text || ''
+      ].filter(Boolean).join(' ｜ ').slice(0, 260);
+      return false;
     }
 
-    nativeStatus = '🟠 尚未找到此遊戲的原生 Skip';
+    nativeStatus = '🔎 診斷中：尚未找到安全 Skip';
+    lastNativeVia = '';
     return false;
+  }
+
+  function freeRuntimeDiagnostics() {
+    const rows = [];
+
+    for (const w of gameWindows()) {
+      try {
+        const cocos = w.cc || w.legacyCC || w._cc;
+        const scene = cocos?.director?.getScene?.();
+        const Component = cocos?.Component;
+        if (!scene || !Component || typeof scene.getComponentsInChildren !== 'function') continue;
+
+        const components = scene.getComponentsInChildren(Component) || [];
+        for (const component of components) {
+          const node = component?.node;
+          if (!node || node.activeInHierarchy === false) continue;
+
+          const cls = String(
+            component?.__classname__ ||
+            component?.constructor?.__classname__ ||
+            component?.constructor?.name ||
+            ''
+          );
+          const path = cocosNodePath(node);
+          const ctx = (cls + ' ' + path).toLowerCase();
+
+          if (!/(free|bonus|result|summary|win|settle|feature|award|currenttimes|gameview)/i.test(ctx)) continue;
+
+          const methods = [];
+          let cur = component;
+          const seen = new Set();
+
+          for (let depth = 0; cur && depth < 6; depth += 1) {
+            try {
+              for (const name of Object.getOwnPropertyNames(cur)) {
+                if (seen.has(name)) continue;
+                seen.add(name);
+                if (
+                  typeof component?.[name] === 'function' &&
+                  /(skip|finish|complete|result|summary|next|continue|close|end|free|bonus)/i.test(name)
+                ) {
+                  methods.push(name);
+                }
+              }
+            } catch (_) {}
+            try { cur = Object.getPrototypeOf(cur); } catch (_) { cur = null; }
+          }
+
+          if (!methods.length && !/(free|bonus|result|summary)/i.test(ctx)) continue;
+
+          rows.push({
+            component: cls || '(anonymous)',
+            path,
+            methods: methods.slice(0, 12)
+          });
+        }
+      } catch (_) {}
+    }
+
+    const unique = [];
+    const used = new Set();
+
+    for (const row of rows) {
+      const key = row.component + '|' + row.path + '|' + row.methods.join(',');
+      if (used.has(key)) continue;
+      used.add(key);
+      unique.push(row);
+      if (unique.length >= 18) break;
+    }
+
+    try {
+      window.__XIANYAO_ATG_FREE_RUNTIME_DIAG__ = {
+        at: Date.now(),
+        freeActive: Boolean(window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameActive),
+        rows: unique
+      };
+      localStorage.setItem(
+        'xinyao_atg_free_runtime_diag_v1',
+        JSON.stringify(window.__XIANYAO_ATG_FREE_RUNTIME_DIAG__)
+      );
+    } catch (_) {}
+
+    return unique;
+  }
+
+  function diagText() {
+    const rows = freeRuntimeDiagnostics();
+    if (!rows.length) return '尚未抓到免遊元件';
+
+    return rows.slice(0, 4).map(row => {
+      const methods = row.methods.length ? row.methods.join(',') : '無方法';
+      return (row.component + '｜' + row.path + '｜' + methods).slice(0, 180);
+    }).join(' ⬥ ');
   }
 
   function handleAuto(active) {
     if (!settings.auto) {
       freeWasActive = false;
-      nativeStatus = '自動跳過已關閉';
+      nativeStatus = '免遊診斷已關閉';
       return;
     }
 
     if (!active) {
-      if (freeWasActive) nativeStatus = '✅ 免遊已結束';
+      if (freeWasActive) nativeStatus = '✅ 免遊已結束｜診斷已保存';
       freeWasActive = false;
       return;
     }
 
     if (!freeWasActive) {
       freeWasActive = true;
-      nativeStatus = '🔎 尋找 ATG 原生免遊控制…';
+      nativeStatus = '🔎 正在辨識 ATG 免遊 Runtime…';
       tryNativeStart();
     }
 
     const now = Date.now();
-    if (now - lastNativeAttemptAt < 450) return;
+    if (now - lastNativeAttemptAt < 700) return;
     lastNativeAttemptAt = now;
 
-    // 真正跳過：只呼叫遊戲自身 Skip/Finish/Result 按鈕或 handler。
-    // 找不到時保持原速，不再用 16× 當作替代品。
     tryNativeSkip();
+
+    const summary = diagText();
+    if (summary) {
+      nativeStatus = '🔎 安全診斷中';
+      lastNativeVia = summary;
+    }
   }
 
   function ensurePanel() {
@@ -15262,14 +15356,14 @@ try {
       <button type="button" class="fg-close" aria-label="關閉">×</button>
       <div class="fg-title">🎁 遇到免費遊戲</div>
       <div class="fg-row">
-        <div class="fg-text">免遊：自動開始＋真正跳過</div>
-        <button type="button" class="fg-switch ${settings.auto ? 'on' : ''}" data-fg-toggle="auto" aria-label="自動開始與真正跳過"></button>
+        <div class="fg-text">免遊：安全診斷模式</div>
+        <button type="button" class="fg-switch ${settings.auto ? 'on' : ''}" data-fg-toggle="auto" aria-label="免遊安全診斷"></button>
       </div>
       <div class="fg-row">
         <div class="fg-text">👁 免遊劇透（進免遊前報得分）</div>
         <button type="button" class="fg-switch ${settings.spoiler ? 'on' : ''}" data-fg-toggle="spoiler" aria-label="免遊劇透"></button>
       </div>
-      <div class="fg-sub">真正跳過＝直接觸發 ATG/Cocos 原生 Skip／Finish／Result 事件，不使用加速。劇透只顯示 ATG 已先回傳的得分。</div>
+      <div class="fg-sub">安全診斷＝只讀取 ATG/Cocos 免遊元件與事件，不再執行任何 Skip／Finish／Close，避免誤觸離開遊戲。</div>
       <div class="fg-status">${nativeStatus}${lastNativeVia ? '｜' + lastNativeVia : ''}${lastSpoilerValue !== null ? '｜劇透 ' + money(lastSpoilerValue) : ''}</div>
     `;
 
@@ -15398,363 +15492,4 @@ try {
 })();
 
 
-/* ===== 芯瑤 ATG Free Game Hard Skip Engine v1.0｜test161 ===== */
-(() => {
-  'use strict';
 
-  if (window.__XIANYAO_ATG_FREE_HARD_SKIP_V1__) return;
-  window.__XIANYAO_ATG_FREE_HARD_SKIP_V1__ = true;
-
-  const SETTINGS_KEY = 'xinyao_atg_free_helper_v1';
-  const PATCH_MARK = '__xinyaoFreeHardSkip161';
-  const TINY = 0.001;
-
-  const state = {
-    active:false,
-    patchedTween:0,
-    patchedSchedule:0,
-    pulses:0,
-    methodsCalled:0,
-    lastMethod:'',
-    lastContext:'',
-    lastAt:0
-  };
-
-  function enabled() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
-      return Boolean(saved.auto);
-    } catch (_) {
-      return false;
-    }
-  }
-
-  function windows() {
-    const out = [];
-    const seen = new Set();
-    const visit = win => {
-      if (!win || seen.has(win)) return;
-      seen.add(win);
-      try {
-        void win.location.href;
-        out.push(win);
-        for (let i = 0; i < win.frames.length; i += 1) visit(win.frames[i]);
-      } catch (_) {}
-    };
-    visit(window);
-    return out;
-  }
-
-  function nameOf(component) {
-    try {
-      return String(
-        component?.__classname__ ||
-        component?.constructor?.__classname__ ||
-        component?.constructor?.name ||
-        ''
-      );
-    } catch (_) { return ''; }
-  }
-
-  function pathOf(node) {
-    const names = [];
-    let cur = node;
-    for (let i = 0; cur && i < 14; i += 1) {
-      try {
-        if (cur.name) names.push(String(cur.name));
-      } catch (_) {}
-      cur = cur?.parent || cur?._parent || null;
-    }
-    return names.reverse().join('/');
-  }
-
-  function contextOf(componentOrTarget) {
-    try {
-      const node = componentOrTarget?.node || (componentOrTarget?.name ? componentOrTarget : null);
-      return [
-        nameOf(componentOrTarget),
-        componentOrTarget?.name,
-        pathOf(node)
-      ].filter(Boolean).join(' ');
-    } catch (_) {
-      return '';
-    }
-  }
-
-  function freeFlowContext(value) {
-    const s = contextOf(value);
-    return /(freegame|free.?game|freespin|free.?spin|bonus|feature|bigwin|winview|result|summary|settlement|currenttimes|gameview|reel|symbol|slot|cascade)/i.test(s);
-  }
-
-  function collapseActionTree(root) {
-    if (!root || (typeof root !== 'object' && typeof root !== 'function')) return;
-    const seen = new WeakSet();
-
-    function visit(value, depth = 0) {
-      if (!value || depth > 10 || seen.has(value)) return;
-      if (typeof value !== 'object' && typeof value !== 'function') return;
-      seen.add(value);
-
-      try {
-        if (Number.isFinite(Number(value._duration)) && Number(value._duration) > TINY) {
-          value._duration = TINY;
-        }
-      } catch (_) {}
-
-      try {
-        if (Number.isFinite(Number(value._delay)) && Number(value._delay) > TINY) {
-          value._delay = TINY;
-        }
-      } catch (_) {}
-
-      let entries = [];
-      try { entries = Object.entries(value); } catch (_) { return; }
-
-      for (const [key, child] of entries) {
-        if (
-          key === '_target' || key === 'target' || key === '_owner' || key === 'owner' ||
-          key === '_node' || key === 'node' || key === '_eventTargets' || key === '_listeners'
-        ) continue;
-
-        if (Array.isArray(child)) {
-          for (const item of child) visit(item, depth + 1);
-        } else if (child && (typeof child === 'object' || typeof child === 'function')) {
-          visit(child, depth + 1);
-        }
-      }
-    }
-
-    visit(root, 0);
-  }
-
-  function patchWindow(win) {
-    try {
-      const cc = win.cc || win.legacyCC || win._cc;
-      if (!cc) return;
-
-      const tweenProto = cc?.Tween?.prototype;
-      if (tweenProto && typeof tweenProto.start === 'function' && !tweenProto.start[PATCH_MARK]) {
-        const native = tweenProto.start;
-        const wrapped = function (...args) {
-          try {
-            if (state.active && enabled()) {
-              const target = this?._target || this?.target || null;
-              if (!target || freeFlowContext(target)) collapseActionTree(this);
-            }
-          } catch (_) {}
-          return native.apply(this, args);
-        };
-        try { Object.defineProperty(wrapped, PATCH_MARK, {value:true}); } catch (_) { wrapped[PATCH_MARK] = true; }
-        tweenProto.start = wrapped;
-        state.patchedTween += 1;
-      }
-
-      const compProto = cc?.Component?.prototype;
-      if (compProto && typeof compProto.scheduleOnce === 'function' && !compProto.scheduleOnce[PATCH_MARK]) {
-        const nativeScheduleOnce = compProto.scheduleOnce;
-        const wrappedScheduleOnce = function (callback, delay = 0, ...rest) {
-          let next = delay;
-          try {
-            if (
-              state.active &&
-              enabled() &&
-              Number.isFinite(Number(delay)) &&
-              Number(delay) > 0 &&
-              Number(delay) <= 15 &&
-              freeFlowContext(this)
-            ) {
-              next = TINY;
-            }
-          } catch (_) {}
-          return nativeScheduleOnce.call(this, callback, next, ...rest);
-        };
-        try { Object.defineProperty(wrappedScheduleOnce, PATCH_MARK, {value:true}); } catch (_) { wrappedScheduleOnce[PATCH_MARK] = true; }
-        compProto.scheduleOnce = wrappedScheduleOnce;
-        state.patchedSchedule += 1;
-      }
-    } catch (_) {}
-  }
-
-  function methodNames(component) {
-    const out = new Set();
-    let cur = component;
-    for (let depth = 0; cur && depth < 7; depth += 1) {
-      try { Object.getOwnPropertyNames(cur).forEach(name => out.add(name)); } catch (_) {}
-      try { cur = Object.getPrototypeOf(cur); } catch (_) { cur = null; }
-    }
-    return [...out];
-  }
-
-  function scoreMethod(name) {
-    const s = String(name || '');
-    const lower = s.toLowerCase();
-
-    if (!lower || /^(constructor|onload|start|update|lateupdate|onenable|ondisable|ondestroy|reset|schedule|unschedule)$/i.test(s)) return -1;
-
-    // Never call anything that looks like a wager/network/payment/game-result mutation method.
-    if (/(bet|buy|purchase|spin|request|send|socket|http|api|claim|collect|award|reward|payout|balance|credit|wallet|settle)/i.test(lower)) return -1;
-
-    if (/skip.*(?:free|bonus|feature)|(?:free|bonus|feature).*skip/i.test(lower)) return 1200;
-    if (/fast.?forward|jump.?to.?end|goto.?result|go.?result/i.test(lower)) return 1150;
-    if (/show.*(?:final|result|summary)|open.*(?:result|summary)/i.test(lower)) return 1100;
-    if (/(finish|complete|end).*(?:free|bonus|feature|view|animation|anim)/i.test(lower)) return 1050;
-    if (/(?:free|bonus|feature|view|animation|anim).*(finish|complete|end)/i.test(lower)) return 1030;
-    if (/skip|finish|complete|showresult|showsummary/i.test(lower)) return 900;
-    if (/next.*(?:view|step|stage|page)|(?:view|step|stage|page).*next/i.test(lower)) return 780;
-    if (/continue|close.*(?:view|popup|dialog)|(?:view|popup|dialog).*close/i.test(lower)) return 650;
-    return -1;
-  }
-
-  function invokeFlowMethods() {
-    const hits = [];
-
-    for (const win of windows()) {
-      try {
-        const cc = win.cc || win.legacyCC || win._cc;
-        const scene = cc?.director?.getScene?.();
-        const Component = cc?.Component;
-        if (!scene || !Component || typeof scene.getComponentsInChildren !== 'function') continue;
-
-        const components = scene.getComponentsInChildren(Component) || [];
-        for (const component of components) {
-          const node = component?.node;
-          if (!component || !node || node.activeInHierarchy === false) continue;
-
-          const ctx = contextOf(component);
-          if (!/(freegame|free.?game|freespin|free.?spin|bonus|feature|bigwin|winview|result|summary|currenttimes|gameview)/i.test(ctx)) continue;
-
-          const methods = methodNames(component)
-            .map(name => ({name, score:scoreMethod(name)}))
-            .filter(item => item.score >= 0 && typeof component?.[item.name] === 'function')
-            .sort((a,b) => b.score - a.score);
-
-          for (const item of methods.slice(0, 3)) {
-            try {
-              const fn = component[item.name];
-              // Only zero-argument or optional-event style handlers. Avoid methods that clearly require payloads.
-              if (fn.length > 1) continue;
-              let ok = false;
-              try {
-                fn.call(component);
-                ok = true;
-              } catch (_) {}
-
-              if (ok) {
-                hits.push({
-                  score:item.score,
-                  method:nameOf(component) + '.' + item.name,
-                  context:ctx
-                });
-              }
-            } catch (_) {}
-          }
-        }
-      } catch (_) {}
-    }
-
-    hits.sort((a,b) => b.score - a.score);
-    if (hits.length) {
-      state.methodsCalled += hits.length;
-      state.lastMethod = hits[0].method;
-      state.lastContext = hits[0].context;
-      state.lastAt = Date.now();
-    }
-    return hits;
-  }
-
-  function forceAnimationEnd() {
-    let count = 0;
-    for (const win of windows()) {
-      try {
-        const cc = win.cc || win.legacyCC || win._cc;
-        const scene = cc?.director?.getScene?.();
-        const Animation = cc?.Animation;
-        if (!scene || !Animation || typeof scene.getComponentsInChildren !== 'function') continue;
-
-        const animations = scene.getComponentsInChildren(Animation) || [];
-        for (const anim of animations) {
-          try {
-            if (!anim?.node || anim.node.activeInHierarchy === false) continue;
-            const ctx = contextOf(anim);
-            if (!/(freegame|free.?game|freespin|bonus|feature|bigwin|winview|result|summary|currenttimes|gameview)/i.test(ctx)) continue;
-
-            const clips = typeof anim.getClips === 'function' ? (anim.getClips() || []) : [];
-            for (const clip of clips) {
-              const st = typeof anim.getAnimationState === 'function' ? anim.getAnimationState(clip?.name) : null;
-              if (!st || !st.isPlaying) continue;
-              const dur = Number(st.duration || clip?.duration || 0);
-              if (!(dur > 0)) continue;
-              try { st.time = Math.max(0, dur - TINY); } catch (_) {}
-              try { st.sample?.(); } catch (_) {}
-              count += 1;
-            }
-          } catch (_) {}
-        }
-      } catch (_) {}
-    }
-    return count;
-  }
-
-  function pulse() {
-    if (!state.active || !enabled()) return;
-    state.pulses += 1;
-
-    for (const win of windows()) patchWindow(win);
-    forceAnimationEnd();
-    invokeFlowMethods();
-
-    try {
-      window.__XIANYAO_ATG_FREE_HARD_SKIP_STATE__ = {
-        active:state.active,
-        patchedTween:state.patchedTween,
-        patchedSchedule:state.patchedSchedule,
-        pulses:state.pulses,
-        methodsCalled:state.methodsCalled,
-        lastMethod:state.lastMethod,
-        lastContext:state.lastContext,
-        lastAt:state.lastAt
-      };
-    } catch (_) {}
-  }
-
-  function detectLiveActive() {
-    const live = window.__XIANYAO_ATG_LIVE_SNAPSHOT__ || {};
-    return Boolean(live.freeGameActive) || Number(live.freeGameCount || 0) > 0;
-  }
-
-  window.addEventListener('xinyao:spin-final-observed', event => {
-    try {
-      const detail = event?.detail || {};
-      const raw = JSON.stringify(detail?.engine || {});
-      if (/(startfreegame|startfreespin|freegamestart|freespinstart|freegametriggered|freespinstriggered)/i.test(raw)) {
-        state.active = enabled();
-        if (state.active) {
-          pulse();
-          setTimeout(pulse, 20);
-          setTimeout(pulse, 60);
-          setTimeout(pulse, 120);
-        }
-      }
-    } catch (_) {}
-  });
-
-  setInterval(() => {
-    if (window.__XIANYAO_MAINTENANCE_STATE__?.enabled) {
-      state.active = false;
-      return;
-    }
-
-    const active = enabled() && detectLiveActive();
-    if (active !== state.active) state.active = active;
-    if (state.active) pulse();
-  }, 80);
-
-  for (const win of windows()) patchWindow(win);
-
-  window.__XIANYAO_ATG_FREE_HARD_SKIP__ = {
-    version:'1.0.0-test161',
-    getState:() => ({...state, enabled:enabled()}),
-    pulse,
-    setActive:value => { state.active = Boolean(value) && enabled(); if (state.active) pulse(); }
-  };
-})();
