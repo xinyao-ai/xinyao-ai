@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.170
-// @description  test170：免遊診斷加入安全 engine/gameState 結構快照，記錄 currentView/totalViews/totalWinnings/freeGameCount/startFreeGame 等實際值，不保存 token。
+// @version      4.0.0-test.171
+// @description  test171：修正免遊開始包被 reset 清掉；新免遊開始時清空舊紀錄後，立即保存觸發 spin 的安全 engine/gameState 快照。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -15402,7 +15402,7 @@ try {
       try {
         const latest = freeRuntimeDiagnostics();
         payload = JSON.stringify({
-          version:'test170',
+          version:'test171',
           at:Date.now(),
           href:location.href,
           freeGameActive:Boolean(window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameActive),
@@ -15501,8 +15501,8 @@ try {
       try {
         if (window.__XIANYAO_ATG_FREE_LAST_START_SPIN__ !== spinId) {
           window.__XIANYAO_ATG_FREE_LAST_START_SPIN__ = spinId;
-          window.__XIANYAO_ATG_FREE_PACKET_TRACE__?.reset?.();
-          window.__XIANYAO_ATG_FREE_RESULT_PROBE__?.reset?.();
+          window.__XIANYAO_ATG_FREE_PACKET_TRACE__?.beginFromDetail?.(detail);
+          window.__XIANYAO_ATG_FREE_RESULT_PROBE__?.beginFromDetail?.(detail);
         }
       } catch (_) {}
 
@@ -15796,9 +15796,107 @@ try {
     }
   },500);
 
+  function safeEngineSnapshotFromObject(root){
+    try{
+      if(!root || typeof root!=='object')return null;
+
+      const found=[];
+      const seen=new WeakSet();
+
+      const pickState=s=>{
+        if(!s || typeof s!=='object')return null;
+        const keys=[
+          'currentView','totalViews','totalWinnings','roundWinnings',
+          'startFreeGame','startFreeSpin','freeGameCount','freeSpinCount',
+          'freeGamesLeft','freeSpinsLeft','remainingFreeGame','remainingFreeSpin',
+          'action','view','buyFeatureType','superMainGameCount','isGoldenFg',
+          'isJp','currentTimes'
+        ];
+        const out={};
+        for(const key of keys){
+          if(!Object.prototype.hasOwnProperty.call(s,key))continue;
+          const v=s[key];
+          if(
+            v===null ||
+            typeof v==='string' ||
+            typeof v==='number' ||
+            typeof v==='boolean'
+          ) out[key]=v;
+        }
+        return Object.keys(out).length?out:null;
+      };
+
+      const visit=(value,depth=0)=>{
+        if(!value || typeof value!=='object' || depth>8 || seen.has(value))return;
+        seen.add(value);
+
+        if(!Array.isArray(value)){
+          const obj={};
+          if(value.eventName!==undefined) obj.eventName=value.eventName;
+          if(value.spinId!==undefined) obj.spinId=String(value.spinId);
+          if(value.action!==undefined) obj.action=value.action;
+          if(value.buyFeatureType!==undefined) obj.buyFeatureType=value.buyFeatureType;
+
+          if(Array.isArray(value.gameState)){
+            obj.gameState=value.gameState
+              .map(pickState)
+              .filter(Boolean)
+              .slice(0,40);
+          }
+
+          if(Object.keys(obj).length && (obj.gameState?.length || obj.spinId || obj.eventName)){
+            found.push(obj);
+          }
+
+          for(const [key,child] of Object.entries(value)){
+            if(/^token$/i.test(key))continue;
+            if(child && typeof child==='object')visit(child,depth+1);
+          }
+        }else{
+          for(const child of value){
+            if(child && typeof child==='object')visit(child,depth+1);
+          }
+        }
+      };
+
+      visit(root);
+      return found.length?found.slice(0,16):null;
+    }catch(_){
+      return null;
+    }
+  }
+
+  function beginFromDetail(detail){
+    state.active=true;
+    state.startedAt=Date.now();
+    state.inbound=[];
+    state.outbound=[];
+
+    const snapshot=safeEngineSnapshotFromObject(detail?.engine || detail || null);
+    state.inbound.push({
+      at:Date.now(),
+      summary:JSON.stringify({
+        event:'xinyao:free-start',
+        keys:['spinId','gameState'],
+        bytes:0
+      }),
+      engineSnapshot:snapshot || []
+    });
+
+    try{
+      window.__XIANYAO_ATG_FREE_PACKET_TRACE_STATE__={
+        active:true,
+        startedAt:state.startedAt,
+        inbound:[...state.inbound],
+        outbound:[...state.outbound]
+      };
+    }catch(_){}
+  }
+
   window.__XIANYAO_ATG_FREE_PACKET_TRACE__={
-    version:'1.2.0-test170',
+    version:'1.3.0-test171',
     push,
+    beginFromDetail,
     getState:()=>({
       active:state.active,
       startedAt:state.startedAt,
@@ -16102,29 +16200,59 @@ try {
     if (state.active) renderOverlay();
   }, 120);
 
-  window.__XIANYAO_ATG_FREE_RESULT_PROBE__ = {
-    version:'1.1.0-test167',
-    observe,
-    getState:() => ({...state,spinIds:[...state.spinIds],payoutBySpin:{...state.payoutBySpin}}),
-    reset:() => {
-      state.active=false;
-      state.mode='idle';
-      state.startedAt=0;
-      state.startBalance=null;
-      state.startCount=null;
-      state.spinIds=[];
-      state.payoutBySpin={};
-      state.runningTotal=0;
-      state.finalAmount=null;
-      state.finalPath='';
-      state.candidate=null;
-      state.candidatePath='';
-      state.candidateScore=0;
-      state.packetCount=0;
-      state.updatedAt=Date.now();
-      // test167：已取消全畫面遮罩
-      publish();
+  function resetState(){
+    state.active=false;
+    state.mode='idle';
+    state.startedAt=0;
+    state.startBalance=null;
+    state.startCount=null;
+    state.spinIds=[];
+    state.payoutBySpin={};
+    state.runningTotal=0;
+    state.finalAmount=null;
+    state.finalPath='';
+    state.candidate=null;
+    state.candidatePath='';
+    state.candidateScore=0;
+    state.packetCount=0;
+    state.updatedAt=Date.now();
+    publish();
+  }
+
+  function beginFromDetail(detail){
+    resetState();
+
+    const live=currentSnapshot();
+    state.active=true;
+    state.mode='probing';
+    state.startedAt=Date.now();
+    state.startBalance=num(live.balance);
+    state.startCount=num(live.freeGameCount);
+
+    const engine=detail?.engine || {};
+    const spinId=String(detail?.spinId || engine?.spinId || '');
+
+    if(spinId) state.spinIds.push(spinId);
+
+    let payout=num(detail?.finalState?.totalWinnings);
+    if(payout===null) payout=num(detail?.finalState?.roundWinnings);
+
+    if(payout!==null && spinId){
+      state.payoutBySpin[spinId]=payout;
+      state.runningTotal=Math.round(payout*100)/100;
     }
+
+    state.packetCount=1;
+    observe(engine);
+    publish();
+  }
+
+  window.__XIANYAO_ATG_FREE_RESULT_PROBE__ = {
+    version:'1.2.0-test171',
+    observe,
+    beginFromDetail,
+    getState:() => ({...state,spinIds:[...state.spinIds],payoutBySpin:{...state.payoutBySpin}}),
+    reset:resetState
   };
 
   publish();
