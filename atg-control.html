@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>芯瑤 ATG｜系統控制</title>
+<style>
+:root{--pink:#ff5f9e;--pink2:#ffb7d3;--bg:#fff6fa;--card:#fff;--text:#3c2b35;--muted:#927c88;--line:#f4bfd4;--green:#24945b;--red:#d94c68}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(135deg,#fff7fb,#fdeaf3);font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif;color:var(--text)}
+.wrap{width:min(620px,calc(100% - 28px));margin:34px auto;padding-bottom:40px}
+.brand{background:rgba(255,255,255,.78);border:1px solid var(--line);border-radius:24px;padding:20px 22px;box-shadow:0 14px 40px rgba(190,81,127,.10)}
+.brand h1{margin:0;font-size:25px}.brand p{margin:7px 0 0;color:var(--muted);font-size:13px}
+.card{margin-top:16px;background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:22px;padding:20px;box-shadow:0 12px 32px rgba(190,81,127,.08)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:17px 0;border-top:1px solid #f6dce7}.row:first-child{border-top:0;padding-top:0}
+.title{font-size:17px;font-weight:900}.status{margin-top:5px;font-size:13px;font-weight:900}.desc{margin-top:6px;color:var(--muted);font-size:12px;line-height:1.55}
+button{border:0;border-radius:12px;padding:10px 13px;font-weight:900;cursor:pointer;background:var(--pink);color:#fff}
+button.soft{background:#fff0f6;color:#cf4e82;border:1px solid var(--line)}
+button:disabled{opacity:.5;cursor:not-allowed}
+.input{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:#fff;color:var(--text);outline:none}
+label{display:block;margin:12px 0 6px;font-size:12px;font-weight:800;color:var(--muted)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+#loginCard{max-width:420px;margin-left:auto;margin-right:auto}
+.hidden{display:none!important}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:10px}.pill{font-size:12px;padding:7px 10px;border-radius:999px;background:#fff0f6;color:#cf4e82;font-weight:900}
+.note{margin-top:14px;padding:11px 12px;border-radius:12px;background:#fff7fb;color:var(--muted);font-size:12px;line-height:1.6}
+.error{color:var(--red);font-size:12px;font-weight:800;margin-top:9px}
+@media(max-width:560px){.row{align-items:flex-start;flex-direction:column}.row button{width:100%}.wrap{margin-top:18px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <div class="topbar">
+      <div>
+        <h1>🌸 芯瑤 ATG｜系統控制</h1>
+        <p>全站維護＋皇鼎來源限制</p>
+      </div>
+      <button id="logoutBtn" class="soft hidden">登出</button>
+    </div>
+  </div>
+
+  <div id="loginCard" class="card">
+    <div class="title">🔐 管理員登入</div>
+    <label>帳號</label>
+    <input id="adminUser" class="input" autocomplete="username">
+    <label>密碼</label>
+    <input id="adminPass" class="input" type="password" autocomplete="current-password">
+    <div class="actions"><button id="loginBtn">登入後台</button></div>
+    <div id="loginError" class="error"></div>
+  </div>
+
+  <div id="controlCard" class="card hidden">
+    <div class="row">
+      <div>
+        <div class="title">🛠️ 全站維護模式</div>
+        <div id="maintenanceStatus" class="status">讀取中…</div>
+        <div class="desc">開啟後會員端與 ATG 即時助手會進入維護狀態。</div>
+      </div>
+      <button id="maintenanceBtn">讀取中…</button>
+    </div>
+
+    <label>會員看到的維護訊息</label>
+    <textarea id="maintenanceMessage" class="input" rows="4" maxlength="430"></textarea>
+
+    <div class="row" style="margin-top:14px">
+      <div>
+        <div class="title">👑 僅限皇鼎使用</div>
+        <div id="hdStatus" class="status">讀取中…</div>
+        <div class="desc">關掉後，從其他娛樂城進入同一個 ATG 也能使用芯瑤助手；重新開啟就恢復皇鼎限制。</div>
+      </div>
+      <button id="hdBtn">讀取中…</button>
+    </div>
+
+    <div class="note">
+      Tampermonkey 會每 10 秒同步一次。限制切換後，已開啟的 ATG 頁面會自動重新載入一次套用新狀態。
+    </div>
+    <div id="controlError" class="error"></div>
+  </div>
+</div>
+
+<script>
+const ADMIN_API="https://xinyao-atg-admin-api.love06130430.workers.dev";
+const LIVE_API="https://xinyao-atg-live.love06130430.workers.dev";
+const TOKEN_KEY="atg_admin_token";
+const MARK_RE=/\[\[XIANYAO_HD_ONLY=(0|1)\]\]/i;
+
+let current={enabled:false,message:"芯瑤 ATG 系統升級維護中，完成後將立即開放使用。",updatedAt:null};
+let busy=false;
+const $=id=>document.getElementById(id);
+
+function visibleMessage(message){
+  return String(message||"").replace(MARK_RE,"").replace(/\n{3,}/g,"\n\n").trim()||
+    "芯瑤 ATG 系統升級維護中，完成後將立即開放使用。";
+}
+function hdOnly(message){
+  const m=String(message||"").match(MARK_RE);
+  return m?m[1]!=="0":true;
+}
+function composeMessage(text,onlyHd){
+  return visibleMessage(text)+"\n[[XIANYAO_HD_ONLY="+(onlyHd?"1":"0")+"]]";
+}
+function token(){return sessionStorage.getItem(TOKEN_KEY)||""}
+function showLogin(show){
+  $("loginCard").classList.toggle("hidden",!show);
+  $("controlCard").classList.toggle("hidden",show);
+  $("logoutBtn").classList.toggle("hidden",show);
+}
+function setError(msg){$("controlError").textContent=msg||""}
+function render(){
+  const onlyHd=hdOnly(current.message);
+  $("maintenanceMessage").value=visibleMessage(current.message);
+
+  $("maintenanceStatus").textContent=current.enabled?"🔴 目前：維護中":"🟢 目前：正常開放";
+  $("maintenanceStatus").style.color=current.enabled?"#d94c68":"#24945b";
+  $("maintenanceBtn").textContent=current.enabled?"✅ 恢復正常使用":"🛠️ 開啟維護模式";
+  $("maintenanceBtn").className=current.enabled?"soft":"";
+
+  $("hdStatus").textContent=onlyHd?"🔒 目前：只允許皇鼎":"🌐 目前：任一娛樂城皆可使用";
+  $("hdStatus").style.color=onlyHd?"#d88b14":"#24945b";
+  $("hdBtn").textContent=onlyHd?"🌐 關閉皇鼎限制":"👑 開啟皇鼎限制";
+  $("hdBtn").className=onlyHd?"soft":"";
+
+  $("maintenanceBtn").disabled=busy;
+  $("hdBtn").disabled=busy;
+}
+async function adminFetch(path,options={}){
+  const headers={"Content-Type":"application/json",...(options.headers||{})};
+  if(token())headers.Authorization="Bearer "+token();
+  const res=await fetch(ADMIN_API+path,{...options,headers,cache:"no-store"});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok||data?.ok===false)throw new Error(data.message||data.error||"操作失敗");
+  return data;
+}
+async function liveRequest(method="GET",body=null){
+  const headers={"Content-Type":"application/json"};
+  if(token())headers.Authorization="Bearer "+token();
+  const res=await fetch(LIVE_API+"/maintenance?t="+Date.now(),{
+    method,headers,cache:"no-store",...(body?{body:JSON.stringify(body)}:{})
+  });
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok||!data?.ok)throw new Error(data.message||data.error||"讀取設定失敗");
+  return data;
+}
+async function loadState(){
+  setError("");
+  const data=await liveRequest("GET");
+  current={enabled:Boolean(data.enabled),message:String(data.message||""),updatedAt:data.updatedAt??null};
+  render();
+}
+async function login(){
+  $("loginError").textContent="";
+  try{
+    const res=await fetch(ADMIN_API+"/admin/login",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({username:$("adminUser").value.trim(),password:$("adminPass").value})
+    });
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok||!data?.ok||!data.token)throw new Error(data.message||"登入失敗");
+    sessionStorage.setItem(TOKEN_KEY,data.token);
+    $("adminPass").value="";
+    showLogin(false);
+    await loadState();
+  }catch(e){$("loginError").textContent=e.message||"登入失敗"}
+}
+async function save(nextEnabled,nextHd){
+  if(busy)return;
+  busy=true;render();setError("");
+  try{
+    const text=$("maintenanceMessage").value.trim()||visibleMessage(current.message);
+    const message=composeMessage(text,nextHd);
+    await liveRequest("POST",{enabled:nextEnabled,message});
+    await loadState();
+  }catch(e){setError(e.message||"操作失敗")}
+  finally{busy=false;render()}
+}
+$("loginBtn").addEventListener("click",login);
+$("adminPass").addEventListener("keydown",e=>{if(e.key==="Enter")login()});
+$("logoutBtn").addEventListener("click",()=>{sessionStorage.removeItem(TOKEN_KEY);showLogin(true)});
+$("maintenanceBtn").addEventListener("click",()=>save(!current.enabled,hdOnly(current.message)));
+$("hdBtn").addEventListener("click",()=>save(current.enabled,!hdOnly(current.message)));
+
+(async()=>{
+  if(!token()){showLogin(true);return}
+  try{
+    await adminFetch("/admin/session");
+    showLogin(false);
+    await loadState();
+  }catch(_){
+    sessionStorage.removeItem(TOKEN_KEY);
+    showLogin(true);
+  }
+})();
+</script>
+</body>
+</html>
