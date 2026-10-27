@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.168
-// @description  test168：免遊純讀取不阻擋；新增免遊期間 WebSocket/Socket.IO 封包摘要記錄，供定位真正結算/跳過流程。
+// @version      4.0.0-test.169
+// @description  test169：每次新免遊自動清空診斷紀錄，並從既有解析流程記錄安全的 inbound 事件摘要；不記憑證、不改遊戲流程。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -2215,6 +2215,10 @@ try {
   function parseText(text) {
     const raw = String(text || '').trim();
     if (!raw) return;
+
+    try {
+      window.__XIANYAO_ATG_FREE_PACKET_TRACE__?.push?.('in', raw);
+    } catch (_) {}
 
     const positions = [raw.indexOf('['), raw.indexOf('{')].filter(index => index >= 0);
     if (!positions.length) return;
@@ -15398,7 +15402,7 @@ try {
       try {
         const latest = freeRuntimeDiagnostics();
         payload = JSON.stringify({
-          version:'test168',
+          version:'test169',
           at:Date.now(),
           href:location.href,
           freeGameActive:Boolean(window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameActive),
@@ -15494,6 +15498,14 @@ try {
       const sig = readFreeStartSignal(detail.engine || detail.finalState || {});
       if (!sig.start) return;
 
+      try {
+        if (window.__XIANYAO_ATG_FREE_LAST_START_SPIN__ !== spinId) {
+          window.__XIANYAO_ATG_FREE_LAST_START_SPIN__ = spinId;
+          window.__XIANYAO_ATG_FREE_PACKET_TRACE__?.reset?.();
+          window.__XIANYAO_ATG_FREE_RESULT_PROBE__?.reset?.();
+        }
+      } catch (_) {}
+
       if (settings.auto) {
         handleAuto(true);
       }
@@ -15575,15 +15587,16 @@ try {
     const keys=[];
     const re=/"([^"]{1,48})"\s*:/g;
     let mm;
-    while((mm=re.exec(text)) && keys.length<18){
+    while((mm=re.exec(text)) && keys.length<24){
       const k=mm[1];
+      if(/^token$/i.test(k))continue;
       if(!keys.includes(k))keys.push(k);
     }
 
     return JSON.stringify({
       event,
       keys,
-      sample:text.slice(0,900)
+      bytes:text.length
     });
   }
 
@@ -15700,7 +15713,7 @@ try {
   },500);
 
   window.__XIANYAO_ATG_FREE_PACKET_TRACE__={
-    version:'1.0.0-test168',
+    version:'1.1.0-test169',
     push,
     getState:()=>({
       active:state.active,
