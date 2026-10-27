@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.172
-// @description  test172：沿用 test171 免遊第一包保留修正，並在免遊面板顯示目前版本，方便確認瀏覽器實際執行最新版。
+// @version      4.0.0-test.173
+// @description  test173：免遊診斷只保留遊戲關鍵封包，獨立永久保存 free-start 第一包，避免被大量 slotTableUpdated 洗掉。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -15364,7 +15364,7 @@ try {
     panel.innerHTML = `
       <button type="button" class="fg-close" aria-label="關閉">×</button>
       <div class="fg-title">🎁 遇到免費遊戲</div>
-      <div style="font-size:10px;opacity:.65;margin:-2px 0 8px;">版本 test172</div>
+      <div style="font-size:10px;opacity:.65;margin:-2px 0 8px;">版本 test173</div>
       <div class="fg-row">
         <div class="fg-text">免遊：直接看結算</div>
         <button type="button" class="fg-switch ${settings.auto ? 'on' : ''}" data-fg-toggle="auto" aria-label="免遊直接看結算"></button>
@@ -15403,7 +15403,7 @@ try {
       try {
         const latest = freeRuntimeDiagnostics();
         payload = JSON.stringify({
-          version:'test172',
+          version:'test173',
           at:Date.now(),
           href:location.href,
           freeGameActive:Boolean(window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameActive),
@@ -15567,7 +15567,8 @@ try {
     startedAt:0,
     inbound:[],
     outbound:[],
-    max:80
+    max:60,
+    freeStart:null
   };
 
   function freeActive(){
@@ -15689,9 +15690,31 @@ try {
       state.outbound=[];
     }
 
+    const summaryText=summarize(raw);
+    let summaryObj=null;
+    try{ summaryObj=JSON.parse(summaryText); }catch(_){}
+
+    // test173：忽略房間排行榜更新與 ping，只保留真正遊戲流程封包。
+    if(kind==='in'){
+      const evt=String(summaryObj?.event||'');
+      const keys=Array.isArray(summaryObj?.keys)?summaryObj.keys:[];
+      const looksGame=
+        /^(spin|closeSpin|notify)$/i.test(evt) ||
+        keys.includes('engine') ||
+        keys.includes('gameState') ||
+        keys.includes('freeGameCount') ||
+        keys.includes('startFreeGame') ||
+        keys.includes('totalWinnings');
+
+      if(!looksGame)return;
+    }else{
+      const evt=String(summaryObj?.event||'');
+      if(!/^(spin|closeSpin)$/i.test(evt))return;
+    }
+
     const row={
       at:Date.now(),
-      summary:summarize(raw)
+      summary:summaryText
     };
 
     if(kind==='in'){
@@ -15707,6 +15730,7 @@ try {
       window.__XIANYAO_ATG_FREE_PACKET_TRACE_STATE__={
         active:state.active,
         startedAt:state.startedAt,
+        freeStart:state.freeStart,
         inbound:[...state.inbound],
         outbound:[...state.outbound]
       };
@@ -15786,6 +15810,7 @@ try {
         window.__XIANYAO_ATG_FREE_PACKET_TRACE_STATE__={
           active:false,
           startedAt:state.startedAt,
+          freeStart:state.freeStart,
           inbound:[...state.inbound],
           outbound:[...state.outbound]
         };
@@ -15874,7 +15899,7 @@ try {
     state.outbound=[];
 
     const snapshot=safeEngineSnapshotFromObject(detail?.engine || detail || null);
-    state.inbound.push({
+    state.freeStart={
       at:Date.now(),
       summary:JSON.stringify({
         event:'xinyao:free-start',
@@ -15882,12 +15907,13 @@ try {
         bytes:0
       }),
       engineSnapshot:snapshot || []
-    });
+    };
 
     try{
       window.__XIANYAO_ATG_FREE_PACKET_TRACE_STATE__={
         active:true,
         startedAt:state.startedAt,
+        freeStart:state.freeStart,
         inbound:[...state.inbound],
         outbound:[...state.outbound]
       };
@@ -15895,18 +15921,20 @@ try {
   }
 
   window.__XIANYAO_ATG_FREE_PACKET_TRACE__={
-    version:'1.3.1-test172',
+    version:'1.4.0-test173',
     push,
     beginFromDetail,
     getState:()=>({
       active:state.active,
       startedAt:state.startedAt,
+      freeStart:state.freeStart,
       inbound:[...state.inbound],
       outbound:[...state.outbound]
     }),
     reset:()=>{
       state.active=false;
       state.startedAt=0;
+      state.freeStart=null;
       state.inbound=[];
       state.outbound=[];
     }
@@ -16186,8 +16214,7 @@ try {
   window.addEventListener('xinyao:spin-final-observed', e => noteSpin(e?.detail || {}));
 
   setInterval(() => {
-    if (!enabled()) {
-      if (state.active) state.active = false;
+    if (!enabled() && !state.active) {
       publish();
       return;
     }
@@ -16249,7 +16276,7 @@ try {
   }
 
   window.__XIANYAO_ATG_FREE_RESULT_PROBE__ = {
-    version:'1.2.1-test172',
+    version:'1.3.0-test173',
     observe,
     beginFromDetail,
     getState:() => ({...state,spinIds:[...state.spinIds],payoutBySpin:{...state.payoutBySpin}}),
