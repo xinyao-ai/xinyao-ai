@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.175
-// @description  test175：完整免遊結果一旦在第一包出現就強制顯示最終結算，不再依賴免遊開關狀態；只做畫面覆蓋，不改伺服器流程。
+// @version      4.0.0-test.176
+// @description  test176：移除自製免遊結算卡；完整免遊結果第一包出現時，僅加速 Cocos 本地播放時間軸，讓 ATG 自己快速進入原生「贏得獎金／關閉」結算畫面。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -10400,8 +10400,10 @@ try {
   if (window.__XIANYAO_ATG_UNIFIED_SPEED_INTEGRATED__) return;
   window.__XIANYAO_ATG_UNIFIED_SPEED_INTEGRATED__ = true;
 
-  const SPEED_VERSION = '1.0.0';
+  const SPEED_VERSION = '1.1.0-test176';
   const SPEED_KEY = 'xinyao_atg_unified_speed_v1';
+  const FREE_SKIP_SPEED = 180;
+  const FREE_SKIP_MAX_MS = 5000;
   const SPEEDS = [1, 3, 5, 8, 10, 12, 16];
   const DEFAULT_SPEED = 10;
   const CLEAR_MAX_DURATION = 0.06;
@@ -10418,7 +10420,10 @@ try {
     schedulePatched: 0,
     tweenStarts: 0,
     waitsScaled: 0,
-    lastPatchedAt: 0
+    lastPatchedAt: 0,
+    freeSkipActive: false,
+    freeSkipUntil: 0,
+    schedulerBoosted: 0
   };
 
   function safe(fn, fallback = null) {
@@ -10443,8 +10448,17 @@ try {
     return DEFAULT_SPEED;
   }
 
+  function freeSkipActive() {
+    if (!speedState.freeSkipActive) return false;
+    if (Date.now() <= Number(speedState.freeSkipUntil || 0)) return true;
+    speedState.freeSkipActive = false;
+    speedState.freeSkipUntil = 0;
+    return false;
+  }
+
   function effectiveSpeed() {
     if (window.__XIANYAO_MAINTENANCE_STATE__?.enabled) return 1;
+    if (freeSkipActive()) return FREE_SKIP_SPEED;
     return SPEEDS.includes(speedState.speed) ? speedState.speed : DEFAULT_SPEED;
   }
 
@@ -10633,11 +10647,62 @@ try {
     return out;
   }
 
+  function setSchedulerScaleForWindow(win, scale) {
+    try {
+      const cc = safe(() => win.cc, null) || safe(() => win.legacyCC, null) || safe(() => win._cc, null);
+      const director =
+        safe(() => cc?.director, null) ||
+        safe(() => cc?.Director?.instance, null) ||
+        safe(() => cc?.Director?._instance, null);
+      const scheduler = safe(() => director?.getScheduler?.(), null);
+      if (!scheduler || typeof scheduler.setTimeScale !== 'function') return false;
+      scheduler.setTimeScale(scale);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function syncSchedulerBoost() {
+    const boost = freeSkipActive();
+    let count = 0;
+    for (const win of collectSameOriginWindows()) {
+      if (setSchedulerScaleForWindow(win, boost ? FREE_SKIP_SPEED : 1)) count += 1;
+    }
+    speedState.schedulerBoosted = boost ? count : 0;
+  }
+
+  function startFreeSkipBoost(durationMs = FREE_SKIP_MAX_MS) {
+    const ms = Math.max(400, Math.min(8000, Number(durationMs) || FREE_SKIP_MAX_MS));
+    speedState.freeSkipActive = true;
+    speedState.freeSkipUntil = Date.now() + ms;
+    syncSchedulerBoost();
+    try {
+      window.dispatchEvent(new CustomEvent('xinyao:free-native-skip-boost', {
+        detail:{active:true,speed:FREE_SKIP_SPEED,until:speedState.freeSkipUntil}
+      }));
+    } catch (_) {}
+    return true;
+  }
+
+  function stopFreeSkipBoost() {
+    speedState.freeSkipActive = false;
+    speedState.freeSkipUntil = 0;
+    syncSchedulerBoost();
+    try {
+      window.dispatchEvent(new CustomEvent('xinyao:free-native-skip-boost', {
+        detail:{active:false,speed:1}
+      }));
+    } catch (_) {}
+    return true;
+  }
+
   function patchAll() {
     for (const win of collectSameOriginWindows()) {
       patchTweenForWindow(win);
       patchScheduleForWindow(win);
     }
+    syncSchedulerBoost();
     updateSpeedUi();
   }
 
@@ -10724,11 +10789,16 @@ try {
     get speed() { return speedState.speed; },
     get effectiveSpeed() { return effectiveSpeed(); },
     setSpeed,
+    startFreeSkipBoost,
+    stopFreeSkipBoost,
     getState() {
       return {
         version: SPEED_VERSION,
         speed: speedState.speed,
         effectiveSpeed: effectiveSpeed(),
+        freeSkipActive: freeSkipActive(),
+        freeSkipUntil: speedState.freeSkipUntil,
+        schedulerBoosted: speedState.schedulerBoosted,
         tweenPatched: speedState.tweenPatched,
         schedulePatched: speedState.schedulePatched,
         tweenStarts: speedState.tweenStarts,
@@ -15364,7 +15434,7 @@ try {
     panel.innerHTML = `
       <button type="button" class="fg-close" aria-label="關閉">×</button>
       <div class="fg-title">🎁 遇到免費遊戲</div>
-      <div style="font-size:10px;opacity:.65;margin:-2px 0 8px;">版本 test175</div>
+      <div style="font-size:10px;opacity:.65;margin:-2px 0 8px;">版本 test176</div>
       <div class="fg-row">
         <div class="fg-text">免遊：直接看結算</div>
         <button type="button" class="fg-switch ${settings.auto ? 'on' : ''}" data-fg-toggle="auto" aria-label="免遊直接看結算"></button>
@@ -15403,7 +15473,7 @@ try {
       try {
         const latest = freeRuntimeDiagnostics();
         payload = JSON.stringify({
-          version:'test175',
+          version:'test176',
           at:Date.now(),
           href:location.href,
           freeGameActive:Boolean(window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameActive),
@@ -15921,7 +15991,7 @@ try {
   }
 
   window.__XIANYAO_ATG_FREE_PACKET_TRACE__={
-    version:'1.4.2-test175',
+    version:'1.4.3-test176',
     push,
     beginFromDetail,
     getState:()=>({
@@ -16096,6 +16166,10 @@ try {
   function finishSession() {
     if (!state.active) return;
 
+    try{
+      window.__XIANYAO_ATG_UNIFIED_SPEED__?.stopFreeSkipBoost?.();
+    }catch(_){}
+
     state.active = false;
     state.mode = 'finished';
 
@@ -16191,98 +16265,12 @@ try {
   }
 
   function ensureOverlay() {
-    let el=document.getElementById(OVERLAY_ID);
-    if(el)return el;
-
-    el=document.createElement('div');
-    el.id=OVERLAY_ID;
-    el.style.cssText=[
-      'position:fixed',
-      'inset:0',
-      'z-index:2147483646',
-      'display:none',
-      'align-items:center',
-      'justify-content:center',
-      'pointer-events:none',
-      'background:rgba(7,6,11,.96)',
-      'backdrop-filter:blur(8px)',
-      '-webkit-backdrop-filter:blur(8px)',
-      'font-family:Arial,"Noto Sans TC",sans-serif'
-    ].join(';');
-
-    el.innerHTML=`
-      <div style="
-        min-width:min(520px,82vw);
-        max-width:82vw;
-        padding:34px 42px;
-        border:1px solid rgba(255,133,187,.72);
-        border-radius:24px;
-        background:rgba(20,16,24,.95);
-        box-shadow:0 0 42px rgba(255,82,158,.22);
-        text-align:center;
-      ">
-        <div style="font-size:17px;font-weight:800;color:#ff9bc7;letter-spacing:.08em;">
-          🎁 免遊最終結果
-        </div>
-        <div data-xinyao-free-final style="
-          margin-top:14px;
-          font-size:clamp(42px,7vw,86px);
-          line-height:1;
-          font-weight:1000;
-          color:#fff;
-          text-shadow:0 0 26px rgba(255,117,178,.55);
-        ">0</div>
-        <div style="margin-top:10px;font-size:14px;font-weight:800;color:#ffd2e5;">
-          本次免遊贏得
-        </div>
-        <div data-xinyao-free-note style="
-          margin-top:18px;
-          font-size:12px;
-          line-height:1.6;
-          color:rgba(255,255,255,.66);
-        ">ATG 已回傳完整免遊結果<br>背景結算完成後會自動返回遊戲</div>
-      </div>
-    `;
-
-    (document.body||document.documentElement).appendChild(el);
-    return el;
+    // test176：不再建立自製結算畫面；只讓 ATG 原生流程快速走到最後。
+    return null;
   }
-
-  let overlayHideTimer=0;
 
   function renderOverlay(forceFinal = false) {
     publish();
-
-    const el=ensureOverlay();
-    const amount=num(state.finalAmount);
-    const shouldShow=amount!==null && (state.active || forceFinal);
-
-    if(!shouldShow){
-      if(!state.active && !forceFinal)el.style.display='none';
-      return;
-    }
-
-    const value=el.querySelector('[data-xinyao-free-final]');
-    if(value)value.textContent=amount.toLocaleString('zh-TW',{
-      minimumFractionDigits:0,
-      maximumFractionDigits:2
-    });
-
-    const note=el.querySelector('[data-xinyao-free-note]');
-    if(note){
-      note.innerHTML=forceFinal
-        ? '✅ 免遊結算完成'
-        : 'ATG 已回傳完整免遊結果<br>背景結算中，完成後會自動返回遊戲';
-    }
-
-    el.style.display='flex';
-
-    if(forceFinal){
-      clearTimeout(overlayHideTimer);
-      overlayHideTimer=setTimeout(()=>{
-        try{ el.style.display='none'; }catch(_){}
-      },1800);
-    }
   }
 
   function publish() {
@@ -16334,7 +16322,12 @@ try {
             state.finalAmount=Math.round(total*100)/100;
             state.finalPath='packets.freeStart.engineSnapshot.gameState[last].totalWinnings';
             state.updatedAt=Date.now();
-            renderOverlay();
+            try{
+              const speedApi=window.__XIANYAO_ATG_UNIFIED_SPEED__;
+              if(!speedApi?.getState?.()?.freeSkipActive){
+                speedApi?.startFreeSkipBoost?.(5000);
+              }
+            }catch(_){}
           }
         }
       }catch(_){}
@@ -16363,8 +16356,7 @@ try {
     state.packetCount=0;
     state.updatedAt=Date.now();
     try{
-      const el=document.getElementById(OVERLAY_ID);
-      if(el)el.style.display='none';
+      window.__XIANYAO_ATG_UNIFIED_SPEED__?.stopFreeSkipBoost?.();
     }catch(_){}
     publish();
   }
@@ -16449,14 +16441,15 @@ try {
     observe(engine);
 
     if(preloaded){
-      renderOverlay();
       try{
-        window.__XIANYAO_ATG_FREE_FORCE_RESULT__={
+        window.__XIANYAO_ATG_UNIFIED_SPEED__?.startFreeSkipBoost?.(5000);
+        window.__XIANYAO_ATG_FREE_NATIVE_SKIP_STATE__={
           at:Date.now(),
           amount:preloaded.amount,
           totalViews:preloaded.totalViews,
           currentView:preloaded.currentView,
-          spinId
+          spinId,
+          mode:'native-fast-forward'
         };
       }catch(_){}
     }
@@ -16465,7 +16458,7 @@ try {
   }
 
   window.__XIANYAO_ATG_FREE_RESULT_PROBE__ = {
-    version:'1.5.0-test175',
+    version:'1.6.0-test176',
     observe,
     beginFromDetail,
     getState:() => ({...state,spinIds:[...state.spinIds],payoutBySpin:{...state.payoutBySpin}}),
