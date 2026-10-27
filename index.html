@@ -2591,16 +2591,19 @@
     justify-content:center;
     overflow:hidden;
     background-position:center;
-    background-size:cover;
+    background-size:contain;
     background-repeat:no-repeat;
+    background-color:transparent;
     image-rendering:auto;
     filter:none;
+    transform:translateZ(0);
+    backface-visibility:hidden;
   }
   .game-launcher-cover.seth{
-    background-image:url("https://www.atg-games.com/gamesV2/golden-seth/products/zh-tw.png");
+    background-image:url("https://www.atg-games.com/storm-of-seth-2-awakening/zh-cn/game_icon.png?v=20261027-hires");
   }
   .game-launcher-cover.tiger{
-    background-image:url("https://atg-games.com/_ipx/f_webp/tiger-girl/zh-tw/game_icon.png");
+    background-image:url("https://atg-games.com/_ipx/f_webp/tiger-girl/zh-tw/game_icon.png?v=20261027-hires");
   }
   .game-launcher-symbol{display:none}
   .game-launcher-cover::before,
