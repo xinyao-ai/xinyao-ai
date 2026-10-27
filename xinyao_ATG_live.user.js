@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.159
-// @description  test159：新增免遊助手（自動開始＋跳過、進免遊前顯示 ATG 已回傳得分）；不動選房/掃描/進房核心。
+// @version      4.0.0-test.160
+// @description  test160：免遊助手改為 ATG/Cocos 原生開始與真正 Skip handler；移除 16× 假跳過，不動選房/掃描/進房核心。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -14734,7 +14734,9 @@ try {
   let lastSpoilerValue = null;
   let lastClickAt = 0;
   let freeWasActive = false;
-  let restoreSpeed = null;
+  let nativeStatus = '等待免遊';
+  let lastNativeVia = '';
+  let lastNativeAttemptAt = 0;
 
   try {
     const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
@@ -14963,52 +14965,220 @@ try {
     return false;
   }
 
-  function currentSpeed() {
-    const api = window.__XIANYAO_ATG_UNIFIED_SPEED__;
-    const n = Number(api?.speed ?? api?.getState?.()?.speed);
-    return Number.isFinite(n) ? n : null;
+  function gameWindows() {
+    const out = [];
+    const seen = new Set();
+    const visit = w => {
+      if (!w || seen.has(w)) return;
+      seen.add(w);
+      try {
+        void w.location.href;
+        out.push(w);
+        for (let i = 0; i < w.frames.length; i += 1) visit(w.frames[i]);
+      } catch (_) {}
+    };
+    visit(window);
+    return out;
   }
 
-  function setSpeed(value) {
-    try { return Boolean(window.__XIANYAO_ATG_UNIFIED_SPEED__?.setSpeed?.(value)); } catch (_) { return false; }
+  function cocosNodePath(node) {
+    const parts = [];
+    let cur = node;
+    for (let i = 0; cur && i < 14; i += 1) {
+      const name = String(cur?.name || '').trim();
+      if (name) parts.push(name);
+      cur = cur.parent || cur._parent || null;
+    }
+    return parts.reverse().join('/');
+  }
+
+  function cocosButtonText(button, cocos) {
+    try {
+      const node = button?.node;
+      const Label = cocos?.Label;
+      if (!node || !Label || typeof node.getComponentsInChildren !== 'function') return '';
+      return (node.getComponentsInChildren(Label) || [])
+        .map(label => String(label?.string ?? label?._string ?? '').trim())
+        .filter(Boolean)
+        .join(' | ');
+    } catch (_) { return ''; }
+  }
+
+  function buttonHandlerText(button) {
+    try {
+      const events = Array.isArray(button?.clickEvents) ? button.clickEvents : [];
+      return events.map(handler => [
+        handler?.handler,
+        handler?.component,
+        handler?.customEventData,
+        handler?.target?.name
+      ].filter(Boolean).join(' ')).join(' | ');
+    } catch (_) { return ''; }
+  }
+
+  function emitCocosButton(candidate) {
+    const button = candidate?.button;
+    const cocos = candidate?.cocos;
+    const node = button?.node;
+    if (!button || !node) return false;
+
+    try {
+      if (button.interactable === false || button.enabledInHierarchy === false) return false;
+    } catch (_) {}
+
+    try {
+      if (typeof button._emitButtonEvent === 'function') {
+        button._emitButtonEvent();
+        return true;
+      }
+    } catch (_) {}
+
+    try {
+      if (typeof button._emitClickEvent === 'function') {
+        button._emitClickEvent();
+        return true;
+      }
+    } catch (_) {}
+
+    try {
+      const events = Array.isArray(button.clickEvents) ? button.clickEvents : [];
+      const EventHandler = cocos?.Component?.EventHandler || cocos?.EventHandler;
+      if (events.length && typeof EventHandler?.emitEvents === 'function') {
+        EventHandler.emitEvents(events, button);
+        return true;
+      }
+    } catch (_) {}
+
+    try {
+      const clickType = cocos?.Button?.EventType?.CLICK || 'click';
+      node.emit?.(clickType, button);
+      return true;
+    } catch (_) {}
+
+    return false;
+  }
+
+  function scoreCocosButton(button, cocos, mode) {
+    const node = button?.node;
+    if (!node || node.activeInHierarchy === false) return null;
+
+    const text = cocosButtonText(button, cocos);
+    const path = cocosNodePath(node);
+    const handlers = buttonHandlerText(button);
+    const hay = (text + ' ' + path + ' ' + handlers).toLowerCase();
+
+    if (/(buyfree|buy.*free|purchase|購買|购买|bet|押注|spinbtn|autospin|menu|sound|setting)/i.test(hay)) {
+      return null;
+    }
+
+    let score = 0;
+
+    if (mode === 'start') {
+      if (/開始免費遊戲|開始免遊|進入免費遊戲|進入免遊/i.test(text)) score += 160;
+      if (/\bstart\b.*(?:free|bonus)|(?:free|bonus).*\bstart\b/i.test(hay)) score += 120;
+      if (/(freegame|freespin|bonus).*(start|enter|play)/i.test(hay)) score += 100;
+      if (/(startfree|freegamestart|freespinstart)/i.test(hay)) score += 130;
+    } else {
+      if (/^(?:跳過|略過|skip|skip all)$/i.test(String(text || '').trim())) score += 180;
+      if (/跳過|略過|skip/i.test(text)) score += 150;
+      if (/(freegame|freespin|bonus).*(skip|finish|complete|result|summary)/i.test(hay)) score += 140;
+      if (/(skipfree|skip.*bonus|onskip|clickskip|handleskip)/i.test(hay)) score += 170;
+      if (/(skip|finishfreegame|completefreegame|showresult|showresultview)/i.test(handlers)) score += 150;
+      if (/skip/i.test(path)) score += 110;
+    }
+
+    if (button.interactable !== false) score += 10;
+    return score > 0 ? { score, text, path, handlers } : null;
+  }
+
+  function findCocosAction(mode) {
+    const candidates = [];
+
+    for (const w of gameWindows()) {
+      try {
+        const cocos = w.cc || w.legacyCC || w._cc;
+        const scene = cocos?.director?.getScene?.();
+        const Button = cocos?.Button;
+        if (!scene || !Button || typeof scene.getComponentsInChildren !== 'function') continue;
+
+        const buttons = scene.getComponentsInChildren(Button) || [];
+        for (const button of buttons) {
+          const meta = scoreCocosButton(button, cocos, mode);
+          if (!meta) continue;
+          candidates.push({ button, cocos, window:w, ...meta });
+        }
+      } catch (_) {}
+    }
+
+    candidates.sort((a,b) => b.score - a.score);
+    const best = candidates[0] || null;
+    const threshold = mode === 'skip' ? 140 : 100;
+    return best && best.score >= threshold ? best : null;
+  }
+
+  function tryNativeStart() {
+    if (clickByTexts(['開始免費遊戲','開始免遊','進入免費遊戲','進入免遊'])) {
+      nativeStatus = '✅ 已送出開始免遊';
+      lastNativeVia = 'DOM';
+      return true;
+    }
+
+    const candidate = findCocosAction('start');
+    if (candidate && emitCocosButton(candidate)) {
+      lastClickAt = Date.now();
+      nativeStatus = '✅ 已觸發 ATG 原生開始';
+      lastNativeVia = candidate.path || candidate.handlers || 'Cocos start';
+      return true;
+    }
+
+    return false;
+  }
+
+  function tryNativeSkip() {
+    if (clickByTexts(['跳過','略過','skip','SKIP','Skip All'])) {
+      nativeStatus = '✅ 已送出真正跳過';
+      lastNativeVia = 'DOM Skip';
+      return true;
+    }
+
+    const candidate = findCocosAction('skip');
+    if (candidate && emitCocosButton(candidate)) {
+      lastClickAt = Date.now();
+      nativeStatus = '✅ 已觸發 ATG 原生 Skip';
+      lastNativeVia = candidate.path || candidate.handlers || 'Cocos Skip';
+      return true;
+    }
+
+    nativeStatus = '🟠 尚未找到此遊戲的原生 Skip';
+    return false;
   }
 
   function handleAuto(active) {
     if (!settings.auto) {
-      if (restoreSpeed !== null) {
-        setSpeed(restoreSpeed);
-        restoreSpeed = null;
-      }
+      freeWasActive = false;
+      nativeStatus = '自動跳過已關閉';
+      return;
+    }
+
+    if (!active) {
+      if (freeWasActive) nativeStatus = '✅ 免遊已結束';
       freeWasActive = false;
       return;
     }
 
-    if (active) {
-      if (!freeWasActive) {
-        freeWasActive = true;
-        const nowSpeed = currentSpeed();
-        if (Number.isFinite(nowSpeed)) restoreSpeed = nowSpeed;
-        setSpeed(16);
-      }
-
-      if (Date.now() - lastClickAt > 700) {
-        const started = clickByTexts([
-          '開始免費遊戲','開始免遊','開始','進入免費遊戲','進入免遊','start','play'
-        ]);
-        if (!started) {
-          clickByTexts(['跳過','略過','skip']);
-        }
-      }
-      return;
+    if (!freeWasActive) {
+      freeWasActive = true;
+      nativeStatus = '🔎 尋找 ATG 原生免遊控制…';
+      tryNativeStart();
     }
 
-    if (freeWasActive) {
-      freeWasActive = false;
-      if (restoreSpeed !== null) {
-        setSpeed(restoreSpeed);
-        restoreSpeed = null;
-      }
-    }
+    const now = Date.now();
+    if (now - lastNativeAttemptAt < 450) return;
+    lastNativeAttemptAt = now;
+
+    // 真正跳過：只呼叫遊戲自身 Skip/Finish/Result 按鈕或 handler。
+    // 找不到時保持原速，不再用 16× 當作替代品。
+    tryNativeSkip();
   }
 
   function ensurePanel() {
@@ -15030,15 +15200,15 @@ try {
       <button type="button" class="fg-close" aria-label="關閉">×</button>
       <div class="fg-title">🎁 遇到免費遊戲</div>
       <div class="fg-row">
-        <div class="fg-text">免遊：自動開始＋跳過</div>
-        <button type="button" class="fg-switch ${settings.auto ? 'on' : ''}" data-fg-toggle="auto" aria-label="自動開始與跳過"></button>
+        <div class="fg-text">免遊：自動開始＋真正跳過</div>
+        <button type="button" class="fg-switch ${settings.auto ? 'on' : ''}" data-fg-toggle="auto" aria-label="自動開始與真正跳過"></button>
       </div>
       <div class="fg-row">
         <div class="fg-text">👁 免遊劇透（進免遊前報得分）</div>
         <button type="button" class="fg-switch ${settings.spoiler ? 'on' : ''}" data-fg-toggle="spoiler" aria-label="免遊劇透"></button>
       </div>
-      <div class="fg-sub">劇透＝ATG 已先回傳本次免遊得分時，提前顯示該數值；不是自行預測。</div>
-      <div class="fg-status">${Boolean(live.freeGameActive) ? '🟢 免遊進行中' : '⚪ 等待免遊'}${lastSpoilerValue !== null ? '｜最近劇透 ' + money(lastSpoilerValue) : ''}</div>
+      <div class="fg-sub">真正跳過＝直接觸發 ATG/Cocos 原生 Skip／Finish／Result 事件，不使用加速。劇透只顯示 ATG 已先回傳的得分。</div>
+      <div class="fg-status">${nativeStatus}${lastNativeVia ? '｜' + lastNativeVia : ''}${lastSpoilerValue !== null ? '｜劇透 ' + money(lastSpoilerValue) : ''}</div>
     `;
 
     panel.querySelector('.fg-close')?.addEventListener('click', () => {
@@ -15150,7 +15320,7 @@ try {
   }, 500);
 
   window.__XIANYAO_ATG_FREE_HELPER__ = {
-    version:'1.0.0-test159',
+    version:'1.1.0-test160',
     getState:() => ({...settings,lastSpoilerValue}),
     setAuto:value => { settings.auto = Boolean(value); saveSettings(); },
     setSpoiler:value => { settings.spoiler = Boolean(value); saveSettings(); },
