@@ -2530,7 +2530,9 @@ try {
         <div class="xinyaoRow"><span>本次完成轉數</span><b>${state.completedSpins}</b></div>
       </div>
 
-      <div class="xinyaoGroup"><button id="xinyaoRiskOpen" type="button" style="width:100%;border:1px solid rgba(255,174,207,.38);border-radius:9px;background:rgba(255,95,158,.10);color:#ffd3e4;padding:7px 8px;font-size:11px;font-weight:900;cursor:pointer;">🛡️ 止盈／止損</button></div>\n\n      ${pairBox}
+      <div class="xinyaoGroup"><button id="xinyaoRiskOpen" type="button" style="width:100%;border:1px solid rgba(255,174,207,.38);border-radius:9px;background:rgba(255,95,158,.10);color:#ffd3e4;padding:7px 8px;font-size:11px;font-weight:900;cursor:pointer;">🛡️ 止盈／止損</button></div>
+
+      ${pairBox}
     `;
 
     bindPanelEvents();
@@ -14751,7 +14753,16 @@ try {
   }
 
 
-  window.__XIANYAO_ATG_STOP_AUTOPLAY__ = {\n    version:'1.0.0-test186',\n    stop:() => tryStopAutoplay(),\n    available:() => {\n      try { return sameOriginSignalWindows().some(w => Boolean(findExactATGStopAutoButton(w)?.button)); } catch (_) { return false; }\n    },\n    getLastVia:() => String(probe.autoStopLastVia || '')\n  };\n\n  window.addEventListener(EVENT_NAME, handleSpinFinal);
+  window.__XIANYAO_ATG_STOP_AUTOPLAY__ = {
+    version:'1.0.0-test186',
+    stop:() => tryStopAutoplay(),
+    available:() => {
+      try { return sameOriginSignalWindows().some(w => Boolean(findExactATGStopAutoButton(w)?.button)); } catch (_) { return false; }
+    },
+    getLastVia:() => String(probe.autoStopLastVia || '')
+  };
+
+  window.addEventListener(EVENT_NAME, handleSpinFinal);
 
   try {
     window.addEventListener('xinyao:maintenance', render);
