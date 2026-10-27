@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.177
-// @description  test177：免遊開始後隱藏中間動畫，背景照常快速播放；偵測 ATG 原生「贏得獎金／關閉」視窗出現後才解除遮罩。
+// @version      4.0.0-test.179
+// @description  test179：原生 Skip 偵測版；停用遮罩與自動加速，只掃描 ATG 可見按鈕、clickEvent 與 skip/finish/result 元件方法。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -15257,6 +15257,126 @@ try {
     return best && best.score >= threshold ? best : null;
   }
 
+  function scanNativeSkipCandidates() {
+    const buttons = [];
+    const components = [];
+
+    for (const w of gameWindows()) {
+      try {
+        const cocos = w.cc || w.legacyCC || w._cc;
+        const scene = cocos?.director?.getScene?.();
+        const Button = cocos?.Button;
+        const Component = cocos?.Component;
+        if (!scene || typeof scene.getComponentsInChildren !== 'function') continue;
+
+        if (Button) {
+          const allButtons = scene.getComponentsInChildren(Button) || [];
+          for (const button of allButtons) {
+            try {
+              const node = button?.node;
+              if (!node || node.activeInHierarchy === false) continue;
+
+              const textValue = cocosButtonText(button, cocos);
+              const pathValue = cocosNodePath(node);
+              const handlersValue = buttonHandlerText(button);
+              const hay = (textValue + ' ' + pathValue + ' ' + handlersValue).toLowerCase();
+
+              if (!/(skip|跳過|略過|free|bonus|finish|complete|result|summary|continue|next)/i.test(hay)) continue;
+              if (/(buyfree|buy.*free|purchase|購買|购买|bet|押注|spinbtn|autospin)/i.test(hay)) continue;
+
+              const scored = scoreCocosButton(button, cocos, 'skip');
+              buttons.push({
+                score: scored?.score || 0,
+                text: textValue || '',
+                path: pathValue || '',
+                handlers: handlersValue || '',
+                interactable: button.interactable !== false,
+                enabledInHierarchy: button.enabledInHierarchy !== false
+              });
+            } catch (_) {}
+          }
+        }
+
+        if (Component) {
+          const allComponents = scene.getComponentsInChildren(Component) || [];
+          for (const component of allComponents) {
+            try {
+              const node = component?.node;
+              if (!node || node.activeInHierarchy === false) continue;
+
+              const cls = String(
+                component?.__classname__ ||
+                component?.constructor?.__classname__ ||
+                component?.constructor?.name ||
+                ''
+              );
+              const pathValue = cocosNodePath(node);
+              const ctx = (cls + ' ' + pathValue).toLowerCase();
+              if (!/(free|bonus|result|summary|win|gameview|feature)/i.test(ctx)) continue;
+
+              const methods = [];
+              const seen = new Set();
+              let cur = component;
+
+              for (let depth = 0; cur && depth < 6; depth += 1) {
+                let names = [];
+                try { names = Object.getOwnPropertyNames(cur); } catch (_) {}
+                for (const name of names) {
+                  if (seen.has(name)) continue;
+                  seen.add(name);
+                  try {
+                    if (
+                      typeof component?.[name] === 'function' &&
+                      /(skip|finish|complete|showresult|result|summary|continue|next|endfree|free.*end|bonus.*end)/i.test(name)
+                    ) {
+                      methods.push(name);
+                    }
+                  } catch (_) {}
+                }
+                try { cur = Object.getPrototypeOf(cur); } catch (_) { cur = null; }
+              }
+
+              if (methods.length) {
+                components.push({
+                  component: cls || '(anonymous)',
+                  path: pathValue,
+                  methods: [...new Set(methods)].slice(0, 20)
+                });
+              }
+            } catch (_) {}
+          }
+        }
+      } catch (_) {}
+    }
+
+    buttons.sort((a,b) => b.score - a.score);
+
+    const uniqueComponents = [];
+    const used = new Set();
+    for (const row of components) {
+      const key = row.component + '|' + row.path + '|' + row.methods.join(',');
+      if (used.has(key)) continue;
+      used.add(key);
+      uniqueComponents.push(row);
+    }
+
+    const result = {
+      version: 'test179',
+      at: Date.now(),
+      freeGameActive: Boolean(window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameActive),
+      freeGameCount: window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameCount ?? null,
+      buttons: buttons.slice(0, 20),
+      components: uniqueComponents.slice(0, 30)
+    };
+
+    try {
+      window.__XIANYAO_ATG_NATIVE_SKIP_SCAN__ = result;
+      localStorage.setItem('xinyao_atg_native_skip_scan_v1', JSON.stringify(result));
+    } catch (_) {}
+
+    return result;
+  }
+
   function tryNativeStart() {
     // test164：先只辨識，不自動送出 Cocos 事件，避免命中錯誤的開始/離開流程。
     const candidate = findCocosAction('start');
@@ -15434,7 +15554,7 @@ try {
     panel.innerHTML = `
       <button type="button" class="fg-close" aria-label="關閉">×</button>
       <div class="fg-title">🎁 遇到免費遊戲</div>
-      <div style="font-size:10px;opacity:.65;margin:-2px 0 8px;">版本 test177</div>
+      <div style="font-size:10px;opacity:.65;margin:-2px 0 8px;">版本 test179</div>
       <div class="fg-row">
         <div class="fg-text">免遊：直接看結算</div>
         <button type="button" class="fg-switch ${settings.auto ? 'on' : ''}" data-fg-toggle="auto" aria-label="免遊直接看結算"></button>
@@ -15443,7 +15563,7 @@ try {
         <div class="fg-text">👁 免遊劇透（進免遊前報得分）</div>
         <button type="button" class="fg-switch ${settings.spoiler ? 'on' : ''}" data-fg-toggle="spoiler" aria-label="免遊劇透"></button>
       </div>
-      <div class="fg-sub">直接看結算＝只讀取 ATG 已回傳的免遊總贏分；不遮畫面、不加速、不強制跳過，避免卡住遊戲流程。</div>
+      <div class="fg-sub">原生 Skip 偵測＝只找 ATG 自己已存在的跳過／快速結算入口，不會自動點擊或送出結算指令。</div>
       <div class="fg-status">${nativeStatus}${lastNativeVia ? '｜' + lastNativeVia : ''}${lastSpoilerValue !== null ? '｜目前回包 ' + money(lastSpoilerValue) : ''}</div>
       <div class="fg-status" style="margin-top:7px;color:#ffd1e4;">${(() => {
         const s = window.__XIANYAO_ATG_FREE_RESULT_STATE__;
@@ -15453,7 +15573,8 @@ try {
         if (s.mode === 'finished' && Number.isFinite(Number(s.finalAmount))) return '✅ 本次免遊總贏分：' + money(s.finalAmount);
         return '正在判斷免遊結算方式…';
       })()}</div>
-      <button type="button" data-fg-copy-diag style="margin-top:10px;width:100%;border:1px solid rgba(255,185,215,.5);border-radius:10px;background:rgba(255,95,158,.12);color:#fff;padding:8px 10px;font-size:11px;font-weight:800;cursor:pointer;">📋 複製免遊資料</button>
+      <button type="button" data-fg-scan-native style="margin-top:10px;width:100%;border:1px solid rgba(255,185,215,.62);border-radius:10px;background:rgba(255,95,158,.16);color:#fff;padding:8px 10px;font-size:11px;font-weight:900;cursor:pointer;">🔎 找 ATG 原生跳過</button>
+      <button type="button" data-fg-copy-diag style="margin-top:7px;width:100%;border:1px solid rgba(255,185,215,.5);border-radius:10px;background:rgba(255,95,158,.12);color:#fff;padding:8px 10px;font-size:11px;font-weight:800;cursor:pointer;">📋 複製免遊資料</button>
     `;
 
     panel.querySelector('.fg-close')?.addEventListener('click', () => {
@@ -15468,12 +15589,50 @@ try {
       });
     });
 
+    panel.querySelector('[data-fg-scan-native]')?.addEventListener('click', async () => {
+      const result = scanNativeSkipCandidates();
+      const payload = JSON.stringify(result, null, 2);
+
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(payload);
+        copied = true;
+      } catch (_) {}
+
+      const best = result.buttons?.[0];
+      if (best) {
+        nativeStatus = '🔎 找到原生 Skip 候選';
+        lastNativeVia = [
+          best.text || '',
+          best.path || '',
+          best.handlers || ''
+        ].filter(Boolean).join(' ｜ ').slice(0, 280);
+      } else if (result.components?.length) {
+        const row = result.components[0];
+        nativeStatus = '🔎 找到 Skip / Result 元件方法';
+        lastNativeVia = (
+          row.component + ' ｜ ' +
+          row.path + ' ｜ ' +
+          row.methods.join(',')
+        ).slice(0, 280);
+      } else {
+        nativeStatus = '❌ 目前畫面沒找到原生 Skip';
+        lastNativeVia = '';
+      }
+
+      renderPanel();
+
+      if (!copied) {
+        try { window.prompt('複製原生 Skip 掃描結果', payload); } catch (_) {}
+      }
+    });
+
     panel.querySelector('[data-fg-copy-diag]')?.addEventListener('click', async () => {
       let payload = '';
       try {
         const latest = freeRuntimeDiagnostics();
         payload = JSON.stringify({
-          version:'test177',
+          version:'test179',
           at:Date.now(),
           href:location.href,
           freeGameActive:Boolean(window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameActive),
@@ -16116,11 +16275,11 @@ try {
   }
 
   function begin(){
-    show();
-
-    try{
-      window.__XIANYAO_ATG_UNIFIED_SPEED__?.startFreeSkipBoost?.(6500);
-    }catch(_){}
+    // test179：純診斷模式，不遮罩、不加速、不改遊戲流程。
+    state.active=false;
+    state.nativeResultSeen=false;
+    state.startedAt=Date.now();
+    return false;
 
     if(state.pollTimer)clearInterval(state.pollTimer);
     state.pollTimer=setInterval(()=>{
