@@ -2914,6 +2914,12 @@ aspect-ratio:2.45 / 1!important;
 max-height:190px!important;
 }
 }
+</style><style id="oracle-live-carousel-img-5038">
+#oracleBannerCarousel .oracle-banner-slide{overflow:hidden}
+#oracleBannerCarousel .oracle-banner-slide>a,#oracleBannerCarousel .oracle-banner-slide>.oracle-carousel-image{display:block;width:100%;height:100%}
+#oracleBannerCarousel .oracle-banner-slide picture{display:block;width:100%;height:100%}
+#oracleBannerCarousel .oracle-banner-slide img{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
+#oracleBannerCarousel .oracle-banner-dots button:focus-visible,#oracleBannerCarousel>button:focus-visible{outline:2px solid #f0d08b;outline-offset:3px}
 </style></head>
 
 <body>
@@ -4374,5 +4380,26 @@ max-height:190px!important;
   run();
 })();
 </script>
-<script id="oracle-carousel-script-5031">(function(){function boot(){const root=document.getElementById('oracleBannerCarousel');if(!root)return;const slides=[...root.querySelectorAll('.oracle-banner-slide')],dots=[...root.querySelectorAll('.oracle-banner-dots button')];let current=0;function go(n){current=(n+slides.length)%slides.length;slides.forEach((el,i)=>el.classList.toggle('is-active',i===current));dots.forEach((el,i)=>el.classList.toggle('is-active',i===current));}root.querySelector('.oracle-banner-prev').addEventListener('click',()=>go(current-1));root.querySelector('.oracle-banner-next').addEventListener('click',()=>go(current+1));dots.forEach((el,i)=>el.addEventListener('click',()=>go(i)));setInterval(()=>{if(!document.hidden)go(current+1)},6500);}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();})();</script></body>
+<script id="oracle-carousel-script-5031">(function(){function boot(){const root=document.getElementById('oracleBannerCarousel');if(!root)return;const slides=[...root.querySelectorAll('.oracle-banner-slide')],dots=[...root.querySelectorAll('.oracle-banner-dots button')];let current=0;function go(n){current=(n+slides.length)%slides.length;slides.forEach((el,i)=>el.classList.toggle('is-active',i===current));dots.forEach((el,i)=>el.classList.toggle('is-active',i===current));}root.querySelector('.oracle-banner-prev').addEventListener('click',()=>go(current-1));root.querySelector('.oracle-banner-next').addEventListener('click',()=>go(current+1));dots.forEach((el,i)=>el.addEventListener('click',()=>go(i)));setInterval(()=>{if(!document.hidden)go(current+1)},6500);}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();})();</script><script id="oracle-carousel-live-config-5038">
+(function(){
+const el=document.getElementById('oracleBannerCarousel');if(!el)return;
+const track=el.querySelector('.oracle-banner-track'), dots=el.querySelector('.oracle-banner-dots');
+let index=0,active=false;
+function show(n){const slides=[...track.children];if(!slides.length)return;index=(n+slides.length)%slides.length;slides.forEach((slide,i)=>slide.classList.toggle('is-active',i===index));[...dots.children].forEach((btn,i)=>btn.classList.toggle('is-active',i===index))}
+function redraw(items){
+ if(!items.length)return;
+ track.replaceChildren();dots.replaceChildren();
+ for(let i=0;i<items.length;i++){const item=items[i],slide=document.createElement('div');slide.className='oracle-banner-slide';
+ const picture=document.createElement('picture'),mobile=document.createElement('source'),img=document.createElement('img');
+ mobile.media='(max-width:700px)';mobile.srcset=item.mobile||item.desktop;picture.appendChild(mobile);img.src=item.desktop;img.alt=item.title||'賽特神諭輪播圖 '+(i+1);img.loading=i===0?'eager':'lazy';picture.appendChild(img);
+ if(item.link&&/^https?:\/\//.test(item.link)){const a=document.createElement('a');a.href=item.link;a.target='_blank';a.rel='noopener noreferrer';a.appendChild(picture);slide.appendChild(a)}else{picture.className='oracle-carousel-image';slide.appendChild(picture)}
+ track.appendChild(slide);const dot=document.createElement('button');dot.type='button';dot.setAttribute('aria-label','第'+(i+1)+'張');dot.addEventListener('click',()=>show(i));dots.appendChild(dot)}
+ show(0);active=true;
+}
+async function load(){try{const r=await fetch('./carousel-config.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const cfg=await r.json();const items=(Array.isArray(cfg.slides)?cfg.slides:[]).filter(x=>x.enabled!==false&&typeof x.desktop==='string'&&/^https?:\/\//.test(x.desktop));redraw(items)}catch(e){console.warn('Carousel config unavailable',e)}}
+el.querySelector('.oracle-banner-prev')?.addEventListener('click',()=>{if(active)show(index-1)},true);
+el.querySelector('.oracle-banner-next')?.addEventListener('click',()=>{if(active)show(index+1)},true);
+load();
+})();
+</script></body>
 </html>
