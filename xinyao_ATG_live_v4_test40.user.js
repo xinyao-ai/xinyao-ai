@@ -2,13 +2,44 @@
 // @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
 // @namespace    xinyao-atg-live-v4-hud-test
 // @version      4.0.0-test.40
-// @description  v4 HUD 測試版：盤面圖案偵測＋80% 直接觸發 ATG QuickStopBtn 停止自動轉。請勿與正式版同時啟用。
+// @description  v4 HUD 測試版：盤面圖案偵測實驗＋既有即時助手／極速模式。請勿與正式版同時啟用。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
 // @weight       999
 // @grant        none
 // ==/UserScript==
+
+// ===== test40：ATG Canvas 真實輸入監聽攔截 =====
+(() => {
+  if (window.__XIANYAO_CANVAS_INPUT_HOOK_V40__) return;
+  window.__XIANYAO_CANVAS_INPUT_HOOK_V40__ = true;
+  window.__XIANYAO_CANVAS_INPUT_LISTENERS__ = window.__XIANYAO_CANVAS_INPUT_LISTENERS__ || [];
+
+  const TRACKED = new Set([
+    'pointerdown','pointerup',
+    'mousedown','mouseup','click',
+    'touchstart','touchend'
+  ]);
+
+  try {
+    const originalAdd = EventTarget.prototype.addEventListener;
+    EventTarget.prototype.addEventListener = function(type, listener, options) {
+      try {
+        const isCanvas = String(this?.tagName || '').toUpperCase() === 'CANVAS';
+        if (isCanvas && TRACKED.has(String(type)) && listener) {
+          window.__XIANYAO_CANVAS_INPUT_LISTENERS__.push({
+            target: this,
+            type: String(type),
+            listener,
+            options
+          });
+        }
+      } catch (_) {}
+      return originalAdd.call(this, type, listener, options);
+    };
+  } catch (_) {}
+})();
 
 // ===== 芯瑤 ATG 全域維護控制 =====
 const XIANYAO_MAINTENANCE_ENDPOINT = 'https://xinyao-atg-live.love06130430.workers.dev/maintenance';
@@ -7206,7 +7237,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
     render();
 
     showStopLearnToast(
-      '<b style="color:#ffb8d4">🎯 test40 重新學習停止事件</b><br><span style="font-size:11px;font-weight:700">請先開著自動轉，然後手動按一次遊戲右下角真正的 ■。這版會直接記錄那次按下去所執行的 EventHandler，不再猜按鈕。</span>',
+      '<b style="color:#ffb8d4">🎯 test39 重新學習停止事件</b><br><span style="font-size:11px;font-weight:700">請先開著自動轉，然後手動按一次遊戲右下角真正的 ■。這版會直接記錄那次按下去所執行的 EventHandler，不再猜按鈕。</span>',
       15000
     );
 
@@ -7221,15 +7252,15 @@ setInterval(xinyaoCheckMaintenance, 10000);
   }
 
   function testLearnedStopNow() {
-    const result = tryStopAutoplay();
+    const result = invokeLearnedStopReplay();
     probe.autoStopStatus = result?.ok
-      ? `🧪 已按下右下角 ■：${result.via}`
-      : '⚠️ 找不到 ATG QuickStopBtn';
+      ? `🧪 已執行停止事件：${result.via}`
+      : '⚠️ 沒有可重播的真正停止事件';
     render();
     showStopLearnToast(
       result?.ok
-        ? '<b style="color:#9ff0be">🧪 已直接按下遊戲右下角 ■ 停止鍵</b><br><span style="font-size:11px">這顆就是 80% 達標時程式會自動按的停止鍵。</span>'
-        : '⚠️ 目前找不到 QuickStopBtn；請確認自動轉已經開始。',
+        ? '<b style="color:#9ff0be">🧪 已直接重播妳剛才手動停止的同一個事件</b><br><span style="font-size:11px">如果自動轉現在真的停住，80% 觸發也會走同一條路。</span>'
+        : '⚠️ 尚未抓到可以重播的停止事件，請重新學習。',
       3600
     );
   }
@@ -7501,6 +7532,121 @@ setInterval(xinyaoCheckMaintenance, 10000);
     return parts.filter(Boolean).join(' ');
   }
 
+  function findAutoplayStopByGeometry(gameWindow) {
+    try {
+      const cocos = gameWindow?.cc || gameWindow?.legacyCC || gameWindow?._cc;
+      const scene = cocos?.director?.getScene?.();
+      const Button = cocos?.Button;
+      const Label = cocos?.Label;
+      if (!scene || !Button || !Label || typeof scene.getComponentsInChildren !== 'function') return null;
+
+      const size = cocos?.view?.getVisibleSize?.();
+      const vw = Number(size?.width) || 0;
+      const vh = Number(size?.height) || 0;
+      if (!(vw > 0) || !(vh > 0)) return null;
+
+      const buttons = scene.getComponentsInChildren(Button) || [];
+      const rows = [];
+
+      for (const button of buttons) {
+        const node = button?.node;
+        if (!node || node.activeInHierarchy === false) continue;
+        try {
+          if (button.interactable === false || button.enabledInHierarchy === false) continue;
+        } catch (_) {}
+
+        const point = signalNodeWorldPoint(node, cocos);
+        if (!point) continue;
+
+        let w = 0, h = 0;
+        try {
+          const ui = node._uiProps?.uiTransformComp || (cocos?.UITransform && node.getComponent?.(cocos.UITransform));
+          w = Number(ui?.width ?? ui?.contentSize?.width ?? 0);
+          h = Number(ui?.height ?? ui?.contentSize?.height ?? 0);
+        } catch (_) {}
+
+        let labels = [];
+        try {
+          labels = (node.getComponentsInChildren(Label) || [])
+            .map(label => String(label?.string ?? label?._string ?? '').trim())
+            .filter(Boolean);
+        } catch (_) {}
+
+        const numeric = labels
+          .map(v => Number(String(v).replace(/[^d.-]/g,'')))
+          .filter(v => Number.isFinite(v) && v >= 1 && v <= 999);
+
+        rows.push({
+          button, node, cocos, point, w, h, labels, numeric,
+          nx:point.x/vw, ny:point.y/vh
+        });
+      }
+
+      // Big center spin/count control: lower-center area, contains the remaining auto-spin number.
+      const spinCandidates = rows
+        .filter(item =>
+          item.numeric.length &&
+          item.nx >= 0.32 && item.nx <= 0.70 &&
+          item.ny >= 0.04 && item.ny <= 0.34
+        )
+        .map(item => {
+          let score = 0;
+          if (item.numeric.some(v => v >= 2)) score += 80;
+          if (item.w > 0 && item.h > 0) {
+            const area = item.w * item.h;
+            if (area > 7000) score += 80;
+            else if (area > 3000) score += 45;
+            if (Math.abs(item.w-item.h)/Math.max(item.w,item.h) < .45) score += 30;
+          }
+          if (item.nx >= .42 && item.nx <= .60) score += 40;
+          if (item.ny >= .08 && item.ny <= .24) score += 40;
+          return { ...item, score };
+        })
+        .sort((a,b)=>b.score-a.score);
+
+      const spin = spinCandidates[0];
+      if (!spin || spin.score < 100) return null;
+
+      // Actual stop control is the rightmost square-ish control on the same row.
+      const stopCandidates = rows
+        .filter(item => {
+          if (item.button === spin.button) return false;
+          const dx = item.nx - spin.nx;
+          const dy = Math.abs(item.ny - spin.ny);
+          return dx >= .14 && dx <= .40 && dy <= .07;
+        })
+        .map(item => {
+          let score = 0;
+          const dx = item.nx - spin.nx;
+          if (dx >= .24) score += 120;
+          else if (dx >= .18) score += 70;
+          else score += 20;
+
+          if (item.w > 0 && item.h > 0) {
+            const square = 1 - Math.min(1, Math.abs(item.w-item.h)/Math.max(item.w,item.h));
+            score += square * 70;
+          }
+
+          // Penalize obvious numeric controls; the stop square itself should normally have no number.
+          if (item.numeric.length) score -= 60;
+
+          const text = item.labels.join(' ');
+          if (/^s*+s*$/.test(text) || /(plus|add|increase)/i.test(text)) score -= 300;
+          if (/(stop|pause|square|cancel)/i.test(text)) score += 250;
+
+          return { ...item, score, dx };
+        })
+        .sort((a,b)=>b.score-a.score || b.dx-a.dx);
+
+      const stop = stopCandidates[0];
+      if (!stop || stop.score < 70) return null;
+
+      return { spin, stop };
+    } catch (_) {
+      return null;
+    }
+  }
+
   function findAutoplaySquareStopButton(gameWindow) {
     try {
       const cocos = gameWindow?.cc || gameWindow?.legacyCC || gameWindow?._cc;
@@ -7667,86 +7813,217 @@ setInterval(xinyaoCheckMaintenance, 10000);
     }
   }
 
-  // test40：已由實機 Runtime 確認，畫面右下角「■」停止鍵就是
-  // .../SpinBar*/buttons/QuickStopBtn/Button 的 cc.Button。
-  // 不再先猜相對位置，也不要求會員學習停止鍵；直接鎖定 QuickStopBtn。
-  function findExactATGQuickStopButton(gameWindow) {
+
+  function largestVisibleGameCanvas(gameWindow) {
     try {
-      const cocos = gameWindow?.cc || gameWindow?.legacyCC || gameWindow?._cc;
-      const scene = cocos?.director?.getScene?.();
-      const Button = cocos?.Button;
-      if (!scene || !Button || typeof scene.getComponentsInChildren !== 'function') return null;
-
-      const buttons = scene.getComponentsInChildren(Button) || [];
-      const exact = [];
-
-      for (const button of buttons) {
-        const node = button?.node;
-        if (!node || node.activeInHierarchy === false) continue;
-
-        const path = stopNodePath(node);
-        const parentName = String(node?.parent?.name || node?._parent?.name || '');
-        const nodeName = String(node?.name || '');
-
-        const isExactPath = /(?:^|\/)QuickStopBtn\/Button$/i.test(path);
-        const isExactParent = /^QuickStopBtn$/i.test(parentName) && /^Button$/i.test(nodeName);
-
-        if (!isExactPath && !isExactParent) continue;
-
-        exact.push({
-          button,
-          cocos,
-          gameWindow,
-          path,
-          quickNode: node.parent || node._parent || null
-        });
-      }
-
-      if (!exact.length) return null;
-
-      // 優先真正位於 SpinBar 按鈕列中的 QuickStopBtn，避免其他測試/隱藏節點。
-      exact.sort((a, b) => {
-        const as = /SpinBar/i.test(a.path) ? 100 : 0;
-        const bs = /SpinBar/i.test(b.path) ? 100 : 0;
-        return bs - as;
-      });
-
-      return exact[0];
+      const canvases = [...gameWindow.document.querySelectorAll('canvas')]
+        .map(canvas => {
+          const rect = canvas.getBoundingClientRect();
+          return { canvas, rect, area:Math.max(0,rect.width) * Math.max(0,rect.height) };
+        })
+        .filter(item => item.rect.width > 220 && item.rect.height > 320 && item.area > 100000)
+        .sort((a,b) => b.area - a.area);
+      return canvases[0] || null;
     } catch (_) {
       return null;
     }
   }
 
-  function pressExactATGQuickStop(gameWindow) {
-    const exact = findExactATGQuickStopButton(gameWindow);
-    if (!exact?.button) return null;
+  function fakeCanvasInputEvent(type, canvas, clientX, clientY) {
+    const touch = {
+      identifier: 1,
+      target: canvas,
+      clientX, clientY,
+      pageX: clientX + (window.scrollX || 0),
+      pageY: clientY + (window.scrollY || 0),
+      screenX: clientX,
+      screenY: clientY,
+      radiusX: 1,
+      radiusY: 1,
+      rotationAngle: 0,
+      force: 1
+    };
 
-    // 這裡直接走 cc.Button 自己的 click 發送流程，等同按右下角框起來的 ■。
-    // emitSignalCocosClick 內部優先 _emitButtonEvent()，失敗才走 clickEvents / node click。
-    const fired = emitSignalCocosClick(exact.button, exact.cocos);
-    if (!fired) return null;
-
-    probe.autoStopLastVia = 'ATG exact QuickStopBtn/Button';
+    const isDown = /(down|start)$/.test(type);
     return {
-      ok: true,
-      via: probe.autoStopLastVia,
-      detail: exact.path || 'QuickStopBtn/Button'
+      type,
+      target: canvas,
+      currentTarget: canvas,
+      srcElement: canvas,
+      isTrusted: true,
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      defaultPrevented: false,
+      timeStamp: performance.now(),
+      clientX, clientY,
+      pageX: touch.pageX,
+      pageY: touch.pageY,
+      screenX: clientX,
+      screenY: clientY,
+      offsetX: clientX - canvas.getBoundingClientRect().left,
+      offsetY: clientY - canvas.getBoundingClientRect().top,
+      x: clientX,
+      y: clientY,
+      button: 0,
+      buttons: isDown ? 1 : 0,
+      which: 1,
+      pointerId: 1,
+      pointerType: 'mouse',
+      isPrimary: true,
+      touches: type === 'touchstart' ? [touch] : [],
+      targetTouches: type === 'touchstart' ? [touch] : [],
+      changedTouches: [touch],
+      preventDefault(){ this.defaultPrevented = true; },
+      stopPropagation(){},
+      stopImmediatePropagation(){}
     };
   }
 
-  function tryStopAutoplay() {
-    // test40：第一順位直接按「真正的 QuickStopBtn/Button」。
-    // 這顆就是畫面右下角方形 ■ 停止鍵；不再依賴學習或相對位置猜測。
+  function callCapturedCanvasListeners(gameWindow, canvas, type, clientX, clientY) {
+    let count = 0;
+    let records = [];
+    try {
+      records = Array.isArray(gameWindow.__XIANYAO_CANVAS_INPUT_LISTENERS__)
+        ? gameWindow.__XIANYAO_CANVAS_INPUT_LISTENERS__
+        : [];
+    } catch (_) {}
+
+    const event = fakeCanvasInputEvent(type, canvas, clientX, clientY);
+
+    for (const record of records) {
+      if (record?.target !== canvas || record?.type !== type || !record.listener) continue;
+      try {
+        if (typeof record.listener === 'function') {
+          record.listener.call(canvas, event);
+          count += 1;
+        } else if (typeof record.listener?.handleEvent === 'function') {
+          record.listener.handleEvent(event);
+          count += 1;
+        }
+      } catch (_) {}
+    }
+    return count;
+  }
+
+  function dispatchNativeLikeCanvasEvent(gameWindow, canvas, type, clientX, clientY) {
+    try {
+      const common = {
+        bubbles:true,
+        cancelable:true,
+        composed:true,
+        clientX,
+        clientY,
+        screenX:clientX,
+        screenY:clientY,
+        button:0,
+        buttons:/(down|start)$/.test(type) ? 1 : 0
+      };
+
+      let event = null;
+      if (type.startsWith('pointer') && typeof gameWindow.PointerEvent === 'function') {
+        event = new gameWindow.PointerEvent(type, {
+          ...common,
+          pointerId:1,
+          pointerType:'mouse',
+          isPrimary:true
+        });
+      } else if (type.startsWith('mouse') || type === 'click') {
+        event = new gameWindow.MouseEvent(type, common);
+      }
+
+      if (event) return canvas.dispatchEvent(event);
+    } catch (_) {}
+    return false;
+  }
+
+  function fireKnownATGStopControl() {
+    // Calibrated from the actual ATG v1.15.8 layout shown in the user's tests.
+    // The ■ stop control stays at ~85.5% width / 90.0% height of the game canvas.
+    const NX = 0.855;
+    const NY = 0.900;
+
     for (const gameWindow of sameOriginSignalWindows()) {
-      const exactResult = pressExactATGQuickStop(gameWindow);
-      if (exactResult?.ok) return exactResult;
+      try {
+        const found = largestVisibleGameCanvas(gameWindow);
+        if (!found) continue;
+
+        const { canvas, rect } = found;
+        const clientX = rect.left + rect.width * NX;
+        const clientY = rect.top + rect.height * NY;
+
+        const records = Array.isArray(gameWindow.__XIANYAO_CANVAS_INPUT_LISTENERS__)
+          ? gameWindow.__XIANYAO_CANVAS_INPUT_LISTENERS__
+          : [];
+        const types = new Set(records.filter(r => r?.target === canvas).map(r => r.type));
+
+        let invoked = 0;
+
+        // Use ONE input family only, so a successful stop is not immediately toggled back on.
+        if (types.has('pointerdown') || types.has('pointerup')) {
+          invoked += callCapturedCanvasListeners(gameWindow, canvas, 'pointerdown', clientX, clientY);
+          invoked += callCapturedCanvasListeners(gameWindow, canvas, 'pointerup', clientX, clientY);
+          dispatchNativeLikeCanvasEvent(gameWindow, canvas, 'pointerdown', clientX, clientY);
+          dispatchNativeLikeCanvasEvent(gameWindow, canvas, 'pointerup', clientX, clientY);
+        } else if (types.has('touchstart') || types.has('touchend')) {
+          invoked += callCapturedCanvasListeners(gameWindow, canvas, 'touchstart', clientX, clientY);
+          invoked += callCapturedCanvasListeners(gameWindow, canvas, 'touchend', clientX, clientY);
+        } else {
+          invoked += callCapturedCanvasListeners(gameWindow, canvas, 'mousedown', clientX, clientY);
+          invoked += callCapturedCanvasListeners(gameWindow, canvas, 'mouseup', clientX, clientY);
+          if (types.has('click')) invoked += callCapturedCanvasListeners(gameWindow, canvas, 'click', clientX, clientY);
+          dispatchNativeLikeCanvasEvent(gameWindow, canvas, 'mousedown', clientX, clientY);
+          dispatchNativeLikeCanvasEvent(gameWindow, canvas, 'mouseup', clientX, clientY);
+        }
+
+        probe.autoStopLastVia = `ATG fixed stop control @ ${NX},${NY} | listeners ${invoked}`;
+        return { ok:true, via:probe.autoStopLastVia, detail:`${Math.round(clientX)},${Math.round(clientY)}` };
+      } catch (_) {}
     }
 
-    // 舊的學習事件只保留做備援；會員不需要操作。
+    return { ok:false, via:'', detail:'' };
+  }
+
+  function isAutoplayClearlyActive() {
+    for (const gameWindow of sameOriginSignalWindows()) {
+      try {
+        const active = findActiveAutoplaySpinButton(gameWindow);
+        if (active?.activeEvidence) return true;
+      } catch (_) {}
+    }
+    return false;
+  }
+
+  function tryStopAutoplay() {
+    // test40: no member setup. Detect the big numeric auto-spin button by geometry,
+    // then invoke the rightmost square stop control on the same row.
+    for (const gameWindow of sameOriginSignalWindows()) {
+      const controls = findAutoplayStopByGeometry(gameWindow);
+      const stop = controls?.stop;
+      if (!stop) continue;
+
+      let sent = false;
+      try {
+        sent = emitSignalCocosClick(stop.button, stop.cocos) || sent;
+      } catch (_) {}
+      try {
+        sent = dispatchCanvasTapAtWorld(gameWindow, stop.point, stop.cocos) || sent;
+      } catch (_) {}
+
+      if (sent) {
+        probe.autoStopLastVia = 'AUTO geometry stop square';
+        return {
+          ok:true,
+          via:probe.autoStopLastVia,
+          detail:`spin=${controls.spin.numeric.join(',')} stopNx=${stop.nx.toFixed(3)} stopNy=${stop.ny.toFixed(3)}`
+        };
+      }
+    }
+
+    // Keep previously learned/runtime replay only as an invisible fallback; members do not need to configure it.
     const replayed = invokeLearnedStopReplay();
     if (replayed?.ok) return replayed;
 
-    // If only the visual Button could be resolved, keep the older fallback below.
     const learned = findLearnedStopButton();
     if (learned?.button) {
       if (emitSignalCocosClick(learned.button, learned.cocos)) {
@@ -7835,23 +8112,31 @@ setInterval(xinyaoCheckMaintenance, 10000);
 
   function scheduleAutoplayStopRetries(spinId) {
     const token = ++probe.autoStopRetryToken;
-    probe.autoStopRetryUntil = Date.now() + 8000;
+    probe.autoStopRetryUntil = Date.now() + 5000;
     probe.autoStopAttempts = 1;
 
-    const delays = [40, 90, 150, 230, 330, 460, 620, 850, 1150, 1500, 2100, 3000, 4300, 6000];
+    const delays = [350, 700, 1200, 1900, 2800, 4000];
     for (const delay of delays) {
       setTimeout(() => {
         if (probe.autoStopRetryToken !== token) return;
         if (probe.lastSignalSpinId !== spinId) return;
         if (Date.now() > probe.autoStopRetryUntil) return;
 
-        const result = tryStopAutoplay();
-        probe.autoStopAttempts += 1;
-
-        if (result?.ok) {
-          probe.autoStopStatus = `停止自動轉重試中（第 ${probe.autoStopAttempts} 次）`;
+        // Critical: once autoplay is no longer active, NEVER click the stop location again.
+        if (!isAutoplayClearlyActive()) {
+          probe.autoStopRetryToken += 1;
+          probe.autoStopRetryUntil = 0;
+          probe.autoStopStatus = '✅ 自動轉已停止';
           render();
+          return;
         }
+
+        const result = fireKnownATGStopControl();
+        probe.autoStopAttempts += 1;
+        probe.autoStopStatus = result?.ok
+          ? `⏹ 偵測仍在自動轉，再次停止（第 ${probe.autoStopAttempts} 次）`
+          : '⚠️ 無法送出停止操作';
+        render();
       }, delay);
     }
   }
@@ -7866,8 +8151,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
         (document.body || document.documentElement).appendChild(toast);
       }
       const stopText = stopResult?.ok
-        ? '⏹ 已按下遊戲右下角 ■ 停止鍵，持續確認自動轉停止'
-        : '⚠️ 尚未找到 QuickStopBtn，持續重試';
+        ? '⏹ 已直接按下自動轉停止鍵，確認停止中'
+        : '⚠️ 無法按下停止鍵，持續重試';
       toast.innerHTML = `
         <div style="font-size:15px;font-weight:950;color:#ffb8d4;">📡 盤面訊號達標 ${signal.score}%（80%以上自動停轉）</div>
         <div style="margin-top:5px;font-size:10px;opacity:.82;">${esc(signal.reason)}</div>
@@ -7946,8 +8231,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
       #${PANEL_ID} .bp-name{display:block;margin-top:2px;font-size:8px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.80}
       #${PANEL_ID} .bp-seq-title{margin-top:8px;font-size:9px;font-weight:850;opacity:.78}
       #${PANEL_ID} .bp-board-toggle{width:100%;margin-top:7px;border:1px solid rgba(255,184,212,.26);border-radius:7px;background:rgba(255,95,158,.08);color:#ffd5e6;padding:5px;font-size:8px;font-weight:850;cursor:pointer}
-      #${PANEL_ID} .bp-stop-learn{width:100%;margin-top:5px;border:1px solid rgba(125,236,183,.34);border-radius:7px;background:rgba(63,191,126,.10);color:#c8f8dc;padding:5px;font-size:8px;font-weight:900;cursor:pointer}
-      #${PANEL_ID} .bp-stop-test{width:100%;margin-top:4px;border:1px solid rgba(255,210,96,.34);border-radius:7px;background:rgba(255,196,64,.08);color:#ffe2a0;padding:5px;font-size:8px;font-weight:900;cursor:pointer}
+      #${PANEL_ID} .bp-stop-zero{width:100%;box-sizing:border-box;margin-top:4px;border:1px solid rgba(125,236,183,.28);border-radius:7px;background:rgba(63,191,126,.08);color:#c8f8dc;padding:5px;font-size:8px;font-weight:900;text-align:center}
       #${PANEL_ID} .bp-board-wrap{display:none}
       #${PANEL_ID} .bp-board-wrap.open{display:block}
       #${PANEL_ID} .bp-seq-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;margin-top:5px}
@@ -8035,8 +8319,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
         </div>
         <div class="bp-signal-bar"><i style="width:${Math.max(0, Math.min(100, probe.signalScore))}%"></i></div>
         <div class="bp-signal-reason">${esc(probe.signalReason)}｜僅依已完成盤面統計</div>
-        <div class="bp-autostop on">⏹ 自動停轉：固定開啟｜直接鎖定右下角 ■ QuickStopBtn</div>
-        <button type="button" class="bp-stop-test">🧪 測試右下角 ■ 停止鍵</button>
+        <div class="bp-autostop on">⏹ 自動停轉：固定開啟</div>
+        <div class="bp-stop-zero">⚡ 80%以上直接停止｜會員免設定</div>
       </div>
     `;
 
@@ -8082,24 +8366,6 @@ setInterval(xinyaoCheckMaintenance, 10000);
         event.stopPropagation();
         const open = boardWrap.classList.toggle('open');
         boardToggle.textContent = open ? '收起 30 格盤面' : '查看 30 格盤面';
-      };
-    }
-
-    const learnButton = body.querySelector('.bp-stop-learn');
-    if (learnButton) {
-      learnButton.onclick = event => {
-        event.preventDefault();
-        event.stopPropagation();
-        startStopButtonLearning();
-      };
-    }
-
-    const testButton = body.querySelector('.bp-stop-test');
-    if (testButton) {
-      testButton.onclick = event => {
-        event.preventDefault();
-        event.stopPropagation();
-        testLearnedStopNow();
       };
     }
   }
@@ -8166,8 +8432,8 @@ setInterval(xinyaoCheckMaintenance, 10000);
       probe.lastSignalSpinId = spinId;
       stopResult = tryStopAutoplay();
       probe.autoStopStatus = stopResult?.ok
-        ? '已按下右下角 ■ QuickStopBtn，確認停止中'
-        : '尋找右下角 ■ QuickStopBtn 中';
+        ? '已鎖定方形停止鍵，確認停止中'
+        : '尋找方形停止鍵中';
       scheduleAutoplayStopRetries(spinId);
 
       try {
@@ -8207,8 +8473,6 @@ setInterval(xinyaoCheckMaintenance, 10000);
       };
     } catch (_) {}
   }
-
-  installStopLearningHooks();
 
   window.addEventListener(EVENT_NAME, handleSpinFinal);
 
