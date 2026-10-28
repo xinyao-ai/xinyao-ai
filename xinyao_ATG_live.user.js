@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.8
+// @version      4.0.9
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -219,6 +219,7 @@ if (XIANYAO_HD_ACCESS_ALLOWED) {
 // ===== test140：全域遊戲模式（掃描共用；盤面監測 / 進房分流） =====
 const XIANYAO_GAME_MODULE_KEY = 'xinyao_atg_active_game_module_v1';
 const XIANYAO_GAME_MODULES = Object.freeze({
+  seth1:{ id:'seth1', label:'戰神賽特1', shortLabel:'賽特1', icon:'👁️' },
   seth: { id:'seth', label:'戰神賽特2', shortLabel:'賽特2', icon:'👁️' },
   tiger:{ id:'tiger', label:'虎小妹', shortLabel:'虎小妹', icon:'🐯' }
 });
@@ -229,6 +230,7 @@ function xinyaoNormalizeGameModule(value) {
 }
 
 function xinyaoLoadActiveGameModule() {
+  if (new URL(location.href).searchParams.get('gn') === 'egyptian-mythology') return 'seth1';
   // 從芯瑤會員頁點遊戲進皇鼎時，會員頁會把選擇寫在同一 browsing context 的 window.name。
   // 優先使用這個入口標記，再保存到 ATG 自己的 localStorage，確保進房重載後仍維持同一遊戲機制。
   try {
@@ -253,6 +255,7 @@ function xinyaoLoadActiveGameModule() {
 }
 
 function xinyaoActiveGameModule() {
+  if (new URL(location.href).searchParams.get('gn') === 'egyptian-mythology') return 'seth1';
   const live = xinyaoNormalizeGameModule(window.__XIANYAO_ATG_ACTIVE_GAME_MODULE__);
   return live || xinyaoLoadActiveGameModule();
 }
@@ -10487,9 +10490,11 @@ try {
   function gameModuleSelectorHtml() {
     const current = xinyaoActiveGameModule();
     const option = XIANYAO_GAME_MODULES[current] || XIANYAO_GAME_MODULES.seth;
-    const detail = current === 'seth'
-      ? '盤面監測＋進入此房使用賽特2專屬機制'
-      : '盤面監測＋進入此房使用虎小妹專屬機制';
+    const detail = current === 'seth1'
+      ? '賽特一代獨立類別｜房號掃描已支援，盤面符號仍需實機核對'
+      : current === 'seth'
+        ? '盤面監測＋進入此房使用賽特2專屬機制'
+        : '盤面監測＋進入此房使用虎小妹專屬機制';
     return `
       <div style="margin-top:7px;padding:8px 9px;border:1px solid rgba(255,190,215,.18);border-radius:10px;background:rgba(255,255,255,.04);">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
@@ -11453,6 +11458,7 @@ try {
   // 之後新增遊戲，只要新增一筆選項＋對應圖示辨識資料，不需要再改版面。
   const MANUAL_GAME_PROFILE_KEY = 'xinyao_atg_board_manual_profile_v1';
   const GAME_PROFILE_OPTIONS = Object.freeze([
+    { id:'seth1', label:'戰神賽特1', shortLabel:'賽特1', icon:'👁️' },
     { id:'seth', label:'戰神賽特2', shortLabel:'賽特2', icon:'👁️' },
     { id:'tiger', label:'虎小妹', shortLabel:'虎小妹', icon:'🐯' }
   ]);
@@ -11467,6 +11473,7 @@ try {
   }
 
   function loadManualGameProfile() {
+    if (new URL(location.href).searchParams.get('gn') === 'egyptian-mythology') return 'seth1';
     // test140：盤面監測跟隨全域遊戲模式；不再自己猜目前是哪款。
     try {
       const active = xinyaoNormalizeGameModule(window.__XIANYAO_ATG_ACTIVE_GAME_MODULE__ || xinyaoLoadActiveGameModule());
@@ -12266,6 +12273,7 @@ try {
   }
 
   function gameProfileName(profile = probe.gameProfile) {
+    if (new URL(location.href).searchParams.get('gn') === 'egyptian-mythology') return '戰神賽特1';
     return profile === 'tiger' ? '虎小妹' : '戰神賽特2';
   }
 
