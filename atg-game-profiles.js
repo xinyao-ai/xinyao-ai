@@ -17,6 +17,12 @@
       name: '虎小妹',
       recognizer: 'tiger',
       symbolsVerified: false
+    }),
+    seth1: Object.freeze({
+      id: 'seth1',
+      name: '戰神賽特（一代）',
+      recognizer: 'seth1',
+      symbolsVerified: false
     })
   });
 
