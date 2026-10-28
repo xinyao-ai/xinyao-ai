@@ -1,7 +1,7 @@
 {
-  "name": "芯瑤💕陪你玩",
-  "short_name": "芯瑤💕陪你玩",
-  "description": "芯瑤💕陪你玩 AI 聊天助手",
+  "name": "賽特神諭",
+  "short_name": "賽特神諭",
+  "description": "賽特神諭 ATG 輔助分析程式",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
