@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0
-// @description  正式版：賽特2、虎小妹；修正空房自動換房按鈕。
+// @version      4.0.1
+// @description  正式版：賽特2、虎小妹；修正空房排行只收錄最新狀態 Empty 的房間。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
