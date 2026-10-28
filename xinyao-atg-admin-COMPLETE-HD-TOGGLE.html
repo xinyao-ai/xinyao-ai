@@ -314,7 +314,26 @@
 }
 </style>
 
-</head><body>
+<style id="oracle-carousel-admin-style">
+.oracle-carousel-admin{background:#0a1e22!important;color:#e9d2a0!important;border:1px solid #bd9654!important}
+.oracle-carousel-admin h3{color:#f5d289;font-size:20px;margin:0 0 8px}
+.oracle-carousel-admin .muted{color:#cfbc9c!important}
+.oracle-carousel-admin>label{display:block;color:#efcf89;font-weight:800;margin:12px 0 7px}
+.oracle-carousel-admin input,.oracle-carousel-admin .input{background:#fdfaf3;color:#211c15;max-width:100%}
+.oracle-size-guide{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0}
+.oracle-size-guide>div{border:1px solid #ad8b48;padding:12px;border-radius:12px;background:#132c31;display:flex;flex-direction:column;gap:6px}
+.oracle-size-guide strong{color:#e1c584}.oracle-size-guide b{font-size:20px;color:#fff0c0}
+.oracle-slide-editor{display:grid;gap:12px;margin-top:16px}
+.oracle-edit-row{border:1px solid #ae8e51;background:#102a2f;border-radius:12px;padding:12px;display:grid;gap:10px}
+.oracle-edit-row .oracle-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.oracle-edit-row label{font-size:12px;color:#e8d2a0;display:grid;gap:5px}
+.oracle-edit-row input{width:100%;min-width:0;padding:9px;border-radius:8px;border:1px solid #b8a783}
+.oracle-preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.oracle-preview-grid img{width:100%;aspect-ratio:2.45/1;object-fit:contain;background:#06171c;border:1px dashed #927b50;border-radius:8px}
+.oracle-slide-actions{display:flex;gap:6px;flex-wrap:wrap}
+.oracle-slide-actions button{border:1px solid #ac925b;background:#243638;color:#f2d9a2;border-radius:8px;padding:8px 11px;cursor:pointer}
+@media(max-width:700px){.oracle-size-guide,.oracle-edit-row .oracle-fields,.oracle-preview-grid{grid-template-columns:1fr}}
+</style></head><body>
 <div id="adminLogin">
   <div class="loginCard">
     <div class="loginLogo">💕</div>
@@ -327,7 +346,7 @@
   </div>
 </div>
 <div class="app"><aside class="side"><div class="brand">💕 芯瑤 ATG 後台</div><nav class="nav">
-<button class="active" data-tab="overview">📊 總覽</button><button data-tab="members">👥 會員管理</button><button data-tab="detail">🪪 會員詳細</button><button data-tab="kick">🚪 強制登出</button><button data-tab="batch">➕ 批次新增</button><button data-tab="wins">🎉 恭喜會員</button><button data-tab="system">🟢 系統狀態</button><button data-tab="logs">🧾 操作紀錄</button><button data-tab="activity">👀 上線／操作</button></nav></aside>
+<button class="active" data-tab="overview">📊 總覽</button><button data-tab="members">👥 會員管理</button><button data-tab="detail">🪪 會員詳細</button><button data-tab="kick">🚪 強制登出</button><button data-tab="batch">➕ 批次新增</button><button data-tab="wins">🎉 恭喜會員</button><button data-tab="system">🟢 系統狀態</button><button data-tab="oracleCarousel">🖼️ 輪播圖管理</button><button data-tab="logs">🧾 操作紀錄</button><button data-tab="activity">👀 上線／操作</button></nav></aside>
 <main class="main"><div class="top"><h2 id="title">總覽儀表板</h2><div class="row"><button class="btn soft" onclick="refreshAll()">↻ 更新</button><button id="logoutBtn" class="btn danger" onclick="adminLogout()">登出</button></div></div>
 <section id="overview" class="panel active"><div class="stats"><div class="card stat"><span class="muted">會員總數</span><b id="total">—</b></div><div class="card stat"><span class="muted">正常會員</span><b id="active">—</b></div><div class="card stat"><span class="muted">停用會員</span><b id="disabled">—</b></div><div class="card stat"><span class="muted">目前上線</span><b id="online">—</b></div><div class="card stat"><span class="muted">今日新增</span><b id="today_new">—</b></div></div><div class="card"><b>最近會員操作</b><div id="recent" class="muted">載入中...</div></div></section>
 <section id="members" class="panel"><div class="card"><div class="row"><input id="search" class="input" placeholder="搜尋會員"><button class="btn soft" onclick="loadMembers()">搜尋</button><input id="newAccount" class="input" placeholder="新增會員帳號"><button class="btn primary" onclick="addMember()">新增會員</button></div><div id="memberMsg"></div><div class="table"><table><thead><tr><th>ID</th><th>帳號</th><th>狀態</th><th>最後登入</th><th>最後活動</th><th>到期日</th><th>操作</th></tr></thead><tbody id="memberRows"></tbody></table></div></div></section>
@@ -355,6 +374,24 @@
     <div id="winList" style="margin-top:10px"></div>
   </div>
 </div>
+</section>
+
+<section id="oracleCarousel" class="panel">
+ <div class="card oracle-carousel-admin">
+  <h3>🖼️ 賽特神諭｜首頁輪播圖管理</h3>
+  <p class="muted">此功能獨立運作，不影響會員、維護、數據與原有後台設定。發佈後首頁自動讀取，建議等 1 分鐘再重新整理。</p>
+  <div class="oracle-size-guide"><div><strong>電腦版</strong><b>1920 × 660 px</b><small>橫幅比例約 2.91:1</small></div><div><strong>手機版</strong><b>1200 × 490 px</b><small>橫幅比例約 2.45:1</small></div></div>
+  <p class="muted">PNG／JPG／WebP，建議單張小於 4 MB；可分別上傳電腦與手機圖片。未提供手機圖時會使用電腦圖。</p>
+  <label for="oracleGithubToken">GitHub 寫入權杖（只在此頁記憶體使用，不儲存到網站）</label>
+  <input class="input" type="password" autocomplete="off" id="oracleGithubToken" placeholder="貼上 GitHub fine-grained token（Contents: Read and write）">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
+   <button type="button" class="btn soft" onclick="oracleLoadSlides()">↻ 重新讀取</button>
+   <button type="button" class="btn soft" onclick="oracleAddSlide()">＋ 新增輪播圖</button>
+   <button type="button" class="btn primary" onclick="oraclePublishSlides()">發布輪播圖</button>
+  </div>
+  <div id="oracleCarouselMessage" class="muted" role="status" aria-live="polite"></div>
+  <div id="oracleCarouselRows" class="oracle-slide-editor"></div>
+ </div>
 </section>
 <section id="system" class="panel"><div class="card" id="systemBox">檢查中...</div></section>
 <section id="logs" class="panel"><div class="card"><div class="table"><table><thead><tr><th>時間</th><th>管理員</th><th>操作</th><th>對象</th><th>內容</th></tr></thead><tbody id="logRows"></tbody></table></div></div></section>
@@ -1462,4 +1499,63 @@ document.addEventListener("DOMContentLoaded",()=>{
   </div>
 </div>
 
-</body></html>
+<script id="oracle-carousel-admin-js">
+(function(){
+ const $=id=>document.getElementById(id);
+ const base='https://api.github.com/repos/xinyao-ai/xinyao-ai/contents/';
+ let slides=[],busy=false;
+ function msg(text){const e=$('oracleCarouselMessage');if(e)e.textContent=text;}
+ function validURL(x){try{let u=new URL(x,location.href);return u.protocol==='https:'||u.protocol==='http:'}catch{return false}}
+ function esc(v){return String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+ function decodeText(t){return decodeURIComponent(Array.from(atob(t.replace(/\\s/g,'')),c=>'%'+c.charCodeAt(0).toString(16).padStart(2,'0')).join(''))}
+ function encodeText(t){return btoa(Array.from(new TextEncoder().encode(t),c=>String.fromCharCode(c)).join(''))}
+ function ghToken(){return ($('oracleGithubToken')?.value||'').trim()}
+ async function gh(path,method='GET',data=null){
+  const token=ghToken();if(!token)throw Error('請先輸入 GitHub 寫入權杖。');
+  const res=await fetch(base+path,{method,headers:{Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28',Authorization:'Bearer '+token,...(data?{'Content-Type':'application/json'}:{})},...(data?{body:JSON.stringify(data)}:{})});
+  const json=await res.json().catch(()=>({}));
+  if(!res.ok)throw Error('GitHub '+res.status+'：'+(json.message||'寫入失敗'));
+  return json;
+ }
+ function edit(id,key,value){let s=slides.find(x=>x.id===id);if(s)s[key]=value}
+ function makeRow(item,i){
+  const card=document.createElement('div');card.className='oracle-edit-row';card.dataset.id=item.id;
+  card.innerHTML='<div class="oracle-slide-actions"><b>第 '+(i+1)+' 張</b><button type="button" data-action="up">↑ 上移</button><button type="button" data-action="down">↓ 下移</button><button type="button" data-action="remove">刪除</button></div>'+
+   '<div class="oracle-fields"><label>圖片名稱／說明<input data-field="title" value="'+esc(item.title)+'" placeholder="例如：最新活動"></label><label>點擊前往網址（可留空）<input data-field="link" value="'+esc(item.link)+'" placeholder="https://..."></label></div>'+
+   '<label><input type="checkbox" data-field="enabled" '+(item.enabled?'checked':'')+'> 顯示此張輪播圖</label>'+
+   '<div class="oracle-preview-grid"><label>電腦版 1920 × 660<input type="file" accept="image/png,image/jpeg,image/webp" data-file="desktop"><img data-preview="desktop" alt="電腦版預覽"></label><label>手機版 1200 × 490<input type="file" accept="image/png,image/jpeg,image/webp" data-file="mobile"><img data-preview="mobile" alt="手機版預覽"></label></div>'+
+   '<div class="oracle-fields"><label>電腦圖片網址（也可貼現有網址）<input data-field="desktop" value="'+esc(item.desktop)+'"></label><label>手機圖片網址（可留空）<input data-field="mobile" value="'+esc(item.mobile)+'"></label></div>';
+  card.querySelectorAll('[data-field]').forEach(input=>input.addEventListener('input',()=>{edit(item.id,input.dataset.field,input.type==='checkbox'?input.checked:input.value);if(input.dataset.field==='desktop'||input.dataset.field==='mobile')preview()}));
+  card.querySelectorAll('[data-file]').forEach(input=>input.addEventListener('change',()=>{if(input.files?.[0]){if(input.files[0].size>4*1024*1024){msg('每張圖片請小於 4 MB');input.value='';return}item['_'+input.dataset.file+'File']=input.files[0];preview()}}));
+  card.querySelectorAll('[data-action]').forEach(b=>b.addEventListener('click',()=>{const idx=slides.indexOf(item);if(b.dataset.action==='remove'){if(confirm('確定刪除這張輪播圖？'))slides.splice(idx,1)}else if(b.dataset.action==='up'&&idx>0){[slides[idx-1],slides[idx]]=[slides[idx],slides[idx-1]]}else if(b.dataset.action==='down'&&idx<slides.length-1){[slides[idx],slides[idx+1]]=[slides[idx+1],slides[idx]]}render()}));
+  function preview(){for(const kind of ['desktop','mobile']){const im=card.querySelector('[data-preview="'+kind+'"]');const file=item['_'+kind+'File'];if(im.dataset.blobURL)URL.revokeObjectURL(im.dataset.blobURL);im.dataset.blobURL=file?URL.createObjectURL(file):'';const src=im.dataset.blobURL||item[kind]||'';if(src&&validURL(src))im.src=src;else im.removeAttribute('src')}}
+  preview();return card;
+ }
+ function render(){const el=$('oracleCarouselRows');if(!el)return;el.replaceChildren(...slides.map(makeRow));if(!slides.length)el.textContent='目前沒有圖片。按「新增輪播圖」建立第一張。';}
+ window.oracleLoadSlides=async function(){
+  try{const r=await fetch('./carousel-config.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('讀取設定檔失敗');const cfg=await r.json();slides=(Array.isArray(cfg.slides)?cfg.slides:[]).map((x,i)=>({id:String(x.id||i),title:String(x.title||''),link:String(x.link||''),desktop:String(x.desktop||''),mobile:String(x.mobile||''),enabled:x.enabled!==false}));render();msg('已載入 '+slides.length+' 張輪播圖。');}catch(e){msg('讀取失敗：'+e.message)}
+ };
+ window.oracleAddSlide=function(){slides.push({id:'slide-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),title:'',link:'',desktop:'',mobile:'',enabled:true});render();};
+ async function uploadImage(file,name){
+  const raw=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]);r.onerror=()=>no(Error('圖片讀取失敗'));r.readAsDataURL(file)});
+  const path='assets/carousel/'+name;
+  await gh(path,'PUT',{message:'Upload Oracle carousel image '+name,content:raw,branch:'main'});
+  return 'https://xinyao-ai.github.io/xinyao-ai/'+path;
+ }
+ window.oraclePublishSlides=async function(){
+  if(busy)return;if(!ghToken()){msg('先填 GitHub 寫入權杖才能發佈。');return}
+  if(slides.some(x=>!x.desktop&&!x._desktopFile)){msg('每張輪播圖都需要電腦圖片。');return}
+  if(slides.some(x=>x.link&&!validURL(x.link))){msg('點擊網址格式不正確，請修正或清空。');return}
+  if(!confirm('確定發佈 '+slides.length+' 張輪播圖到網站？'))return;
+  busy=true;try{
+   for(let i=0;i<slides.length;i++){const x=slides[i];for(const kind of ['desktop','mobile']){const file=x['_'+kind+'File'];if(!file)continue;msg('上傳第 '+(i+1)+' 張 '+(kind==='desktop'?'電腦':'手機')+'圖片...');const ext=(file.type==='image/png'?'png':file.type==='image/webp'?'webp':'jpg');x[kind]=await uploadImage(file,Date.now()+'-'+i+'-'+kind+'.'+ext);delete x['_'+kind+'File']}}
+   msg('正在儲存輪播設定...');
+   const config={version:1,intervalMs:6500,slides:slides.map(x=>({id:x.id,title:x.title,desktop:x.desktop,mobile:x.mobile,link:x.link,enabled:x.enabled}))};
+   const old=await gh('carousel-config.json?ref=main');
+   await gh('carousel-config.json','PUT',{message:'Publish Oracle carousel from admin dashboard',branch:'main',sha:old.sha,content:encodeText(JSON.stringify(config,null,2)+'\n')});
+   msg('✅ 發佈成功！GitHub Pages 部署後所有會員就會看到。');render();
+  }catch(e){msg('❌ 發佈失敗：'+e.message+'。已成功上傳的圖片不會影響現有輪播，重新發佈即可。')}finally{busy=false}
+ };
+ document.addEventListener('DOMContentLoaded',()=>{const nav=document.querySelector('[data-tab="oracleCarousel"]');if(nav)nav.addEventListener('click',()=>window.oracleLoadSlides());});
+})();
+</script></body></html>
