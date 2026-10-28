@@ -1,4 +1,4 @@
-const CACHE_NAME = "seth-oracle-v2";
+const CACHE_NAME = "seth-oracle-v3";
 
 const ASSETS = [
   "./",
@@ -43,9 +43,11 @@ self.addEventListener("fetch", function (event) {
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then(function (cached) {
-      return cached || fetch(event.request);
-    })
-  );
+  // Pages and app icons must refresh after a deployment.
+  // Other assets still work offline through the current cache.
+  if (event.request.mode === "navigate" || /\\/(?:icon-192|icon-512|apple-touch-icon|favicon)\\.png$/.test(new URL(event.request.url).pathname)) {
+    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+    return;
+  }
+  event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request)));
 });
