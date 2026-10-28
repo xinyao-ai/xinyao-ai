@@ -2953,7 +2953,29 @@ box-shadow:0 12px 30px rgba(0,0,0,.33)!important;color:#f0dbad!important;
 .screen-transition .transition-ring,.screen-transition .transition-ring::before,.screen-transition .transition-ring::after{border-color:rgba(227,184,102,.55)!important;box-shadow:0 0 23px rgba(217,166,72,.17)!important}
 .screen-transition .transition-check{color:#132024!important;background:linear-gradient(135deg,#fff0bc 0%,#e9bd66 45%,#a67832 100%)!important;box-shadow:0 8px 30px rgba(8,8,5,.46),0 0 24px rgba(219,167,72,.25)!important}
 .screen-transition .transition-label{color:#f0d69b!important;text-shadow:0 2px 8px rgba(0,0,0,.7)!important}
-</style><style id="oracle-seth-cover-5045">#appPage .game-launcher-cover.seth{background-image:url("https://www.atg-games.com/storm-of-seth-2-awakening/zh-cn/game_icon.png?v=20261027-hires")!important}#appPage .game-launcher-cover.seth>.oracle-seth-card-image{width:100%!important;height:100%!important;object-fit:contain!important;object-position:center!important;background:transparent!important;filter:none!important;image-rendering:auto!important;position:relative;z-index:0}</style><style id="oracle-seth1-card-5047">#appPage .oracle-seth1-cover{background:none!important}#appPage .oracle-seth1-cover .game-launcher-img{object-fit:contain!important;background:transparent!important;filter:none!important}#appPage #xinyaoLaunchSeth1{cursor:pointer}</style></head>
+</style><style id="oracle-seth-cover-5045">#appPage .game-launcher-cover.seth{background-image:url("https://www.atg-games.com/storm-of-seth-2-awakening/zh-cn/game_icon.png?v=20261027-hires")!important}#appPage .game-launcher-cover.seth>.oracle-seth-card-image{width:100%!important;height:100%!important;object-fit:contain!important;object-position:center!important;background:transparent!important;filter:none!important;image-rendering:auto!important;position:relative;z-index:0}</style><style id="oracle-seth1-card-5047">#appPage .oracle-seth1-cover{background:none!important}#appPage .oracle-seth1-cover .game-launcher-img{object-fit:contain!important;background:transparent!important;filter:none!important}#appPage #xinyaoLaunchSeth1{cursor:pointer}</style><style id="oracle-game-horizontal-carousel-5048">
+/* Card layout only. Preserve all game buttons, IDs and existing click logic. */
+#appPage .game-launcher-grid{
+ display:flex!important;flex-wrap:nowrap!important;gap:12px!important;
+ overflow-x:auto!important;overflow-y:hidden!important;
+ scroll-snap-type:x mandatory;scroll-behavior:smooth;
+ -webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;
+ padding:3px 2px 12px!important;scrollbar-width:thin;
+ scrollbar-color:#af8a49 transparent;
+}
+#appPage .game-launcher-grid>.game-launcher-item{
+ flex:0 0 calc((100% - 12px)/2)!important;
+ width:calc((100% - 12px)/2)!important;
+ min-width:0!important;scroll-snap-align:start;scroll-snap-stop:always;
+}
+@media(max-width:700px){
+ #appPage .game-launcher-grid{gap:10px!important}
+ #appPage .game-launcher-grid>.game-launcher-item{
+   flex-basis:calc((100% - 10px)/2)!important;
+   width:calc((100% - 10px)/2)!important;
+ }
+}
+</style></head>
 
 <body>
 
