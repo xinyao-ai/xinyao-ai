@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         芯瑤💕 ATG 即時助手｜v4 HUD 測試版
+// @name         賽特神諭｜ATG 即時助手（賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.0-test.179
-// @description  test179：原生 Skip 偵測版；停用遮罩與自動加速，只掃描 ATG 可見按鈕、clickEvent 與 skip/finish/result 元件方法。
+// @version      4.0.0
+// @description  正式版：賽特2、虎小妹；修正空房自動換房按鈕。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -2530,6 +2530,8 @@ try {
         <div class="xinyaoRow"><span>本次完成轉數</span><b>${state.completedSpins}</b></div>
       </div>
 
+      <div class="xinyaoGroup xinyaoRiskGroup"><button id="xinyaoRiskOpen" type="button" style="width:100%;min-width:0;white-space:nowrap;word-break:keep-all;border:1px solid rgba(255,174,207,.38);border-radius:9px;background:rgba(255,95,158,.10);color:#ffd3e4;padding:8px 6px;font-size:10px;line-height:1.2;font-weight:900;cursor:pointer;">🛡️ 止盈／止損</button></div>
+
       ${pairBox}
     `;
 
@@ -2638,6 +2640,17 @@ try {
         gap:5px;
       }
       #xinyaoATGLiveV200 .xinyaoPairGroup{padding-bottom:8px;}
+      #xinyaoATGLiveV200 .xinyaoRiskGroup{
+        display:block;
+      }
+      #xinyaoATGLiveV200 #xinyaoRiskOpen{
+        display:block;
+        width:100%;
+        white-space:nowrap;
+        word-break:keep-all;
+        overflow:hidden;
+        text-overflow:ellipsis;
+      }
       #xinyaoATGLiveV200 input::placeholder { color:rgba(255,255,255,.48); }
 
       /* v3.2.3：全裝置版面板可上下滑動，避免極速模式掉到螢幕下方 */
@@ -2693,6 +2706,22 @@ try {
           margin-top:5px;
           padding:4px;
           border-radius:8px;
+        }
+        #xinyaoATGLiveV200 .xinyaoRiskGroup{
+          display:block !important;
+          grid-template-columns:none !important;
+          width:100%;
+          box-sizing:border-box;
+        }
+        #xinyaoATGLiveV200 #xinyaoRiskOpen{
+          width:100% !important;
+          min-height:34px;
+          padding:7px 4px !important;
+          font-size:9px !important;
+          white-space:nowrap !important;
+          word-break:keep-all !important;
+          overflow:hidden;
+          text-overflow:clip;
         }
         #xinyaoATGLiveV200 .xinyaoRow{
           display:block;
@@ -2786,6 +2815,25 @@ try {
       html.xinyao-phone-ui #xinyaoATGLiveV200 .xinyaoConn{margin-top:2px;font-size:8px}
       html.xinyao-phone-ui #xinyaoATGLiveV200 .xinyaoGroup{
         display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;margin-top:5px;padding:4px;border-radius:8px
+      }
+      html.xinyao-phone-ui #xinyaoATGLiveV200 .xinyaoRiskGroup{
+        display:block !important;
+        grid-template-columns:none !important;
+        width:100% !important;
+        box-sizing:border-box !important;
+      }
+      html.xinyao-phone-ui #xinyaoATGLiveV200 .xinyaoRiskGroup #xinyaoRiskOpen{
+        display:block !important;
+        width:100% !important;
+        min-width:0 !important;
+        box-sizing:border-box !important;
+        padding:8px 6px !important;
+        font-size:10px !important;
+        line-height:1.2 !important;
+        white-space:nowrap !important;
+        word-break:keep-all !important;
+        overflow:visible !important;
+        text-overflow:unset !important;
       }
       html.xinyao-phone-ui #xinyaoATGLiveV200 .xinyaoRow{
         display:block;min-width:0;margin:0;padding:4px 4px 5px;border-radius:6px;background:rgba(255,255,255,.035);line-height:1.15
@@ -2891,6 +2939,7 @@ try {
     // 遊戲可能在同源 iframe 裡，而且 Socket.IO 常比面板更早建立連線。
     // 每次巡檢都先補 prototype.send；這不依賴重新建立 WebSocket，所以換房也能抓。
     for (const gameWindow of collectSameOriginLiveWindows()) {
+      patchWebSocketInboundHandlersForWindow(gameWindow);
       patchWebSocketPrototypeSendForWindow(gameWindow);
     }
 
@@ -2934,6 +2983,12 @@ try {
 
     const wrapped = function(...args) {
       const result = nativeJSONParse(...args);
+
+      // test181：這一層比 Socket.IO onevent 更早。
+      // ATG 把伺服器回包 JSON.parse 完之後、真正建立免遊播放佇列之前，
+      // 先把完整預載的 free gameState 折疊成「開始 + 最後結算」。
+      try { xinyaoCollapsePreloadedFreeGamePacket(result); } catch (_) {}
+
       try { inspectObject(result); } catch (_) {}
       return result;
     };
@@ -3224,6 +3279,365 @@ try {
     }, { capture:true });
   } catch (_) {}
 
+
+  // ===== test180：免遊「直接結算」核心 =====
+  // ATG 戰神賽特2 的 spin 回包已確認會一次帶回整段 free gameState。
+  // 這裡不遮畫面、不倍速、也不偽造派彩；只在 Socket.IO 把結果交給遊戲前，
+  // 將已預載的中間 freeSpin view 折疊成「開始 view + 最終 view」。
+  // 讓 ATG 自己照原生流程收尾並送 closeSpin。
+  function xinyaoFreeDirectSettleEnabled() {
+    // test183：不再修改 ATG 封包 / gameState / WebSocket 資料。
+    return false;
+  }
+
+  function xinyaoIsSethDirectSettleTarget() {
+    try {
+      const active = typeof xinyaoActiveGameModule === 'function'
+        ? String(xinyaoActiveGameModule() || '').toLowerCase()
+        : String(window.__XIANYAO_ATG_ACTIVE_GAME_MODULE__ || '').toLowerCase();
+      if (active) return active === 'seth';
+    } catch (_) {}
+
+    try {
+      const url = new URL(location.href);
+      return String(url.searchParams.get('gn') || '').toLowerCase() === 'golden-seth';
+    } catch (_) {
+      return /(?:^|[?&])gn=golden-seth(?:&|$)/i.test(String(location.href || ''));
+    }
+  }
+
+  function xinyaoCollapsePreloadedFreeGamePacket(root) {
+    const report = {
+      version: 'test189',
+      at: Date.now(),
+      enabled: false,
+      target: false,
+      changed: false,
+      collapsed: 0,
+      rows: []
+    };
+
+    try {
+      report.enabled = xinyaoFreeDirectSettleEnabled();
+      report.target = xinyaoIsSethDirectSettleTarget();
+      if (!report.enabled || !report.target || !root || typeof root !== 'object') {
+        window.__XIANYAO_ATG_FREE_DIRECT_SETTLE_STATE__ = report;
+        return report;
+      }
+
+      const seen = new WeakSet();
+
+      const collapseStates = (owner, path) => {
+        const states = owner?.gameState;
+        if (!Array.isArray(states) || states.length < 3) return;
+
+        const startIndex = states.findIndex(item => item?.startFreeGame === true);
+        const hasFreeSpin = states.some(item => String(item?.action || '').toLowerCase() === 'freespin');
+        if (startIndex < 0 || !hasFreeSpin) return;
+
+        let finalIndex = states.length - 1;
+        let finalView = Number(states[finalIndex]?.currentView);
+        for (let i = 0; i < states.length; i += 1) {
+          const view = Number(states[i]?.currentView);
+          if (Number.isFinite(view) && (!Number.isFinite(finalView) || view >= finalView)) {
+            finalView = view;
+            finalIndex = i;
+          }
+        }
+
+        if (finalIndex === startIndex) return;
+
+        const startRaw = states[startIndex];
+        const finalRaw = states[finalIndex];
+        const finalCount = Number(finalRaw?.freeGameCount);
+        const finalTotal = Number(finalRaw?.totalWinnings);
+
+        // 只有「最後 view 已明確 freeGameCount=0」才折疊，避免碰到逐轉伺服器型免遊。
+        if (!Number.isFinite(finalCount) || finalCount !== 0) return;
+        if (!Number.isFinite(finalTotal)) return;
+
+        const originalLength = states.length;
+        const originalTotalViews = Number(startRaw?.totalViews) || Number(finalRaw?.totalViews) || originalLength;
+
+        const first = { ...startRaw };
+        const last = { ...finalRaw };
+
+        // 維持原生「進免遊 -> 最後一個 freeSpin -> 結算」狀態機，但不再餵中間十幾個 view。
+        // freeGameCount 改成 1 是為了讓 ATG 不再等待不存在的其餘免遊 view。
+        first.currentView = 0;
+        first.totalViews = 2;
+        first.startFreeGame = true;
+        if ('freeGameCount' in first) first.freeGameCount = 1;
+
+        last.currentView = 1;
+        last.totalViews = 2;
+        last.startFreeGame = false;
+        if ('freeGameCount' in last) last.freeGameCount = 0;
+
+        // 原地 splice，確保遊戲其他地方若持有同一 gameState 參照也會同步看到折疊後內容。
+        states.splice(0, states.length, first, last);
+
+        report.changed = true;
+        report.collapsed += 1;
+        report.rows.push({
+          path,
+          originalLength,
+          originalTotalViews,
+          collapsedLength: states.length,
+          finalAmount: Math.round(finalTotal * 100) / 100,
+          spinId: String(owner?.spinId || '')
+        });
+      };
+
+      const visit = (value, path = 'packet', depth = 0) => {
+        if (!value || typeof value !== 'object' || depth > 18 || seen.has(value)) return;
+        seen.add(value);
+
+        try { collapseStates(value, path); } catch (_) {}
+
+        if (Array.isArray(value)) {
+          for (let i = 0; i < value.length; i += 1) {
+            if (value[i] && typeof value[i] === 'object') visit(value[i], `${path}[${i}]`, depth + 1);
+          }
+        } else {
+          for (const [key, child] of Object.entries(value)) {
+            if (child && typeof child === 'object') visit(child, `${path}.${key}`, depth + 1);
+          }
+        }
+      };
+
+      visit(root);
+    } catch (error) {
+      report.error = String(error?.message || error || 'collapse_failed');
+    }
+
+    report.at = Date.now();
+    try {
+      window.__XIANYAO_ATG_FREE_DIRECT_SETTLE_STATE__ = report;
+      sessionStorage.setItem('xinyao_atg_free_direct_settle_test183', JSON.stringify(report));
+      if (report.changed) {
+        window.dispatchEvent(new CustomEvent('xinyao:free-direct-settle', { detail: report }));
+      }
+    } catch (_) {}
+
+    return report;
+  }
+
+
+  // ===== test183：Raw WebSocket inbound 前置攔截 =====
+  // test180/181 證明：後段 engine / JSON 副本不是 ATG 畫面真正消費的播放資料。
+  // test182 改在 WebSocket message handler 邊界：遊戲 callback 看到 data 之前先改寫。
+  const XIANYAO_FREE_RAW_WRAP = Symbol('xinyaoFreeRawWrap182');
+  const XIANYAO_FREE_RAW_LISTENERS = new WeakMap();
+  const XIANYAO_FREE_RAW_ONMESSAGE = new WeakMap();
+
+  function xinyaoRewriteOneInboundTextFrame(rawText) {
+    const raw = String(rawText ?? '');
+    if (!raw || !xinyaoFreeDirectSettleEnabled() || !xinyaoIsSethDirectSettleTarget()) return raw;
+
+    const positions = [raw.indexOf('['), raw.indexOf('{')].filter(i => i >= 0);
+    if (!positions.length) return raw;
+
+    const start = Math.min(...positions);
+    const prefix = raw.slice(0, start);
+    const body = raw.slice(start);
+
+    let parsed;
+    try { parsed = nativeJSONParse(body); }
+    catch (_) { return raw; }
+
+    let report;
+    try { report = xinyaoCollapsePreloadedFreeGamePacket(parsed); }
+    catch (_) { return raw; }
+
+    if (!report?.changed) return raw;
+
+    let rewritten;
+    try { rewritten = prefix + JSON.stringify(parsed); }
+    catch (_) { return raw; }
+
+    try {
+      window.__XIANYAO_ATG_FREE_RAW_SETTLE_STATE__ = {
+        version:'test189',
+        at:Date.now(),
+        changed:true,
+        collapsed:Number(report.collapsed || 0),
+        rows:Array.isArray(report.rows) ? report.rows.slice(0,8) : [],
+        originalBytes:raw.length,
+        rewrittenBytes:rewritten.length
+      };
+      sessionStorage.setItem(
+        'xinyao_atg_free_raw_settle_test183',
+        JSON.stringify(window.__XIANYAO_ATG_FREE_RAW_SETTLE_STATE__)
+      );
+      window.dispatchEvent(new CustomEvent('xinyao:free-raw-settle', {
+        detail:window.__XIANYAO_ATG_FREE_RAW_SETTLE_STATE__
+      }));
+    } catch (_) {}
+
+    return rewritten;
+  }
+
+  function xinyaoRewriteInboundFrameData(data) {
+    try {
+      if (typeof data === 'string') {
+        // Engine.IO 有機會把多個 packet 以 record-separator 合併。
+        if (data.includes('\x1e')) {
+          const parts = data.split('\x1e');
+          let changed = false;
+          const next = parts.map(part => {
+            const rewritten = xinyaoRewriteOneInboundTextFrame(part);
+            if (rewritten !== part) changed = true;
+            return rewritten;
+          });
+          return changed ? next.join('\x1e') : data;
+        }
+        return xinyaoRewriteOneInboundTextFrame(data);
+      }
+
+      // 少數實作把 UTF-8 text 以 ArrayBuffer / TypedArray 交給 listener。
+      // 只處理可直接 UTF-8 解碼且可 JSON.parse 的資料；壓縮 binary 保持原樣。
+      if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
+        const view = data instanceof ArrayBuffer
+          ? new Uint8Array(data)
+          : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+        const decoded = new TextDecoder().decode(view).replace(/^\u0004+/, '');
+        const rewritten = xinyaoRewriteOneInboundTextFrame(decoded);
+        if (rewritten === decoded) return data;
+        return new TextEncoder().encode(rewritten).buffer;
+      }
+    } catch (_) {}
+    return data;
+  }
+
+  function xinyaoProxyMessageEvent(event, nextData) {
+    if (!event || nextData === event.data) return event;
+    try {
+      return new Proxy(event, {
+        get(target, prop) {
+          if (prop === 'data') return nextData;
+          const value = Reflect.get(target, prop, target);
+          return typeof value === 'function' ? value.bind(target) : value;
+        }
+      });
+    } catch (_) {
+      try {
+        return new MessageEvent('message', {
+          data:nextData,
+          origin:event.origin || '',
+          lastEventId:event.lastEventId || ''
+        });
+      } catch (_) {
+        return event;
+      }
+    }
+  }
+
+  function xinyaoWrapMessageListener(listener) {
+    if (!listener) return listener;
+    if (listener?.[XIANYAO_FREE_RAW_WRAP]) return listener;
+
+    let wrapped;
+    if (typeof listener === 'function') {
+      wrapped = function(event) {
+        let nextEvent = event;
+        try {
+          const nextData = xinyaoRewriteInboundFrameData(event?.data);
+          if (nextData !== event?.data) nextEvent = xinyaoProxyMessageEvent(event, nextData);
+        } catch (_) {}
+        return listener.call(this, nextEvent);
+      };
+    } else if (typeof listener?.handleEvent === 'function') {
+      wrapped = {
+        handleEvent(event) {
+          let nextEvent = event;
+          try {
+            const nextData = xinyaoRewriteInboundFrameData(event?.data);
+            if (nextData !== event?.data) nextEvent = xinyaoProxyMessageEvent(event, nextData);
+          } catch (_) {}
+          return listener.handleEvent(nextEvent);
+        }
+      };
+    } else {
+      return listener;
+    }
+
+    try { Object.defineProperty(wrapped, XIANYAO_FREE_RAW_WRAP, { value:true }); } catch (_) {}
+    return wrapped;
+  }
+
+  function patchWebSocketInboundHandlersForWindow(targetWindow) {
+    try {
+      const WS = targetWindow?.WebSocket;
+      const proto = WS?.prototype;
+      if (!proto || proto.__xinyaoFreeRawInbound182) return false;
+
+      const nativeAdd = proto.addEventListener;
+      const nativeRemove = proto.removeEventListener;
+
+      if (typeof nativeAdd === 'function' && typeof nativeRemove === 'function') {
+        proto.addEventListener = function(type, listener, options) {
+          if (String(type).toLowerCase() !== 'message' || !listener) {
+            return nativeAdd.call(this, type, listener, options);
+          }
+
+          let bySocket = XIANYAO_FREE_RAW_LISTENERS.get(this);
+          if (!bySocket) {
+            bySocket = new WeakMap();
+            XIANYAO_FREE_RAW_LISTENERS.set(this, bySocket);
+          }
+
+          let wrapped = bySocket.get(listener);
+          if (!wrapped) {
+            wrapped = xinyaoWrapMessageListener(listener);
+            try { bySocket.set(listener, wrapped); } catch (_) {}
+          }
+          return nativeAdd.call(this, type, wrapped, options);
+        };
+
+        proto.removeEventListener = function(type, listener, options) {
+          if (String(type).toLowerCase() === 'message' && listener) {
+            const wrapped = XIANYAO_FREE_RAW_LISTENERS.get(this)?.get(listener);
+            if (wrapped) return nativeRemove.call(this, type, wrapped, options);
+          }
+          return nativeRemove.call(this, type, listener, options);
+        };
+      }
+
+      // engine.io / socket.io-client 常用 ws.onmessage = fn，這條也一起攔。
+      try {
+        const desc = Object.getOwnPropertyDescriptor(proto, 'onmessage');
+        if (desc?.set && desc?.get) {
+          Object.defineProperty(proto, 'onmessage', {
+            configurable: desc.configurable !== false,
+            enumerable: desc.enumerable,
+            get() {
+              const row = XIANYAO_FREE_RAW_ONMESSAGE.get(this);
+              if (row) return row.original;
+              try { return desc.get.call(this); } catch (_) { return null; }
+            },
+            set(listener) {
+              if (typeof listener !== 'function') {
+                XIANYAO_FREE_RAW_ONMESSAGE.delete(this);
+                return desc.set.call(this, listener);
+              }
+              const wrapped = xinyaoWrapMessageListener(listener);
+              XIANYAO_FREE_RAW_ONMESSAGE.set(this, { original:listener, wrapped });
+              return desc.set.call(this, wrapped);
+            }
+          });
+        }
+      } catch (_) {}
+
+      try { Object.defineProperty(proto, '__xinyaoFreeRawInbound182', { value:true }); }
+      catch (_) { proto.__xinyaoFreeRawInbound182 = true; }
+
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   function patchSocketIO() {
     for (const gameWindow of collectSameOriginLiveWindows()) {
       try {
@@ -3233,7 +3647,10 @@ try {
         if (typeof proto.onevent === 'function' && !proto.onevent.__xinyaoLiveV200Wrapped) {
           const nativeOnevent = proto.onevent;
           const wrappedOnevent = function(packet) {
+            // 先讓芯瑤讀完整原始回包，保留最終贏分 / 診斷資料；
+            // 再於 ATG 自己的 handler 執行前折疊免遊中間 view。
             try { if (packet?.data) inspectObject(packet.data); } catch (_) {}
+            try { if (packet?.data) xinyaoCollapsePreloadedFreeGamePacket(packet.data); } catch (_) {}
             return nativeOnevent.call(this, packet);
           };
           try { Object.defineProperty(wrappedOnevent, '__xinyaoLiveV200Wrapped', { value: true }); } catch (_) {}
@@ -8887,6 +9304,174 @@ try {
     };
   }
 
+  const XIANYAO_OCCUPIED_MODAL_ID = 'xinyao-atg-room-occupied-choice-v1';
+
+  function roomStatusForFinalEntry(roomId, roomNumber, nativeInfo = null) {
+    const rid = finiteNumber(roomId);
+    const rnum = finiteNumber(roomNumber);
+
+    if (rid !== null) {
+      try {
+        const live = state.liveStatusByRoomId.get(Math.trunc(rid));
+        if (typeof live?.status === 'string' && live.status) return live.status;
+      } catch (_) {}
+    }
+
+    try {
+      if (typeof nativeInfo?.status === 'string' && nativeInfo.status) return nativeInfo.status;
+    } catch (_) {}
+
+    try {
+      for (const room of numberedRooms()) {
+        const roomRid = finiteNumber(room?.roomId);
+        const roomNum = finiteNumber(room?.number);
+        if ((rid !== null && roomRid === rid) || (rnum !== null && roomNum === rnum)) {
+          if (typeof room?.status === 'string' && room.status) return room.status;
+        }
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  function sameGameObservationCandidates(moduleId, excludeRoomNumber = null) {
+    const active = xinyaoActiveGameModule();
+    if (!moduleId || active !== moduleId) return [];
+
+    const snapshotSource = Array.isArray(state.rankingSnapshotRooms)
+      ? state.rankingSnapshotRooms
+      : numberedRooms();
+
+    const liveByRoomId = new Map();
+    const liveByNumber = new Map();
+    for (const room of numberedRooms()) {
+      const rid = finiteNumber(room?.roomId);
+      const rnum = finiteNumber(room?.number);
+      if (rid !== null) liveByRoomId.set(Math.trunc(rid), room);
+      if (rnum !== null) liveByNumber.set(Math.trunc(rnum), room);
+    }
+
+    const rows = snapshotSource.map(snapshotRoom => {
+      const rid = finiteNumber(snapshotRoom?.roomId);
+      const rnum = finiteNumber(snapshotRoom?.number);
+      const direct = rid !== null ? state.liveStatusByRoomId.get(Math.trunc(rid)) : null;
+      const live =
+        (rid !== null ? liveByRoomId.get(Math.trunc(rid)) : null) ||
+        (rnum !== null ? liveByNumber.get(Math.trunc(rnum)) : null) ||
+        null;
+      return {
+        ...snapshotRoom,
+        status: direct?.status ?? live?.status ?? snapshotRoom?.status,
+        updatedAt: direct?.updatedAt ?? live?.updatedAt ?? snapshotRoom?.updatedAt
+      };
+    }).filter(room => {
+      const n = finiteNumber(room?.number);
+      if (n === null) return false;
+      if (excludeRoomNumber !== null && Math.trunc(n) === Math.trunc(excludeRoomNumber)) return false;
+      return room?.status === 'Empty';
+    });
+
+    return rankRooms(rows, { onlyEmpty:true, mode:'observation' });
+  }
+
+  function closeOccupiedRoomChoice() {
+    try { document.getElementById(XIANYAO_OCCUPIED_MODAL_ID)?.remove(); } catch (_) {}
+  }
+
+  function showOccupiedRoomChoice(roomNumber, roomId, status, moduleId) {
+    closeOccupiedRoomChoice();
+
+    const currentModule = xinyaoActiveGameModule();
+    if (currentModule !== moduleId) return false;
+
+    const roomNo = Math.trunc(finiteNumber(roomNumber) || 0);
+    const roomText = String(roomNo).padStart(4,'0');
+    const game = XIANYAO_GAME_MODULES[moduleId] || XIANYAO_GAME_MODULES.seth;
+    const candidates = sameGameObservationCandidates(moduleId, roomNo);
+    const best = candidates[0] || null;
+    const statusText = status === 'Locked' ? '已鎖定' : status === 'Full' ? '目前有人使用' : '目前無法進入';
+
+    const overlay = document.createElement('div');
+    overlay.id = XIANYAO_OCCUPIED_MODAL_ID;
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(0,0,0,.72);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif;';
+
+    const bestText = best
+      ? String(best.number).padStart(4,'0') + '｜觀察分數 ' + (best.metrics?.observationScore?.toFixed?.(1) ?? '—')
+      : '目前沒有可用空房';
+
+    overlay.innerHTML =
+      '<div style="width:min(430px,calc(100vw - 28px));box-sizing:border-box;padding:22px 20px;border:1px solid rgba(255,184,212,.58);border-radius:20px;background:rgba(21,17,26,.98);color:#fff;box-shadow:0 20px 60px rgba(0,0,0,.55);text-align:center;">'+
+        '<div style="font-size:13px;font-weight:900;color:#ffb9d4;">'+game.icon+' '+game.label+'</div>'+
+        '<div style="margin-top:8px;font-size:21px;font-weight:1000;color:#fff;">你挑的 #'+roomText+' 這房'+statusText+'</div>'+
+        '<div style="margin-top:7px;font-size:12px;opacity:.7;">要怎麼處理？</div>'+
+        '<button type="button" data-room-choice="auto" '+(best?'':'disabled')+' style="width:100%;margin-top:18px;border:0;border-radius:12px;background:'+(best?'linear-gradient(135deg,#ff87b5,#ff5f9e)':'rgba(255,255,255,.09)')+';color:#fff;padding:13px 12px;font-size:13px;font-weight:950;cursor:'+(best?'pointer':'default')+';opacity:'+(best?'1':'.5')+';">⚡ 自動挑同遊戲「觀察分數」最高空房</button>'+
+        '<div style="margin-top:6px;font-size:10px;color:#ffd0e0;opacity:.78;">'+bestText+'</div>'+
+        '<button type="button" data-room-choice="back" style="width:100%;margin-top:12px;border:1px solid rgba(255,184,212,.46);border-radius:12px;background:rgba(255,255,255,.04);color:#fff;padding:12px;font-size:13px;font-weight:900;cursor:pointer;">↩️ 回到選房頁</button>'+
+      '</div>';
+
+    (document.body || document.documentElement).appendChild(overlay);
+
+    overlay.querySelector('[data-room-choice="back"]')?.addEventListener('click', () => {
+      closeOccupiedRoomChoice();
+      state.enterRoomStatus = '↩️ 已取消進房｜請重新選擇空房';
+      scheduleRender();
+    });
+
+    const autoButton = overlay.querySelector('[data-room-choice="auto"]');
+    let autoChosen = false;
+    async function chooseNextEmpty(event) {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      event?.stopImmediatePropagation?.();
+      if (autoChosen || !best) return;
+      autoChosen = true;
+      if (autoButton) { autoButton.disabled = true; autoButton.textContent = '⏳ 正在重新檢查空房…'; }
+      if (xinyaoActiveGameModule() !== moduleId) {
+        closeOccupiedRoomChoice();
+        state.enterRoomStatus = '⚠️ 遊戲已切換，請重新掃描';
+        scheduleRender();
+        return;
+      }
+      const waitStarted = Date.now();
+      while (state.enterRoomBusy && Date.now() - waitStarted < 8000) await roomWait(80);
+      if (state.enterRoomBusy) {
+        closeOccupiedRoomChoice();
+        state.enterRoomStatus = '⚠️ 上一次選房還在執行，請稍後重新點選';
+        scheduleRender();
+        return;
+      }
+      const fresh = sameGameObservationCandidates(moduleId, roomNo)[0] || null;
+      if (!fresh) {
+        closeOccupiedRoomChoice();
+        state.enterRoomStatus = '⚠️ 沒有最新可用空房，請重新掃描';
+        scheduleRender();
+        return;
+      }
+      const latestStatus = roomStatusForFinalEntry(fresh.roomId, fresh.number, fresh);
+      if (latestStatus && latestStatus !== 'Empty') {
+        closeOccupiedRoomChoice();
+        showOccupiedRoomChoice(fresh.number, fresh.roomId, latestStatus, moduleId);
+        return;
+      }
+      closeOccupiedRoomChoice();
+      state.enterRoomStatus = '⚡ 自動改挑 ' + String(fresh.number).padStart(4,'0') + '｜'+game.label+' 專屬空房';
+      scheduleRender();
+      routeEnterRoomFromRanking(fresh.number, fresh.roomId);
+    }
+    autoButton?.addEventListener('pointerdown', chooseNextEmpty, { capture:true });
+    autoButton?.addEventListener('click', chooseNextEmpty, { capture:true });;
+
+    return true;
+  }
+
+  function blockOccupiedRoomBeforeConfirm(roomNumber, roomId, nativeInfo, moduleId) {
+    const status = roomStatusForFinalEntry(roomId, roomNumber, nativeInfo);
+    if (!status || status === 'Empty') return false;
+    showOccupiedRoomChoice(roomNumber, roomId, status, moduleId);
+    state.enterRoomStatus = '⚠️ ' + String(Math.trunc(roomNumber)).padStart(4,'0') + ' 已不是空房｜等待選擇處理方式';
+    scheduleRender();
+    return true;
+  }
   async function enterRoomFromRanking(roomNumber, roomId) {
     const number = finiteNumber(roomNumber);
     const id = finiteNumber(roomId);
@@ -9031,6 +9616,10 @@ try {
       const finalInfo = findRoomInfoInSlotTableMap(controller, wantedId);
       if (!finalInfo) {
         throw new Error(`送出前原生 tableInfo 消失｜roomId=${wantedId}`);
+      }
+
+      if (blockOccupiedRoomBeforeConfirm(roomNo, wantedId, finalInfo, 'seth')) {
+        return;
       }
 
       const confirm = findConfirmRoomButton();
@@ -9835,6 +10424,10 @@ try {
         throw new Error(`虎小妹送出前原生 tableInfo 消失｜roomId=${wantedId}`);
       }
 
+      if (blockOccupiedRoomBeforeConfirm(roomNo, wantedId, finalInfo, 'tiger')) {
+        return;
+      }
+
       const confirm = findConfirmRoomButton();
       if (!confirm?.node) throw new Error('虎小妹：找不到 confirmBtn/selectBtn');
 
@@ -9994,28 +10587,6 @@ try {
           <div style="display:grid;grid-template-columns:30px 52px 1fr 1fr 48px 72px;gap:5px;font-size:10px;opacity:.7;padding-bottom:3px;"><span>名次</span><span>房號</span><span>今日率</span><span>累計率</span><span>分數</span><span>操作</span></div>
           ${topRowsHtml()}
           ${state.enterRoomStatus ? `<div style="margin-top:6px;padding:6px 7px;border:1px solid rgba(255,184,212,.18);border-radius:7px;background:rgba(255,255,255,.04);font-size:9.5px;color:#ffd2e4;">${escapeHtml(state.enterRoomStatus)}</div>` : ''}
-          <button id="xinyao-handler-refresh" type="button" style="margin-top:6px;width:100%;border:1px solid rgba(255,211,138,.32);border-radius:7px;background:rgba(255,186,86,.10);color:#ffd8a3;padding:6px 8px;font-size:9.5px;font-weight:800;cursor:pointer;">🧪 重新偵測「選取」handler</button>
-          <div style="font-size:9.5px;margin-top:6px;color:${window.__XIANYAO_ATG_RAW_SELECT_FRAME__
-              ? '⚡ 原始選房封包已學習｜可直接指定 roomId'
-              : '⚡ 尚未學到原始選房封包：手動點任一房一次即可'}
-          </div>
-          <div style="margin-top:6px;padding:6px 7px;border:1px solid rgba(255,211,138,.22);border-radius:7px;background:rgba(255,255,255,.035);font-size:9.5px;line-height:1.55;color:#ffd8a3;">
-            🧪 ${escapeHtml(confirmHandlerDiagnosticsText())}
-          </div>
-          <div style="margin-top:6px;padding:6px 7px;border:1px solid rgba(141,234,193,.22);border-radius:7px;background:rgba(255,255,255,.03);font-size:9.5px;color:#bff5dd;">
-            ⚙️ 選房控制器：${(() => {
-              const ctrl = findSlotTableController();
-              const snap = slotTableControllerSnapshot(ctrl);
-              return snap
-                ? `current=${snap.currentRoomId ?? '—'}｜select=${snap.selectRoomId ?? '—'}｜page=${snap.selectPage ?? '—'}｜map=${snap.mapSize ?? '—'}｜flag=${snap.isUpdateSelectFlag}`
-                : '未找到';
-            })()}
-          </div>
-          <details open style="margin-top:6px;border:1px solid rgba(147,210,255,.20);border-radius:7px;background:rgba(255,255,255,.025);padding:6px 7px;">
-            <summary style="cursor:pointer;font-size:9.5px;font-weight:800;color:#bfe5ff;">🔬 selectBtn 深層資料</summary>
-            <pre style="white-space:pre-wrap;word-break:break-word;font-size:8.5px;line-height:1.45;color:#cbe9ff;margin:6px 0 0;">${escapeHtml(deepSelectDiagnosticsText())}</pre>
-          </details>
-          <div style="font-size:9.5px;opacity:.6;line-height:1.5;margin-top:6px;">觀察分數只整理已發生的統計資料，並以投注量做簡單權重修正，不代表下一局結果。</div>
         </div>
 
         <div style="margin-top:10px;padding-top:9px;border-top:1px solid rgba(255,255,255,.12);">
@@ -14404,6 +14975,15 @@ try {
   }
 
 
+  window.__XIANYAO_ATG_STOP_AUTOPLAY__ = {
+    version:'1.0.0-test189',
+    stop:() => tryStopAutoplay(),
+    available:() => {
+      try { return sameOriginSignalWindows().some(w => Boolean(findExactATGStopAutoButton(w)?.button)); } catch (_) { return false; }
+    },
+    getLastVia:() => String(probe.autoStopLastVia || '')
+  };
+
   window.addEventListener(EVENT_NAME, handleSpinFinal);
 
   try {
@@ -14417,6 +14997,298 @@ try {
   }
 })();
 
+
+
+
+/* ===== 芯瑤 ATG 止盈／止損 v1.0｜test186 ===== */
+(() => {
+  'use strict';
+  if (window.__XIANYAO_ATG_RISK_GUARD_V1__) return;
+  window.__XIANYAO_ATG_RISK_GUARD_V1__ = true;
+
+  const PANEL_ID='xinyao-atg-risk-guard-v1';
+  const MINI_ID='xinyao-atg-risk-mini-v1';
+  const TOAST_ID='xinyao-atg-risk-toast-v1';
+  const STYLE_ID='xinyao-atg-risk-style-v1';
+  const SETTINGS_KEY='xinyao_atg_risk_guard_settings_v1';
+  const SESSION_KEY='xinyao_atg_risk_guard_session_v1';
+
+  let cfg={autoStop:true,takeProfit:3000,stopLoss:3000,showPnl:true,showLimits:true};
+  let run={active:false,startBalance:null,triggered:false,triggerType:'',stopStatus:'',stopAttempts:0};
+  let retryToken=0;
+
+  const n=v=>{
+    if(v===null||v===undefined||v==='')return null;
+    const x=Number(v);
+    return Number.isFinite(x)?x:null;
+  };
+  const clamp=v=>{
+    const x=n(v);
+    return x===null?0:Math.max(0,Math.min(1000000,Math.round(x)));
+  };
+  const balance=()=>n((window.__XIANYAO_ATG_LIVE_SNAPSHOT__||{}).balance);
+  const pnl=()=>{
+    const b=balance();
+    if(b===null||run.startBalance===null)return 0;
+    return Math.round((b-run.startBalance)*100)/100;
+  };
+  const money=(v,signed)=>{
+    const x=n(v);
+    if(x===null)return '—';
+    const body=Math.abs(x).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+    if(!signed)return body;
+    return x>0?'+'+body:x<0?'-'+body:'+0.00';
+  };
+
+  function save(){
+    try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(cfg));}catch(_){}
+    try{sessionStorage.setItem(SESSION_KEY,JSON.stringify(run));}catch(_){}
+  }
+
+  function load(){
+    try{
+      const x=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}');
+      cfg=Object.assign(cfg,x||{});
+      cfg.autoStop=cfg.autoStop!==false;
+      cfg.showPnl=cfg.showPnl!==false;
+      cfg.showLimits=cfg.showLimits!==false;
+      cfg.takeProfit=clamp(cfg.takeProfit||3000);
+      cfg.stopLoss=clamp(cfg.stopLoss||3000);
+    }catch(_){}
+    try{
+      const x=JSON.parse(sessionStorage.getItem(SESSION_KEY)||'{}');
+      if(x&&typeof x==='object')run=Object.assign(run,x);
+      run.active=Boolean(run.active);
+      run.triggered=Boolean(run.triggered);
+      run.startBalance=n(run.startBalance);
+    }catch(_){}
+  }
+
+  function ensureStyle(){
+    if(document.getElementById(STYLE_ID))return;
+    const el=document.createElement('style');
+    el.id=STYLE_ID;
+    el.textContent=
+      '#'+PANEL_ID+'{position:fixed;z-index:2147483647;left:50%;top:50%;transform:translate(-50%,-50%);width:min(560px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto;box-sizing:border-box;padding:18px;border:1px solid rgba(255,181,214,.56);border-radius:20px;background:rgba(17,15,22,.965);color:#fff;box-shadow:0 22px 70px rgba(0,0,0,.55);backdrop-filter:blur(14px);font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif}'+
+      '#'+PANEL_ID+' .rg-head{display:flex;align-items:center;justify-content:space-between;gap:12px}'+
+      '#'+PANEL_ID+' .rg-title{font-size:18px;font-weight:950;color:#ffd1e3}'+
+      '#'+PANEL_ID+' .rg-close{border:0;background:transparent;color:#fff;font-size:24px;cursor:pointer;opacity:.7}'+
+      '#'+PANEL_ID+' .rg-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-top:1px solid rgba(255,255,255,.08)}'+
+      '#'+PANEL_ID+' .rg-label{font-size:13px;font-weight:900}'+
+      '#'+PANEL_ID+' .rg-sub{font-size:10px;opacity:.62;margin-top:3px}'+
+      '#'+PANEL_ID+' .rg-switch{position:relative;width:54px;height:30px;flex:0 0 54px;border:0;border-radius:999px;background:rgba(255,255,255,.13);cursor:pointer}'+
+      '#'+PANEL_ID+' .rg-switch:after{content:"";position:absolute;left:4px;top:4px;width:22px;height:22px;border-radius:50%;background:#d9d0d4;transition:.18s}'+
+      '#'+PANEL_ID+' .rg-switch.on{background:linear-gradient(135deg,#ff8fba,#ff5f9e)}'+
+      '#'+PANEL_ID+' .rg-switch.on:after{transform:translateX(24px);background:#fff}'+
+      '#'+PANEL_ID+' .rg-pnl{font-size:36px;font-weight:1000;text-align:center;margin:12px 0 14px}'+
+      '#'+PANEL_ID+' .rg-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}'+
+      '#'+PANEL_ID+' .rg-btn{border:1px solid rgba(255,184,214,.55);border-radius:11px;background:rgba(255,95,158,.14);color:#fff;padding:10px;font-size:13px;font-weight:950;cursor:pointer}'+
+      '#'+PANEL_ID+' .rg-btn.primary{background:linear-gradient(135deg,#ff87b5,#ff5f9e);border-color:transparent}'+
+      '#'+PANEL_ID+' .rg-number{display:grid;grid-template-columns:40px 1fr 40px;gap:6px;margin-top:7px}'+
+      '#'+PANEL_ID+' .rg-number button{height:36px;border:1px solid rgba(255,184,214,.3);border-radius:9px;background:rgba(255,255,255,.045);color:#fff;font-size:20px;font-weight:900;cursor:pointer}'+
+      '#'+PANEL_ID+' .rg-number input{height:36px;box-sizing:border-box;border:1px solid rgba(255,184,214,.28);border-radius:9px;background:rgba(255,255,255,.055);color:#fff;text-align:center;font-size:16px;font-weight:950;outline:none;width:100%}'+
+      '#'+PANEL_ID+' .rg-status{margin-top:12px;padding:9px 10px;border:1px solid rgba(255,184,214,.16);border-radius:10px;background:rgba(255,255,255,.035);font-size:11px;line-height:1.55;color:#ffd0e1}'+
+      '#'+MINI_ID+'{position:fixed;z-index:2147483645;left:10px;bottom:10px;min-width:126px;padding:8px 10px;border:1px solid rgba(255,184,214,.45);border-radius:12px;background:rgba(18,16,23,.90);color:#fff;box-shadow:0 8px 25px rgba(0,0,0,.35);font:800 11px -apple-system,BlinkMacSystemFont,"PingFang TC",sans-serif;cursor:pointer}'+
+      '#'+MINI_ID+' b{font-size:15px;color:#ffd0e2}'+
+      '#'+TOAST_ID+'{position:fixed;z-index:2147483647;top:74px;left:50%;transform:translateX(-50%);width:min(330px,calc(100vw - 24px));box-sizing:border-box;padding:13px 15px;border:1px solid rgba(255,184,214,.58);border-radius:14px;background:rgba(19,16,24,.97);color:#fff;text-align:center;box-shadow:0 12px 38px rgba(0,0,0,.46);font:900 12px -apple-system,BlinkMacSystemFont,"PingFang TC",sans-serif}';
+    (document.head||document.documentElement).appendChild(el);
+  }
+
+  function toast(title,detail){
+    let el=document.getElementById(TOAST_ID);
+    if(!el){el=document.createElement('div');el.id=TOAST_ID;(document.body||document.documentElement).appendChild(el);}
+    el.innerHTML='<div style="color:#ffb6d3;font-size:14px;">'+title+'</div>'+(detail?'<div style="margin-top:5px;font-size:11px;opacity:.8;">'+detail+'</div>':'');
+    clearTimeout(toast.t);
+    toast.t=setTimeout(()=>el&&el.remove(),4200);
+  }
+
+  function stopWithRetry(reason){
+    const token=++retryToken;
+    const delays=[0,80,180,350,650,1000,1600,2400,3600,5200];
+    run.stopStatus='正在停止自動轉…';
+    run.stopAttempts=0;
+    save();
+    update();
+
+    delays.forEach((delay,index)=>{
+      setTimeout(()=>{
+        if(token!==retryToken)return;
+        let result=null;
+        try{result=window.__XIANYAO_ATG_STOP_AUTOPLAY__?.stop?.();}catch(_){}
+        run.stopAttempts+=1;
+        if(result&&result.ok){
+          run.stopStatus='✅ 已送出停止自動轉｜'+reason;
+          save();
+          update();
+          return;
+        }
+        if(index===delays.length-1){
+          run.stopStatus='⚠️ 已達標，但目前找不到可按的停止鍵';
+          save();
+          update();
+        }
+      },delay);
+    });
+  }
+
+  function trigger(type,value){
+    if(run.triggered)return;
+    run.triggered=true;
+    run.triggerType=type;
+    save();
+    const label=type==='profit'?'止盈達標':'止損達標';
+    const detail='本場盈虧 '+money(value,true);
+    toast('🛡️ '+label,cfg.autoStop?detail+'｜正在停止自動轉':detail);
+    if(cfg.autoStop)stopWithRetry(label);
+    else{run.stopStatus='✅ '+label+'｜自動停止目前關閉';save();update();}
+  }
+
+  function evaluate(){
+    if(!run.active||run.startBalance===null||run.triggered)return;
+    const value=pnl();
+    if(cfg.takeProfit>0&&value>=cfg.takeProfit){trigger('profit',value);return;}
+    if(cfg.stopLoss>0&&value<=-cfg.stopLoss)trigger('loss',value);
+  }
+
+  function start(){
+    const b=balance();
+    if(b===null){toast('⚠️ 尚未取得目前點數','請進入遊戲後再按開始');return;}
+    retryToken+=1;
+    run.active=true;
+    run.startBalance=b;
+    run.triggered=false;
+    run.triggerType='';
+    run.stopStatus='監測中';
+    run.stopAttempts=0;
+    save();
+    update();
+  }
+
+  function pause(){
+    retryToken+=1;
+    run.active=false;
+    run.stopStatus='已暫停監測';
+    save();
+    update();
+  }
+
+  function reset(){
+    retryToken+=1;
+    run.startBalance=balance();
+    run.triggered=false;
+    run.triggerType='';
+    run.stopStatus=run.active?'已重置｜監測中':'已重置';
+    run.stopAttempts=0;
+    save();
+    update();
+  }
+
+  function ensurePanel(){
+    ensureStyle();
+    let p=document.getElementById(PANEL_ID);
+    if(p)return p;
+    p=document.createElement('div');
+    p.id=PANEL_ID;
+    p.style.display='none';
+    p.innerHTML=
+      '<div class="rg-head"><div class="rg-title">🛡️ 止盈／止損</div><button class="rg-close" type="button">×</button></div>'+
+      '<div class="rg-row"><div><div class="rg-label">達到設定金額自動停止</div><div class="rg-sub">只停止 ATG 自動轉，不修改遊戲結果</div></div><button id="rgAuto" class="rg-switch" type="button"></button></div>'+
+      '<div id="rgPnl" class="rg-pnl">+0.00</div>'+
+      '<div class="rg-actions"><button id="rgStart" class="rg-btn primary" type="button">開始</button><button id="rgReset" class="rg-btn" type="button">↻ 重置</button></div>'+
+      '<div class="rg-row"><div style="width:100%"><div class="rg-label" style="color:#8ff0ad">贏到＋（止盈）</div><div class="rg-number"><button data-delta="tp:-100">−</button><input id="rgTp" inputmode="numeric"><button data-delta="tp:100">＋</button></div></div></div>'+
+      '<div class="rg-row"><div style="width:100%"><div class="rg-label" style="color:#ff91aa">輸到－（止損）</div><div class="rg-number"><button data-delta="sl:-100">−</button><input id="rgSl" inputmode="numeric"><button data-delta="sl:100">＋</button></div></div></div>'+
+      '<div class="rg-row"><div class="rg-label">顯示本場盈虧</div><button id="rgShowPnl" class="rg-switch" type="button"></button></div>'+
+      '<div class="rg-row"><div class="rg-label">顯示止盈／止損</div><button id="rgShowLimits" class="rg-switch" type="button"></button></div>'+
+      '<div id="rgStatus" class="rg-status"></div>';
+    (document.body||document.documentElement).appendChild(p);
+
+    p.querySelector('.rg-close').onclick=()=>p.style.display='none';
+    p.querySelector('#rgAuto').onclick=()=>{cfg.autoStop=!cfg.autoStop;save();update();};
+    p.querySelector('#rgShowPnl').onclick=()=>{cfg.showPnl=!cfg.showPnl;save();update();};
+    p.querySelector('#rgShowLimits').onclick=()=>{cfg.showLimits=!cfg.showLimits;save();update();};
+    p.querySelector('#rgStart').onclick=()=>run.active?pause():start();
+    p.querySelector('#rgReset').onclick=reset;
+
+    p.querySelectorAll('[data-delta]').forEach(btn=>{
+      btn.onclick=()=>{
+        const parts=String(btn.dataset.delta||'').split(':');
+        const delta=Number(parts[1]||0);
+        if(parts[0]==='tp')cfg.takeProfit=clamp(cfg.takeProfit+delta);
+        if(parts[0]==='sl')cfg.stopLoss=clamp(cfg.stopLoss+delta);
+        save();update();
+      };
+    });
+
+    const tp=p.querySelector('#rgTp');
+    const sl=p.querySelector('#rgSl');
+    const commit=()=>{
+      cfg.takeProfit=clamp(tp.value);
+      cfg.stopLoss=clamp(sl.value);
+      save();update();
+    };
+    tp.onchange=commit; sl.onchange=commit;
+    tp.onkeydown=e=>{if(e.key==='Enter')tp.blur();};
+    sl.onkeydown=e=>{if(e.key==='Enter')sl.blur();};
+    return p;
+  }
+
+  function renderMini(){
+    ensureStyle();
+    let m=document.getElementById(MINI_ID);
+    if(!run.active||(!cfg.showPnl&&!cfg.showLimits)){m&&m.remove();return;}
+    if(!m){
+      m=document.createElement('button');
+      m.type='button';m.id=MINI_ID;m.onclick=open;
+      (document.body||document.documentElement).appendChild(m);
+    }
+    let html='';
+    if(cfg.showPnl)html+='<div>🛡️ 本場 <b>'+money(pnl(),true)+'</b></div>';
+    if(cfg.showLimits)html+='<div style="margin-top:3px;font-size:10px;opacity:.7;">−'+cfg.stopLoss.toLocaleString()+' / +'+cfg.takeProfit.toLocaleString()+'</div>';
+    m.innerHTML=html;
+  }
+
+  function update(){
+    const p=document.getElementById(PANEL_ID);
+    if(p){
+      const value=pnl();
+      const pe=p.querySelector('#rgPnl');
+      if(pe){pe.textContent=money(value,true);pe.style.color=value>0?'#8ff0ad':value<0?'#ff91aa':'#fff';}
+      const tp=p.querySelector('#rgTp');
+      const sl=p.querySelector('#rgSl');
+      if(tp&&document.activeElement!==tp)tp.value=String(cfg.takeProfit);
+      if(sl&&document.activeElement!==sl)sl.value=String(cfg.stopLoss);
+      const set=(id,on)=>{const el=p.querySelector(id);if(el)el.classList.toggle('on',Boolean(on));};
+      set('#rgAuto',cfg.autoStop);set('#rgShowPnl',cfg.showPnl);set('#rgShowLimits',cfg.showLimits);
+      const startBtn=p.querySelector('#rgStart');if(startBtn)startBtn.textContent=run.active?'暫停監測':'開始';
+      const st=p.querySelector('#rgStatus');
+      if(st)st.innerHTML=(run.active?'● 監測中':'○ 尚未開始')+'｜起始點數 '+money(run.startBalance)+'｜目前點數 '+money(balance())+'<br>'+(run.stopStatus||'設定完成後按「開始」即可');
+    }
+    renderMini();
+    try{window.__XIANYAO_ATG_RISK_GUARD_STATE__={version:'test189',settings:Object.assign({},cfg),session:Object.assign({},run),balance:balance(),pnl:pnl()};}catch(_){}
+  }
+
+  function open(){
+    const p=ensurePanel();
+    p.style.display='block';
+    update();
+  }
+
+  load();
+  document.addEventListener('click',e=>{
+    const b=e.target&&e.target.closest?e.target.closest('#xinyaoRiskOpen'):null;
+    if(!b)return;
+    e.preventDefault();e.stopPropagation();open();
+  },true);
+
+  setInterval(()=>{evaluate();update();},250);
+
+  window.__XIANYAO_ATG_RISK_GUARD__={
+    version:'1.0.0-test189',
+    open,start,pause,reset,
+    getState:()=>({settings:Object.assign({},cfg),session:Object.assign({},run),balance:balance(),pnl:pnl()})
+  };
+  update();
+})();
 
 
 /* ===== 芯瑤 ATG Mobile Quick HUD v1.0｜test87 超小懸浮工具 ===== */
@@ -14881,8 +15753,9 @@ try {
 
   try {
     const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
-    settings.auto = Boolean(saved.auto);
-    settings.spoiler = Boolean(saved.spoiler);
+    settings.auto = false;
+    settings.spoiler = false;
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (_) {}
   } catch (_) {}
 
   function saveSettings() {
@@ -15361,7 +16234,7 @@ try {
     }
 
     const result = {
-      version: 'test179',
+      version: 'test189',
       at: Date.now(),
       freeGameActive: Boolean(window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameActive),
       freeGameCount: window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameCount ?? null,
@@ -15507,33 +16380,27 @@ try {
   function handleAuto(active) {
     if (!settings.auto) {
       freeWasActive = false;
-      nativeStatus = '免遊診斷已關閉';
+      nativeStatus = '結果先顯示已關閉';
+      lastNativeVia = '';
       return;
     }
 
     if (!active) {
-      if (freeWasActive) nativeStatus = '✅ 免遊已結束｜診斷已保存';
+      if (freeWasActive) nativeStatus = '等待下一次免遊';
       freeWasActive = false;
+      lastNativeVia = '';
       return;
     }
 
-    if (!freeWasActive) {
-      freeWasActive = true;
-      nativeStatus = '🔎 正在辨識 ATG 免遊 Runtime…';
-      tryNativeStart();
+    freeWasActive = true;
+
+    const result = window.__XIANYAO_ATG_FREE_RESULT_STATE__ || {};
+    if (result.mode === 'preloaded' && Number.isFinite(Number(result.finalAmount))) {
+      nativeStatus = '✅ 已取得本次免遊最終結果：' + money(result.finalAmount);
+    } else {
+      nativeStatus = '⏳ 等待 ATG 回傳本次免遊最終結果…';
     }
-
-    const now = Date.now();
-    if (now - lastNativeAttemptAt < 700) return;
-    lastNativeAttemptAt = now;
-
-    tryNativeSkip();
-
-    const summary = diagText();
-    if (summary) {
-      nativeStatus = '🔎 安全診斷中';
-      lastNativeVia = summary;
-    }
+    lastNativeVia = '';
   }
 
   function ensurePanel() {
@@ -15550,114 +16417,41 @@ try {
   function renderPanel() {
     const panel = ensurePanel();
     if (!panel || panel.style.display === 'none') return;
-    const live = window.__XIANYAO_ATG_LIVE_SNAPSHOT__ || {};
+
     panel.innerHTML = `
       <button type="button" class="fg-close" aria-label="關閉">×</button>
       <div class="fg-title">🎁 遇到免費遊戲</div>
-      <div style="font-size:10px;opacity:.65;margin:-2px 0 8px;">版本 test179</div>
+      <div style="font-size:10px;opacity:.65;margin:-2px 0 8px;">版本 test189</div>
+
       <div class="fg-row">
-        <div class="fg-text">免遊：直接看結算</div>
-        <button type="button" class="fg-switch ${settings.auto ? 'on' : ''}" data-fg-toggle="auto" aria-label="免遊直接看結算"></button>
+        <div class="fg-text">免遊：結果先顯示</div>
+        <button type="button" class="fg-switch ${settings.auto ? 'on' : ''}" data-fg-toggle="auto" aria-label="免遊結果先顯示"></button>
       </div>
-      <div class="fg-row">
-        <div class="fg-text">👁 免遊劇透（進免遊前報得分）</div>
-        <button type="button" class="fg-switch ${settings.spoiler ? 'on' : ''}" data-fg-toggle="spoiler" aria-label="免遊劇透"></button>
+
+      <div class="fg-sub">
+        ATG 一旦先回傳本次免遊的最終贏分，芯瑤會立即顯示結果卡。<br>
+        不修改 ATG 的免遊播放、派彩或結算流程；遊戲動畫會在背景正常完成。
       </div>
-      <div class="fg-sub">原生 Skip 偵測＝只找 ATG 自己已存在的跳過／快速結算入口，不會自動點擊或送出結算指令。</div>
-      <div class="fg-status">${nativeStatus}${lastNativeVia ? '｜' + lastNativeVia : ''}${lastSpoilerValue !== null ? '｜目前回包 ' + money(lastSpoilerValue) : ''}</div>
-      <div class="fg-status" style="margin-top:7px;color:#ffd1e4;">${(() => {
-        const s = window.__XIANYAO_ATG_FREE_RESULT_STATE__;
-        if (!s) return '等待免遊資料';
-        if (s.mode === 'preloaded' && Number.isFinite(Number(s.finalAmount))) return '✅ ATG 已先回傳最終贏分：' + money(s.finalAmount);
-        if (s.mode === 'sequential') return '⏳ 此遊戲目前判定為逐轉伺服器結算';
-        if (s.mode === 'finished' && Number.isFinite(Number(s.finalAmount))) return '✅ 本次免遊總贏分：' + money(s.finalAmount);
-        return '正在判斷免遊結算方式…';
+
+      <div class="fg-status">${(() => {
+        const result = window.__XIANYAO_ATG_FREE_RESULT_STATE__ || {};
+        if (!settings.auto) return '結果先顯示目前已關閉';
+        if (result.mode === 'preloaded' && Number.isFinite(Number(result.finalAmount))) {
+          return '✅ 本次免遊最終結果：' + money(result.finalAmount);
+        }
+        if (result.mode === 'sequential') return '⏳ 這次結果尚未一次完整回傳';
+        return nativeStatus || '等待免遊';
       })()}</div>
-      <button type="button" data-fg-scan-native style="margin-top:10px;width:100%;border:1px solid rgba(255,185,215,.62);border-radius:10px;background:rgba(255,95,158,.16);color:#fff;padding:8px 10px;font-size:11px;font-weight:900;cursor:pointer;">🔎 找 ATG 原生跳過</button>
-      <button type="button" data-fg-copy-diag style="margin-top:7px;width:100%;border:1px solid rgba(255,185,215,.5);border-radius:10px;background:rgba(255,95,158,.12);color:#fff;padding:8px 10px;font-size:11px;font-weight:800;cursor:pointer;">📋 複製免遊資料</button>
     `;
 
     panel.querySelector('.fg-close')?.addEventListener('click', () => {
       panel.style.display = 'none';
     });
-    panel.querySelectorAll('[data-fg-toggle]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const key = String(btn.dataset.fgToggle || '');
-        if (key === 'auto') settings.auto = !settings.auto;
-        if (key === 'spoiler') settings.spoiler = !settings.spoiler;
-        saveSettings();
-      });
-    });
 
-    panel.querySelector('[data-fg-scan-native]')?.addEventListener('click', async () => {
-      const result = scanNativeSkipCandidates();
-      const payload = JSON.stringify(result, null, 2);
-
-      let copied = false;
-      try {
-        await navigator.clipboard.writeText(payload);
-        copied = true;
-      } catch (_) {}
-
-      const best = result.buttons?.[0];
-      if (best) {
-        nativeStatus = '🔎 找到原生 Skip 候選';
-        lastNativeVia = [
-          best.text || '',
-          best.path || '',
-          best.handlers || ''
-        ].filter(Boolean).join(' ｜ ').slice(0, 280);
-      } else if (result.components?.length) {
-        const row = result.components[0];
-        nativeStatus = '🔎 找到 Skip / Result 元件方法';
-        lastNativeVia = (
-          row.component + ' ｜ ' +
-          row.path + ' ｜ ' +
-          row.methods.join(',')
-        ).slice(0, 280);
-      } else {
-        nativeStatus = '❌ 目前畫面沒找到原生 Skip';
-        lastNativeVia = '';
-      }
-
-      renderPanel();
-
-      if (!copied) {
-        try { window.prompt('複製原生 Skip 掃描結果', payload); } catch (_) {}
-      }
-    });
-
-    panel.querySelector('[data-fg-copy-diag]')?.addEventListener('click', async () => {
-      let payload = '';
-      try {
-        const latest = freeRuntimeDiagnostics();
-        payload = JSON.stringify({
-          version:'test179',
-          at:Date.now(),
-          href:location.href,
-          freeGameActive:Boolean(window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameActive),
-          freeGameCount:window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.freeGameCount ?? null,
-          startFreeGame:window.__XIANYAO_ATG_LIVE_SNAPSHOT__?.startFreeGame ?? null,
-          rows:latest,
-          packets:window.__XIANYAO_ATG_FREE_PACKET_TRACE__?.getState?.() || null,
-          settlement:window.__XIANYAO_ATG_FREE_RESULT_PROBE__?.getState?.() || null
-        }, null, 2);
-      } catch (_) {}
-
-      if (!payload) payload = '尚未抓到免遊診斷資料';
-
-      let copied = false;
-      try {
-        await navigator.clipboard.writeText(payload);
-        copied = true;
-      } catch (_) {}
-
-      nativeStatus = copied ? '✅ 診斷已複製' : '📋 請複製跳出的診斷內容';
-      renderPanel();
-
-      if (!copied) {
-        try { window.prompt('複製下面診斷資料', payload); } catch (_) {}
-      }
+    panel.querySelector('[data-fg-toggle="auto"]')?.addEventListener('click', () => {
+      settings.auto = !settings.auto;
+      settings.spoiler = false;
+      saveSettings();
     });
   }
 
@@ -15670,107 +16464,27 @@ try {
   }
 
   function ensureButtons() {
-    ensureStyle();
-
-    // Desktop: small floating launcher beside existing live panel.
-    if (!document.documentElement.classList.contains('xinyao-phone-ui')) {
-      let btn = document.getElementById(DESKTOP_BTN_ID);
-      if (!btn) {
-        btn = document.createElement('button');
-        btn.id = DESKTOP_BTN_ID;
-        btn.type = 'button';
-        btn.textContent = '🎁 免遊';
-        btn.addEventListener('click', openPanel);
-        (document.body || document.documentElement).appendChild(btn);
-      }
-    } else {
-      document.getElementById(DESKTOP_BTN_ID)?.remove();
-    }
-
-    // Mobile quick HUD: add one more button without touching the existing six.
-    const hud = document.getElementById(HUD_ID);
-    const grid = hud?.querySelector('.qh-grid');
-    if (grid && !grid.querySelector('[data-qh="free"]')) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'qh-btn free';
-      btn.dataset.qh = 'free';
-      btn.title = '免遊助手';
-      btn.setAttribute('aria-label','免遊助手');
-      btn.innerHTML = '<span class="qh-icon">🎁</span><span class="qh-label">免遊</span>';
-      btn.addEventListener('click', event => {
-        event.stopPropagation();
-        openPanel();
-      });
-      grid.appendChild(btn);
-    }
-    updateButtons();
+    // test184：免遊助手完全移除，只保留原本六格 HUD。
+    try { document.getElementById(DESKTOP_BTN_ID)?.remove(); } catch (_) {}
+    try { document.querySelector('#' + HUD_ID + ' [data-qh="free"]')?.remove(); } catch (_) {}
+    try { document.getElementById(PANEL_ID)?.remove(); } catch (_) {}
+    try { document.getElementById(TOAST_ID)?.remove(); } catch (_) {}
+    try { document.getElementById('xinyao-atg-free-result-overlay')?.remove(); } catch (_) {}
   }
 
   function updateButtons() {
-    const active = settings.auto || settings.spoiler;
-    const btn = document.getElementById(DESKTOP_BTN_ID);
-    if (btn) {
-      btn.textContent = active ? '🎁 免遊 ON' : '🎁 免遊';
-      btn.style.borderColor = active ? 'rgba(255,126,178,.92)' : 'rgba(255,185,215,.55)';
-    }
-    const hudBtn = document.querySelector('#' + HUD_ID + ' [data-qh="free"]');
-    if (hudBtn) {
-      hudBtn.style.borderColor = active ? 'rgba(255,126,178,.92)' : '';
-      hudBtn.style.background = active ? 'rgba(255,95,158,.13)' : '';
-    }
+    ensureButtons();
   }
 
-  window.addEventListener('xinyao:spin-final-observed', event => {
-    try {
-      const detail = event?.detail || {};
-      const spinId = String(detail.spinId || '');
-      const sig = readFreeStartSignal(detail.engine || detail.finalState || {});
-      if (!sig.start) return;
-
-      try {
-        if (window.__XIANYAO_ATG_FREE_LAST_START_SPIN__ !== spinId) {
-          window.__XIANYAO_ATG_FREE_LAST_START_SPIN__ = spinId;
-          window.__XIANYAO_ATG_FREE_PACKET_TRACE__?.beginFromDetail?.(detail);
-          window.__XIANYAO_ATG_FREE_RESULT_PROBE__?.beginFromDetail?.(detail);
-        }
-      } catch (_) {}
-
-      if (settings.auto) {
-        handleAuto(true);
-      }
-
-      if (settings.spoiler && spinId !== lastSpoilerSpinId) {
-        const payout = extractSpoilerPayout(detail);
-        if (payout !== null) {
-          lastSpoilerSpinId = spinId;
-          showSpoiler(payout);
-        }
-      }
-    } catch (_) {}
-  });
-
-  const timer = setInterval(() => {
-    if (window.__XIANYAO_MAINTENANCE_STATE__?.enabled) {
-      document.getElementById(PANEL_ID)?.remove();
-      document.getElementById(DESKTOP_BTN_ID)?.remove();
-      document.getElementById(TOAST_ID)?.remove();
-      return;
-    }
-    ensureButtons();
-    const live = window.__XIANYAO_ATG_LIVE_SNAPSHOT__ || {};
-    const active = Boolean(live.freeGameActive) || Number(live.freeGameCount || 0) > 0;
-    handleAuto(active);
-    if (document.getElementById(PANEL_ID)?.style.display !== 'none') renderPanel();
-  }, 500);
+  setInterval(ensureButtons, 1000);
 
   window.__XIANYAO_ATG_FREE_HELPER__ = {
-    version:'1.1.0-test160',
-    getState:() => ({...settings,lastSpoilerValue}),
-    setAuto:value => { settings.auto = Boolean(value); saveSettings(); },
-    setSpoiler:value => { settings.spoiler = Boolean(value); saveSettings(); },
-    open:openPanel,
-    close:() => { const p = document.getElementById(PANEL_ID); if (p) p.style.display = 'none'; }
+    version:'1.3.0-test184',
+    getState:() => ({auto:false,spoiler:false,lastSpoilerValue:null,removed:true}),
+    setAuto:() => false,
+    setSpoiler:() => false,
+    open:() => false,
+    close:() => true
   };
 
   if (document.readyState === 'loading') {
@@ -15790,6 +16504,9 @@ try {
   'use strict';
 
   if (window.__XIANYAO_ATG_FREE_PACKET_TRACE__) return;
+
+  let overlayDismissed = false;
+  let overlayAmount = null;
 
   const state = {
     active:false,
@@ -16464,6 +17181,10 @@ try {
     if (state.active) return;
     const live = currentSnapshot();
 
+    overlayDismissed = false;
+    overlayAmount = null;
+    try { document.getElementById(OVERLAY_ID)?.remove(); } catch (_) {}
+
     state.active = true;
     state.mode = 'probing';
     state.startedAt = Date.now();
@@ -16582,12 +17303,94 @@ try {
   }
 
   function ensureOverlay() {
-    // test176：不再建立自製結算畫面；只讓 ATG 原生流程快速走到最後。
-    return null;
+    let overlay = document.getElementById(OVERLAY_ID);
+    if (overlay) return overlay;
+
+    overlay = document.createElement('div');
+    overlay.id = OVERLAY_ID;
+    overlay.style.cssText = [
+      'position:fixed',
+      'inset:0',
+      'z-index:2147483645',
+      'display:flex',
+      'align-items:center',
+      'justify-content:center',
+      'padding:18px',
+      'background:rgba(5,4,8,.58)',
+      'backdrop-filter:blur(3px)',
+      '-webkit-backdrop-filter:blur(3px)',
+      'font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif'
+    ].join(';');
+
+    overlay.innerHTML = `
+      <div style="
+        width:min(420px,calc(100vw - 32px));
+        border:1px solid rgba(255,184,215,.72);
+        border-radius:22px;
+        background:rgba(20,17,25,.97);
+        box-shadow:0 24px 70px rgba(0,0,0,.55),0 0 26px rgba(255,95,158,.16);
+        padding:24px 22px 20px;
+        color:#fff;
+        text-align:center;
+      ">
+        <div style="font-size:16px;font-weight:950;color:#ffc4dc;">🎁 本次免遊最終結果</div>
+        <div data-free-result-amount style="
+          margin-top:12px;
+          font-size:46px;
+          line-height:1;
+          font-weight:1000;
+          letter-spacing:.5px;
+          color:#fff;
+          text-shadow:0 0 18px rgba(255,95,158,.32);
+        ">—</div>
+        <div style="margin-top:12px;font-size:12px;line-height:1.6;color:rgba(255,255,255,.68);">
+          ATG 已提前回傳本次免遊最終贏分<br>
+          遊戲動畫會在背景正常完成
+        </div>
+        <button type="button" data-free-result-close style="
+          margin-top:18px;
+          width:100%;
+          border:1px solid rgba(255,185,215,.68);
+          border-radius:12px;
+          background:linear-gradient(135deg,#ff83b3,#ff5f9e);
+          color:#fff;
+          padding:11px 14px;
+          font-size:13px;
+          font-weight:950;
+          cursor:pointer;
+        ">關閉結果</button>
+      </div>
+    `;
+
+    overlay.querySelector('[data-free-result-close]')?.addEventListener('click', () => {
+      overlayDismissed = true;
+      try { overlay.remove(); } catch (_) {}
+    });
+
+    (document.body || document.documentElement).appendChild(overlay);
+    return overlay;
   }
 
   function renderOverlay(forceFinal = false) {
     publish();
+
+    if (!enabled()) {
+      try { document.getElementById(OVERLAY_ID)?.remove(); } catch (_) {}
+      return;
+    }
+
+    const amount = num(state.finalAmount);
+    if (amount === null || state.mode !== 'preloaded' || overlayDismissed) return;
+
+    overlayAmount = amount;
+    const overlay = ensureOverlay();
+    const value = overlay?.querySelector?.('[data-free-result-amount]');
+    if (value) {
+      value.textContent = amount.toLocaleString(undefined,{
+        minimumFractionDigits:2,
+        maximumFractionDigits:2
+      });
+    }
   }
 
   function publish() {
@@ -16672,6 +17475,9 @@ try {
     state.candidateScore=0;
     state.packetCount=0;
     state.updatedAt=Date.now();
+    overlayDismissed=false;
+    overlayAmount=null;
+    try{ document.getElementById(OVERLAY_ID)?.remove(); }catch(_){}
     try{
       window.__XIANYAO_ATG_NATIVE_FREE_CURTAIN__?.stop?.();
     }catch(_){}
@@ -16766,7 +17572,7 @@ try {
           totalViews:preloaded.totalViews,
           currentView:preloaded.currentView,
           spinId,
-          mode:'hide-process-until-native-result'
+          mode:'collapse-preloaded-freegame-to-final'
         };
       }catch(_){}
     }
@@ -16775,7 +17581,7 @@ try {
   }
 
   window.__XIANYAO_ATG_FREE_RESULT_PROBE__ = {
-    version:'1.7.0-test177',
+    version:'1.8.3-test183',
     observe,
     beginFromDetail,
     getState:() => ({...state,spinIds:[...state.spinIds],payoutBySpin:{...state.payoutBySpin}}),
