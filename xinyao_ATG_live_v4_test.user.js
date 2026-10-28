@@ -7532,6 +7532,121 @@ setInterval(xinyaoCheckMaintenance, 10000);
     return parts.filter(Boolean).join(' ');
   }
 
+  function findAutoplayStopByGeometry(gameWindow) {
+    try {
+      const cocos = gameWindow?.cc || gameWindow?.legacyCC || gameWindow?._cc;
+      const scene = cocos?.director?.getScene?.();
+      const Button = cocos?.Button;
+      const Label = cocos?.Label;
+      if (!scene || !Button || !Label || typeof scene.getComponentsInChildren !== 'function') return null;
+
+      const size = cocos?.view?.getVisibleSize?.();
+      const vw = Number(size?.width) || 0;
+      const vh = Number(size?.height) || 0;
+      if (!(vw > 0) || !(vh > 0)) return null;
+
+      const buttons = scene.getComponentsInChildren(Button) || [];
+      const rows = [];
+
+      for (const button of buttons) {
+        const node = button?.node;
+        if (!node || node.activeInHierarchy === false) continue;
+        try {
+          if (button.interactable === false || button.enabledInHierarchy === false) continue;
+        } catch (_) {}
+
+        const point = signalNodeWorldPoint(node, cocos);
+        if (!point) continue;
+
+        let w = 0, h = 0;
+        try {
+          const ui = node._uiProps?.uiTransformComp || (cocos?.UITransform && node.getComponent?.(cocos.UITransform));
+          w = Number(ui?.width ?? ui?.contentSize?.width ?? 0);
+          h = Number(ui?.height ?? ui?.contentSize?.height ?? 0);
+        } catch (_) {}
+
+        let labels = [];
+        try {
+          labels = (node.getComponentsInChildren(Label) || [])
+            .map(label => String(label?.string ?? label?._string ?? '').trim())
+            .filter(Boolean);
+        } catch (_) {}
+
+        const numeric = labels
+          .map(v => Number(String(v).replace(/[^d.-]/g,'')))
+          .filter(v => Number.isFinite(v) && v >= 1 && v <= 999);
+
+        rows.push({
+          button, node, cocos, point, w, h, labels, numeric,
+          nx:point.x/vw, ny:point.y/vh
+        });
+      }
+
+      // Big center spin/count control: lower-center area, contains the remaining auto-spin number.
+      const spinCandidates = rows
+        .filter(item =>
+          item.numeric.length &&
+          item.nx >= 0.32 && item.nx <= 0.70 &&
+          item.ny >= 0.04 && item.ny <= 0.34
+        )
+        .map(item => {
+          let score = 0;
+          if (item.numeric.some(v => v >= 2)) score += 80;
+          if (item.w > 0 && item.h > 0) {
+            const area = item.w * item.h;
+            if (area > 7000) score += 80;
+            else if (area > 3000) score += 45;
+            if (Math.abs(item.w-item.h)/Math.max(item.w,item.h) < .45) score += 30;
+          }
+          if (item.nx >= .42 && item.nx <= .60) score += 40;
+          if (item.ny >= .08 && item.ny <= .24) score += 40;
+          return { ...item, score };
+        })
+        .sort((a,b)=>b.score-a.score);
+
+      const spin = spinCandidates[0];
+      if (!spin || spin.score < 100) return null;
+
+      // Actual stop control is the rightmost square-ish control on the same row.
+      const stopCandidates = rows
+        .filter(item => {
+          if (item.button === spin.button) return false;
+          const dx = item.nx - spin.nx;
+          const dy = Math.abs(item.ny - spin.ny);
+          return dx >= .14 && dx <= .40 && dy <= .07;
+        })
+        .map(item => {
+          let score = 0;
+          const dx = item.nx - spin.nx;
+          if (dx >= .24) score += 120;
+          else if (dx >= .18) score += 70;
+          else score += 20;
+
+          if (item.w > 0 && item.h > 0) {
+            const square = 1 - Math.min(1, Math.abs(item.w-item.h)/Math.max(item.w,item.h));
+            score += square * 70;
+          }
+
+          // Penalize obvious numeric controls; the stop square itself should normally have no number.
+          if (item.numeric.length) score -= 60;
+
+          const text = item.labels.join(' ');
+          if (/^s*+s*$/.test(text) || /(plus|add|increase)/i.test(text)) score -= 300;
+          if (/(stop|pause|square|cancel)/i.test(text)) score += 250;
+
+          return { ...item, score, dx };
+        })
+        .sort((a,b)=>b.score-a.score || b.dx-a.dx);
+
+      const stop = stopCandidates[0];
+      if (!stop || stop.score < 70) return null;
+
+      return { spin, stop };
+    } catch (_) {
+      return null;
+    }
+  }
+
   function findAutoplaySquareStopButton(gameWindow) {
     try {
       const cocos = gameWindow?.cc || gameWindow?.legacyCC || gameWindow?._cc;
@@ -7880,9 +7995,42 @@ setInterval(xinyaoCheckMaintenance, 10000);
   }
 
   function tryStopAutoplay() {
-    // test40: zero-setup stop. Members do not need to learn/configure anything.
-    const direct = fireKnownATGStopControl();
-    if (direct?.ok) return direct;
+    // test40: no member setup. Detect the big numeric auto-spin button by geometry,
+    // then invoke the rightmost square stop control on the same row.
+    for (const gameWindow of sameOriginSignalWindows()) {
+      const controls = findAutoplayStopByGeometry(gameWindow);
+      const stop = controls?.stop;
+      if (!stop) continue;
+
+      let sent = false;
+      try {
+        sent = emitSignalCocosClick(stop.button, stop.cocos) || sent;
+      } catch (_) {}
+      try {
+        sent = dispatchCanvasTapAtWorld(gameWindow, stop.point, stop.cocos) || sent;
+      } catch (_) {}
+
+      if (sent) {
+        probe.autoStopLastVia = 'AUTO geometry stop square';
+        return {
+          ok:true,
+          via:probe.autoStopLastVia,
+          detail:`spin=${controls.spin.numeric.join(',')} stopNx=${stop.nx.toFixed(3)} stopNy=${stop.ny.toFixed(3)}`
+        };
+      }
+    }
+
+    // Keep previously learned/runtime replay only as an invisible fallback; members do not need to configure it.
+    const replayed = invokeLearnedStopReplay();
+    if (replayed?.ok) return replayed;
+
+    const learned = findLearnedStopButton();
+    if (learned?.button) {
+      if (emitSignalCocosClick(learned.button, learned.cocos)) {
+        probe.autoStopLastVia = 'learned visual Button fallback';
+        return { ok:true, via:probe.autoStopLastVia, detail:probe.stopLearnInfo?.path || '' };
+      }
+    }
 
 
     // 1) Actual ATG visible stop control: rightmost square button beside the active autoplay counter.
@@ -8083,8 +8231,6 @@ setInterval(xinyaoCheckMaintenance, 10000);
       #${PANEL_ID} .bp-name{display:block;margin-top:2px;font-size:8px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.80}
       #${PANEL_ID} .bp-seq-title{margin-top:8px;font-size:9px;font-weight:850;opacity:.78}
       #${PANEL_ID} .bp-board-toggle{width:100%;margin-top:7px;border:1px solid rgba(255,184,212,.26);border-radius:7px;background:rgba(255,95,158,.08);color:#ffd5e6;padding:5px;font-size:8px;font-weight:850;cursor:pointer}
-      #${PANEL_ID} .bp-stop-learn{width:100%;margin-top:5px;border:1px solid rgba(125,236,183,.34);border-radius:7px;background:rgba(63,191,126,.10);color:#c8f8dc;padding:5px;font-size:8px;font-weight:900;cursor:pointer}
-      #${PANEL_ID} .bp-stop-test{width:100%;margin-top:4px;border:1px solid rgba(255,210,96,.34);border-radius:7px;background:rgba(255,196,64,.08);color:#ffe2a0;padding:5px;font-size:8px;font-weight:900;cursor:pointer}
       #${PANEL_ID} .bp-stop-zero{width:100%;box-sizing:border-box;margin-top:4px;border:1px solid rgba(125,236,183,.28);border-radius:7px;background:rgba(63,191,126,.08);color:#c8f8dc;padding:5px;font-size:8px;font-weight:900;text-align:center}
       #${PANEL_ID} .bp-board-wrap{display:none}
       #${PANEL_ID} .bp-board-wrap.open{display:block}
