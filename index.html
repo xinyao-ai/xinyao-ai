@@ -2887,6 +2887,14 @@ button.primary,.mode-button.active,#loginButton,.register-now-button{color:#1713
 #appPage .app-topbar>.hero::before,#appPage .app-topbar>.hero::after,#appPage .app-topbar>.hero .brand::before,#appPage .app-topbar>.hero .brand::after{content:none!important;display:none!important;animation:none!important}
 #appPage .app-topbar>.hero .oracle-brand-title{position:relative!important;isolation:isolate!important}
 #appPage .app-topbar>.hero .oracle-brand-title::before{content:""!important;display:block!important;position:absolute!important;z-index:-1!important;left:-11px!important;top:-12px!important;width:calc(100% + 22px)!important;height:calc(100% + 24px)!important;background:radial-gradient(ellipse at 38% 50%,rgba(0,0,0,.93) 0%,rgba(0,0,0,.83) 35%,rgba(0,0,0,.48) 65%,transparent 100%)!important;opacity:1!important;filter:none!important;pointer-events:none!important;animation:none!important;transform:none!important}
+</style><style id="oracle-soft-word-shadow-5035">
+/* Remove rectangular halo. Shadow follows the actual transparent title glyphs only. */
+#appPage .app-topbar>.hero::before,
+#appPage .app-topbar>.hero::after,
+#appPage .app-topbar>.hero .oracle-brand-title::before,
+#appPage .app-topbar>.hero .oracle-brand-title::after{content:none!important;display:none!important;background:none!important;box-shadow:none!important;filter:none!important}
+#appPage .app-topbar>.hero .oracle-title-hd{filter:drop-shadow(0 2px 3px rgba(0,0,0,.93)) drop-shadow(0 0 7px rgba(0,0,0,.55))!important}
+#appPage .app-topbar>.hero{background:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 </style></head>
 
 <body>
