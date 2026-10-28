@@ -308,14 +308,15 @@
   // ===== 會員頁遊戲入口：只負責選定遊戲並前往皇鼎 =====
   const XIANYAO_HUANGDING_GAME_LINKS = Object.freeze({
     seth: 'https://hd5577.com/GameLobby?g=ATG&c=golden-seth',
-    tiger: 'https://hd5577.com/GameLobby?g=ATG&c=tiger-princess&p=web&l=zh-cn'
+    tiger: 'https://hd5577.com/GameLobby?g=ATG&c=tiger-princess&p=web&l=zh-cn',
+    seth1: 'https://hd5577.com/GameLobby?g=ATG&c=egyptian-mythology'
   });
 
   const XIANYAO_GAME_WINDOW_KEY =
     'xinyao_atg_game_window_name_v1';
 
   function validSavedGameWindowName(value) {
-    return /^xinyao-hd-launch:(seth|tiger):\d+:[a-z0-9]+$/i.test(String(value || ''));
+    return /^xinyao-hd-launch:(seth|tiger|seth1):\d+:[a-z0-9]+$/i.test(String(value || ''));
   }
 
   function launchHuangDingGame(gameId) {
@@ -346,7 +347,9 @@
     const button =
       id === 'tiger'
         ? $('xinyaoLaunchTiger')
-        : $('xinyaoLaunchSeth');
+        : id === 'seth1'
+          ? $('xinyaoLaunchSeth1')
+          : $('xinyaoLaunchSeth');
 
     if (button) {
       button.classList.add('launching');
@@ -384,7 +387,9 @@
         enter.textContent =
           id === 'tiger'
             ? '進入皇鼎虎小妹'
-            : '進入皇鼎賽特2';
+            : id === 'seth1'
+              ? '進入皇鼎戰神賽特一代'
+              : '進入皇鼎賽特2';
       }
     }, 1200);
   }
@@ -394,6 +399,12 @@
     if (sethButton && sethButton.dataset.bound !== '1') {
       sethButton.dataset.bound = '1';
       sethButton.addEventListener('click', () => launchHuangDingGame('seth'));
+    }
+
+    const seth1Button = $('xinyaoLaunchSeth1');
+    if (seth1Button && seth1Button.dataset.bound !== '1') {
+      seth1Button.dataset.bound = '1';
+      seth1Button.addEventListener('click', () => launchHuangDingGame('seth1'));
     }
 
     const tigerButton = $('xinyaoLaunchTiger');
