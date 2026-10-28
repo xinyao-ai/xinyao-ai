@@ -7573,7 +7573,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
         } catch (_) {}
 
         const numeric = labels
-          .map(v => Number(String(v).replace(/[^d.-]/g,'')))
+          .map(v => Number(String(v).replace(/[^\d.-]/g,'')))
           .filter(v => Number.isFinite(v) && v >= 1 && v <= 999);
 
         rows.push({
@@ -7631,7 +7631,7 @@ setInterval(xinyaoCheckMaintenance, 10000);
           if (item.numeric.length) score -= 60;
 
           const text = item.labels.join(' ');
-          if (/^s*+s*$/.test(text) || /(plus|add|increase)/i.test(text)) score -= 300;
+          if (/^\s*\+\s*$/.test(text) || /(plus|add|increase)/i.test(text)) score -= 300;
           if (/(stop|pause|square|cancel)/i.test(text)) score += 250;
 
           return { ...item, score, dx };
