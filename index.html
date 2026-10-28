@@ -4400,6 +4400,7 @@ async function load(){try{const r=await fetch('./carousel-config.json?t='+Date.n
 el.querySelector('.oracle-banner-prev')?.addEventListener('click',()=>{if(active)show(index-1)},true);
 el.querySelector('.oracle-banner-next')?.addEventListener('click',()=>{if(active)show(index+1)},true);
 load();
+setInterval(()=>{if(active&&!document.hidden)show(index+1)},6500);
 })();
 </script></body>
 </html>
