@@ -1,4 +1,4 @@
-const CACHE_NAME = "xinyao-v1";
+const CACHE_NAME = "seth-oracle-v2";
 
 const ASSETS = [
   "./",
