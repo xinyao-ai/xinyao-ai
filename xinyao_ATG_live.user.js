@@ -5194,11 +5194,17 @@ try {
     state.roomMap.set(key, merged);
 
     const mergedRoomId = finiteNumber(merged?.roomId);
-    if (mergedRoomId !== null && typeof merged?.status === 'string') {
-      state.liveStatusByRoomId.set(Math.trunc(mergedRoomId), {
-        status: merged.status,
-        updatedAt: Date.now()
-      });
+    if (mergedRoomId !== null) {
+      const existing = state.liveStatusByRoomId.get(Math.trunc(mergedRoomId));
+      // 伺服器 slotTableUpdated 是最新的佔用狀態；舊掃描 tables 不得改回 Empty。
+      if (existing?.source === 'slotTableUpdated') {
+        merged.status = existing.status;
+        state.roomMap.set(key, merged);
+      } else if (typeof merged?.status === 'string') {
+        state.liveStatusByRoomId.set(Math.trunc(mergedRoomId), {
+          status: merged.status, updatedAt: Date.now(), source: 'tables'
+        });
+      }
     }
 
     state.lastSource = source;
@@ -5220,7 +5226,8 @@ try {
       // 排行榜會直接讀這份資料，避免舊 Empty 快照殘留。
       state.liveStatusByRoomId.set(Math.trunc(roomId), {
         status,
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        source: 'slotTableUpdated'
       });
 
       let matched = false;
@@ -6649,10 +6656,8 @@ try {
           // 1. slotTableUpdated / 最新 tables 對該 roomId 的即時狀態
           // 2. roomMap 目前狀態
           // 3. 掃描完成當下快照
-          status:
-            directLiveStatus?.status ??
-            live?.status ??
-            snapshotRoom.status,
+          // 必須有當前掃描 / 即時更新狀態，不能只信舊快照的 Empty。
+          status: directLiveStatus?.status ?? live?.status ?? 'Unknown',
           updatedAt:
             directLiveStatus?.updatedAt ??
             live?.updatedAt ??
@@ -9361,7 +9366,7 @@ try {
         null;
       return {
         ...snapshotRoom,
-        status: direct?.status ?? live?.status ?? snapshotRoom?.status,
+        status: direct?.status ?? live?.status ?? 'Unknown',
         updatedAt: direct?.updatedAt ?? live?.updatedAt ?? snapshotRoom?.updatedAt
       };
     }).filter(room => {
