@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.0.6
+// @version      4.0.7
 // @description  單檔三遊戲：賽特一代顯示HUD六功能＋1300房掃描，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -18471,62 +18471,92 @@ if (new URL(location.href).searchParams.get('gn') !== 'egyptian-mythology') {
     return false;
   }
 
+  // 賽特一代：Canvas 頁碼常無 DOM 按鈕，自動定位機台彈窗頁碼。
+  async function autoLocateSethOnePager() {
+    const ready = findPagerButtons();
+    if (ready) return ready;
+    if (state.pageCalibration) return null;
+    const viewportWidth = window.innerWidth || 1;
+    const viewportHeight = window.innerHeight || 1;
+    // 先找畫面上「選擇機台」視窗的 DOM 邊界；Canvas 模式退回比例候選。
+    const guesses = [
+      { x0: 0.156, step: 0.056, y: 0.213 },
+      { x0: 0.152, step: 0.054, y: 0.245 },
+      { x0: 0.156, step: 0.056, y: 0.225 }
+    ];
+    const originalPage = finiteNumber(state.currentPage);
+    for (const guess of guesses) {
+      if (state.scanAbort) return false;
+      let confirmed = 0;
+      for (const page of [1, 3]) {
+        const previousSeq = state.pageLoadSeq;
+        const previousPage = finiteNumber(state.currentPage);
+        const x = guess.x0 + (page - 1) * guess.step;
+        state.scanMessage = `🤖 自動尋找頁碼：第 ${page} 頁…`;
+        scheduleRender();
+        if (!dispatchNormalizedPoint(x, guess.y)) break;
+        const outcome = await waitForPageOutcome(page, previousSeq, previousPage, 2100);
+        if (outcome.ok || (finiteNumber(state.currentPage) === page && state.dataPagesSeen.has(page))) {
+          confirmed++;
+          continue;
+        }
+        break;
+      }
+      if (confirmed === 2) {
+        savePageCalibration({startX:guess.x0,stepX:guess.step,y:guess.y,samplePages:[1,3]});
+        state.scanMessage = '✅ 自動校準完成，開始掃描 1300 房';
+        scheduleRender();
+        return true;
+      }
+    }
+    state.scanError = '自動定位頁碼尚未成功；請確認機台選擇視窗保持開啟。';
+    state.scanMessage = `目前已抓 ${numberedCount()} / ${state.totalTableCount || 1300} 房，尚未完成全部掃描`;
+    scheduleRender();
+    return false;
+  }
+
   async function scanAllPages({ auto = false } = {}) {
     if (state.scanRunning) return;
     const pager = findPagerButtons();
     if (!pager && !state.pageCalibration) {
-      startPageCalibration({ thenScan: true });
-      return;
+      const located = await autoLocateSethOnePager();
+      if (!located) return;
     }
 
     const totalPages = Math.min(3, state.totalPages || pager?.size || 3);
     const startPage = finiteNumber(state.currentPage) || 1;
-
-    // 窄版 / 手機版選房頁可能不會同時顯示第 1 與最後一頁。
-    // 校準時第 1 頁與最後一頁已由使用者實際點過並完成資料擷取，
-    // 掃描時直接略過已抓到的頁面，避免從最後一頁硬跳回第 1 頁而失敗。
     if (state.dataPagesSeen.size >= totalPages) {
       const keep = new Set();
       for (const page of state.pageCalibration?.samplePages || []) keep.add(page);
       if (finiteNumber(state.currentPage) !== null) keep.add(state.currentPage);
       state.dataPagesSeen = keep;
     }
-
     const sequence = buildMissingScanSequence(startPage, totalPages, state.dataPagesSeen);
-
     state.scanRunning = true;
     state.scanAbort = false;
     state.scanVisited = new Set(state.dataPagesSeen);
     state.scanError = '';
-    state.scanMessage = auto ? '自動刷新掃描中…' : '全房掃描中…';
+    state.scanMessage = auto ? '自動刷新掃描中…' : '全房自動掃描中…';
     scheduleRender();
-
     for (const page of sequence) {
       if (state.scanAbort) break;
       state.scanMessage = `掃描第 ${page} / ${totalPages} 頁…`;
       scheduleRender();
-
       const loaded = await navigateToPageAdaptive(page, totalPages);
       if (!loaded) {
-        state.scanError = `第 ${page} 頁自動切換失敗；已嘗試自動修正位置。請保持「選擇機台」畫面開啟後再試一次。`;
+        state.scanError = `第 ${page} 頁尚未自動定位成功，請保持選擇機台畫面開啟。`;
         break;
       }
       state.scanVisited.add(page);
       await delay(220);
     }
-
     state.scanRunning = false;
     const count = numberedCount();
     const expected = state.totalTableCount || 1300;
     const allPages = state.scanVisited.size >= totalPages || state.dataPagesSeen.size >= totalPages;
-
-    if (state.scanAbort) {
-      state.scanMessage = `已停止｜目前 ${count} / ${expected}`;
-    } else if (!state.scanError && allPages && count >= expected) {
-      state.scanMessage = `✅ 全房掃描完成｜${count} / ${expected}`;
-    } else if (!state.scanError) {
-      state.scanMessage = `掃描結束｜目前 ${count} / ${expected}`;
-    }
+    if (state.scanAbort) state.scanMessage = `已停止｜目前 ${count} / ${expected}`;
+    else if (!state.scanError && allPages && count >= expected) state.scanMessage = `✅ 全房掃描完成｜${count} / ${expected}`;
+    else if (!state.scanError) state.scanMessage = `掃描結束｜目前 ${count} / ${expected}`;
     scheduleRender();
   }
 
