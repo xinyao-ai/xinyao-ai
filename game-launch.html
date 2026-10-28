@@ -21,13 +21,14 @@
 (() => {
   const routes = {
     seth: 'https://hd5577.com/GameLobby?g=ATG&c=golden-seth',
-    tiger: 'https://hd5577.com/GameLobby?g=ATG&c=tiger-princess&p=web&l=zh-cn'
+    tiger: 'https://hd5577.com/GameLobby?g=ATG&c=tiger-princess&p=web&l=zh-cn',
+    seth1: 'https://hd5577.com/GameLobby?g=ATG&c=egyptian-mythology'
   };
 
   const q = new URLSearchParams(location.search);
   const game = String(q.get('game') || '').toLowerCase();
   const marker = String(q.get('marker') || '');
-  const validMarker = /^xinyao-hd-launch:(seth|tiger):\d+:[a-z0-9]+$/i.test(marker);
+  const validMarker = /^xinyao-hd-launch:(seth|tiger|seth1):\d+:[a-z0-9]+$/i.test(marker);
 
   if (!routes[game] || !validMarker || !marker.toLowerCase().includes(':' + game + ':')) {
     document.getElementById('msg').textContent = '遊戲入口資料無效，請回會員頁重新點選。';
