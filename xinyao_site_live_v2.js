@@ -1073,7 +1073,7 @@
       'xinyaoDeviceConnectV2';
 
     box.style.cssText =
-      'margin:12px 0 14px;padding:14px;border-radius:16px;background:#fff7fb;border:1px solid #ffd7e8;';
+      'margin:12px 0 14px;padding:14px;border-radius:16px;background:#0b2025;color:#eddab0;border:1px solid #b89653;';
 
     const head =
       card.querySelector(
@@ -2455,7 +2455,7 @@
           <div
             style="
               font-weight:900;
-              color:#d94c89;
+              color:#f0ce83;
               font-size:15px;
             "
           >
@@ -2465,7 +2465,7 @@
           <div
             style="
               font-size:11px;
-              color:#817782;
+              color:#d3c7ae;
               line-height:1.55;
               margin-top:4px;
             "
@@ -2508,10 +2508,10 @@
                 margin-top:10px;
                 padding:10px;
                 border-radius:12px;
-                background:white;
-                border:1px solid #f4d5e2;
+                background:#12292c;
+                border:1px solid #a1834a;
                 font-size:12px;
-                color:#6e5963;
+                color:#e1d0ac;
                 line-height:1.6;
               "
             >
@@ -2547,15 +2547,15 @@
                 margin-top:11px;
                 padding:12px;
                 border-radius:14px;
-                background:white;
-                border:1px solid #f2bfd3;
+                background:#12292c;
+                border:1px solid #a1834a;
                 text-align:center;
               "
             >
               <div
                 style="
                   font-size:11px;
-                  color:#8a7880;
+                  color:#dfc998;
                 "
               >
                 請到 ATG 畫面的
@@ -2568,7 +2568,7 @@
                   font-size:28px;
                   font-weight:1000;
                   letter-spacing:4px;
-                  color:#d94c89;
+                  color:#f0ce83;
                   margin:6px 0;
                 "
               >
@@ -2579,7 +2579,7 @@
                 id="xinyaoPairCountdown"
                 style="
                   font-size:10px;
-                  color:#9b8b92;
+                  color:#beae95;
                 "
               >
                 ${pairCountdownText()}
@@ -2593,8 +2593,8 @@
                   border:0;
                   border-radius:10px;
                   padding:8px 12px;
-                  background:#fff0f6;
-                  color:#d94c89;
+                  background:#233a3a;
+                  color:#f0ce83;
                   font-weight:900;
                   cursor:pointer;
                 "
@@ -2623,9 +2623,9 @@
             text-decoration:none;
             border-radius:11px;
             padding:9px 12px;
-            background:#ffffff;
-            border:1px solid #f2bfd3;
-            color:#d94c89;
+            background:#142d30;
+            border:1px solid #a1834a;
+            color:#f0ce83;
             font-size:12px;
             font-weight:900;
           "
@@ -2640,8 +2640,8 @@
             border:0;
             border-radius:11px;
             padding:9px 12px;
-            background:#ff5f9e;
-            color:white;
+            background:#b78b41;
+            color:#fff7de;
             font-size:12px;
             font-weight:900;
             cursor:pointer;
@@ -2660,7 +2660,7 @@
         style="
           margin-top:8px;
           font-size:11px;
-          color:#968a91;
+          color:#bfb3a0;
           line-height:1.55;
         "
       >
@@ -3133,7 +3133,7 @@
       panel.innerHTML = `
         <div class="card">
           <h2 class="section-title">📊 全房分析</h2>
-          <div style="padding:16px;border-radius:16px;background:#fff7fb;border:1px solid #ffd8e7;line-height:1.8;color:#735c66;">
+          <div style="padding:16px;border-radius:16px;background:#10272b;border:1px solid #b89653;line-height:1.8;color:#ead5aa;">
             尚未收到 ATG 全房資料。<br>
             請先在 ATG 按 <b>【一鍵掃描 4100 房】</b>，完成後再按 <b>【同步到芯瑤】</b>。
           </div>
