@@ -1,12 +1,12 @@
 {
-  "name": "芯瑤💕陪你玩",
-  "short_name": "芯瑤💕陪你玩",
-  "description": "芯瑤💕陪你玩 AI 聊天助手",
+  "name": "賽特神諭",
+  "short_name": "賽特神諭",
+  "description": "賽特神諭 ATG 輔助分析程式",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#fff0f7",
-  "theme_color": "#ff79b7",
+  "background_color": "#080b13",
+  "theme_color": "#09252c",
   "icons": [
     {
       "src": "./icon-192.png",
