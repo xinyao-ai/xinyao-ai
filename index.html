@@ -2744,6 +2744,52 @@ button.primary,.mode-button.active,#loginButton,.register-now-button{color:#1713
 #xinyaoLaunchTiger .game-launcher-cover{background:#07171a!important;overflow:hidden!important}
 #xinyaoLaunchTiger .game-launcher-img{transform:none!important;object-fit:contain!important;object-position:center!important;width:100%!important;height:100%!important}
 </style>
+
+<style id="oracle-layout-redesign-v1">
+/* Structural homepage redesign; IDs and event handlers stay unchanged */
+@media(min-width:900px){
+ #appPage.page{width:min(1120px,calc(100% - 64px))!important;max-width:1120px!important;padding-top:32px!important}
+ #appPage .hero{padding:22px 32px!important}
+ #appPage .brand-icon{width:90px!important;height:90px!important;flex-basis:90px!important}
+ #appPage .brand h1{font-size:43px!important;letter-spacing:2px!important}
+ #xinyaoGameLauncher{padding:24px 28px!important}
+ #xinyaoGameLauncher .game-launcher-grid{gap:22px!important}
+ #xinyaoGameLauncher .game-launcher-cover{aspect-ratio:1.56/1!important;height:auto!important}
+ #xinyaoGameLauncher #xinyaoLaunchSeth .game-launcher-cover{background-size:cover!important;background-position:center 43%!important}
+ #xinyaoGameLauncher #xinyaoLaunchTiger .game-launcher-img{object-fit:cover!important;object-position:center 42%!important}
+ #xinyaoGameLauncher .game-launcher-name{font-size:18px!important}
+ #xinyaoGameLauncher .game-launcher-info{padding:15px!important}
+ #xinyaoLiveDataPanel{padding:24px!important}
+}
+#appPage .hero,#xinyaoGameLauncher,#xinyaoLiveDataPanel{background:linear-gradient(135deg,rgba(5,18,22,.96),rgba(6,23,25,.9))!important;border:1px solid #b9914d!important;box-shadow:0 12px 38px #000a,inset 0 0 0 1px #edc87518!important}
+#appPage .hero{position:relative;overflow:hidden}
+#appPage .hero::after{content:"𓂀";display:block!important;position:absolute;right:20px;top:4px;font-size:70px;color:#d7ac5250;opacity:.8!important;background:transparent!important;pointer-events:none}
+#xinyaoGameLauncher .game-launcher-title,#xinyaoLiveDataPanel .atg-live-title{font-size:clamp(20px,3vw,28px)!important;color:#f1d38c!important}
+#xinyaoGameLauncher .game-launcher-sub{color:#dad1c0!important;font-weight:500!important}
+#xinyaoGameLauncher .game-launcher-item{background:#06161b!important;border:1px solid #bf9548!important;box-shadow:0 7px 22px #0008!important;border-radius:16px!important}
+#xinyaoGameLauncher .game-launcher-cover{background-color:#08191c!important}
+#xinyaoGameLauncher .game-launcher-info{background:#09191c!important}
+#xinyaoGameLauncher .game-launcher-name{color:#f6ead1!important}
+#xinyaoGameLauncher .game-launcher-provider{color:#c4b9a3!important}
+#xinyaoGameLauncher .game-launcher-enter{border:1px solid #b9934f!important;border-radius:10px!important;padding:10px 12px!important;background:linear-gradient(110deg,#182323,#0d1718)!important;color:#f5d487!important;font-size:13px!important}
+#xinyaoGameLauncher .game-launcher-badge{color:#eb8b73!important;border:1px solid #ae7840!important}
+#xinyaoLiveDataPanel .atg-live-grid{gap:11px!important}
+#xinyaoLiveDataPanel .atg-live-item{background:rgba(8,28,30,.94)!important;border:1px solid #8c764b!important}
+#xinyaoLiveDataPanel .atg-live-value{color:#f6e8c9!important}
+#xinyaoLiveDataPanel .atg-live-label{color:#dbbf80!important}
+#xinyaoLiveDataPanel .atg-live-help{color:#bfb8a8!important}
+#xinyaoLiveDataPanel .atg-live-badge{background:#17282a!important;color:#edcf87!important;border:1px solid #b9934f!important}
+#appPage .card{background:rgba(6,21,25,.96)!important;border-color:#bd9855!important}
+#appPage .card input,#appPage .card textarea{background:#102327!important;color:#f4e7ce!important;border:1px solid #957746!important}
+@media(max-width:599px){
+ #appPage.page{padding-left:12px!important;padding-right:12px!important}
+ #xinyaoGameLauncher{padding:13px!important}
+ #xinyaoGameLauncher .game-launcher-grid{gap:9px!important}
+ #xinyaoGameLauncher .game-launcher-enter{font-size:11px!important;padding:8px 6px!important}
+ #xinyaoGameLauncher .game-launcher-cover{aspect-ratio:1/1!important}
+ #appPage .hero::after{font-size:38px;right:10px;top:6px}
+}
+</style>
 </head>
 
 <body>
