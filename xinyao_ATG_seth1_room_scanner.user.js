@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜戰神賽特一代整合助手
 // @namespace    xinyao-atg-seth1-room-scanner
-// @version      1.1.0
+// @version      1.1.1
 // @description  賽特一代專屬 HUD 六功能＋1300 房分析；賽特二及虎小妹維持原版。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -173,7 +173,9 @@ function xinyaoResolveHuangDingAccess() {
 
 const XIANYAO_HD_ONLY_ENABLED = xinyaoLoadRemoteHdOnly();
 const XIANYAO_HD_ACCESS_ALLOWED =
-  !XIANYAO_HD_ONLY_ENABLED || xinyaoResolveHuangDingAccess();
+  new URL(location.href).searchParams.get('gn') === 'egyptian-mythology'
+    ? true // 賽特一代獨立整合版：避免舊 v4 的 seth/tiger 入口驗證誤擋一代
+    : (!XIANYAO_HD_ONLY_ENABLED || xinyaoResolveHuangDingAccess());
 
 try {
   window.__XIANYAO_HD_ONLY_ENABLED__ = XIANYAO_HD_ONLY_ENABLED;
