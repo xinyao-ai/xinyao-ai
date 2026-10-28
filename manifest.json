@@ -9,17 +9,17 @@
   "theme_color": "#ff79b7",
   "icons": [
     {
-      "src": "./icon-192.png",
+      "src": "./icon-192.png?rev=oracle-20261028-2",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "./icon-512.png",
+      "src": "./icon-512.png?rev=oracle-20261028-2",
       "sizes": "512x512",
       "type": "image/png"
     },
     {
-      "src": "./icon-512.png",
+      "src": "./icon-512.png?rev=oracle-20261028-2",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable any"
