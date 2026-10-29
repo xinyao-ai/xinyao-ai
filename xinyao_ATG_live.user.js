@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.3
+// @version      4.1.4
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -175,7 +175,7 @@ function xinyaoResolveHuangDingAccess() {
 
 const XIANYAO_HD_ONLY_ENABLED = xinyaoLoadRemoteHdOnly();
 const XIANYAO_HD_ACCESS_ALLOWED =
-  new URL(location.href).searchParams.get('gn') === 'egyptian-mythology'
+  ['egyptian-mythology','hades'].includes(new URL(location.href).searchParams.get('gn'))
   || !XIANYAO_HD_ONLY_ENABLED || xinyaoResolveHuangDingAccess();
 
 try {
