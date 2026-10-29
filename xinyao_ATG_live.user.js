@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.39
+// @version      4.1.40
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -2560,7 +2560,7 @@ try {
         <input id="xinyaoPairInput" maxlength="12" placeholder="配對碼"
           style="width:100px;min-width:0;border:1px solid rgba(255,255,255,.22);border-radius:8px;background:rgba(255,255,255,.09);color:#fff;padding:6px 7px;font-size:11px;outline:none;text-transform:uppercase;">
         <button id="xinyaoPairButton" type="button" ${state.pairBusy ? 'disabled' : ''}
-          style="border:0;border-radius:8px;background:#ff5f9e;color:#fff;padding:6px 8px;font-size:11px;font-weight:800;cursor:pointer;opacity:${state.pairBusy ? '.55' : '1'};">${state.pairBusy ? '配對中…' : '綁定'}</button>
+          style="border:1px solid #ffe6a6;border-radius:8px;background:linear-gradient(180deg,#ffe8a1 0%,#e8b955 48%,#c58c28 100%);color:#30200b;box-shadow:inset 0 1px 0 #fff4ca,0 2px 8px rgba(212,158,52,.24);padding:6px 8px;font-size:11px;font-weight:800;cursor:pointer;opacity:${state.pairBusy ? '.55' : '1'};">${state.pairBusy ? '配對中…' : '綁定'}</button>
       </div>
       <div id="xinyaoPairMessage" style="font-size:9px;margin-top:5px;opacity:.82;color:${state.pairMessage.startsWith('✅') ? '#9ff0be' : '#ffd0df'};">${state.pairMessage || ''}</div>
       </div>
