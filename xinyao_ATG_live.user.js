@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.20
+// @version      4.1.21
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -12398,17 +12398,12 @@ try {
   function symbolIconHtml(token) {
     const key = String(token ?? '');
     if (probe.gameProfile === 'vampire') {
-      if (key === '1') {
-        return `<span class="bp-icon-shell" title="Wild｜ID 1"><img class="bp-icon bp-icon-img bp-icon-clean" src="https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/main/assets/vampire-wild.svg" alt="Wild" draggable="false" decoding="sync"></span>`;
-      }
-      if (key === '9') {
-        return `<span class="bp-icon-shell" title="Scatter｜ID 9"><img class="bp-icon bp-icon-img bp-icon-clean" src="https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/main/assets/vampire-scatter.svg" alt="Scatter" draggable="false" decoding="sync"></span>`;
-      }
-      // 共用一張由使用者提供素材組成的七符號精靈圖；未核對 ID 保留原數字。
-      const atlasIndex = ({'2':0,'3':1,'4':2,'6':3,'5':4,'7':5,'8':6})[key];
-      if (atlasIndex !== undefined) {
-        const percent = (atlasIndex * 100 / 6).toFixed(4);
-        return `<span class="bp-icon-shell" title="${esc(symbolLabel(key))}｜ID ${esc(key)}"><span style="display:block;width:28px;height:28px;flex:0 0 auto;margin:auto;max-width:100%;background-image:url('https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/main/assets/vampire-symbols-seven.svg');background-size:700% 100%;background-position:${percent}% 50%;background-repeat:no-repeat;image-rendering:-webkit-optimize-contrast;filter:contrast(1.22) saturate(1.1);"></span></span>`;
+      // 使用原圖獨立 PNG，避免低解析精靈圖放大模糊。
+      const labels = VAMPIRE_SYMBOL_LABELS;
+      if (/^(?:[1-9]|10)$/.test(key)) {
+        const label = labels.get(key) || (key === '10' ? 'Jackpot' : `ID ${key}`);
+        const src = `https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/main/assets/vampire_id${key}.png`;
+        return `<span class="bp-icon-shell" title="${esc(label)}｜ID ${esc(key)}"><img class="bp-icon bp-icon-img bp-icon-clean" data-symbol-token="${esc(key)}" src="${src}" alt="${esc(label)}" draggable="false" decoding="async" loading="eager" style="image-rendering:auto!important;filter:none!important;object-fit:contain!important;"></span>`;
       }
       return `<span class="bp-icon bp-unknown" title="惡魔血域符號 ID ${esc(key)}" style="font-size:11px">ID ${esc(key)}</span>`;
     }
