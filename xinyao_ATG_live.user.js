@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.29
+// @version      4.1.30
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -12348,7 +12348,11 @@ try {
     ['2','黑髮男'], ['3','金髮男'], ['4','女孩'],
     ['5','藥水'], ['6','聖經'], ['7','子彈'], ['8','木槌'], ['9','Scatter'], ['1','Wild']
   ]); // 以惡魔血域實機盤面 2026-10-29 符號出現次數核對；其他 ID 不亂配
-  const WUXIA_SYMBOL_LABELS = new Map(); // 武俠符號尚待實機 ID 配對，絕不沿用賽特寶石。
+  const WUXIA_SYMBOL_LABELS = new Map([
+    ['1','Wild'],['2','女主'],['3','男主'],['4','葫蘆'],['5','玉佩'],
+    ['6','元寶'],['7','藍色荷包'],['8','A'],['9','K'],['10','Q'],
+    ['11','J'],['12','10'],['13','Jackpot'],['14','Scatter']
+  ]); // 依使用者提供多張盤面與 ID 計數初步配對，待實機核對。
   function activeSymbolLabels() {
     if (probe.gameProfile === 'wuxia') return WUXIA_SYMBOL_LABELS;
     if (probe.gameProfile === 'vampire') return VAMPIRE_SYMBOL_LABELS;
@@ -12409,7 +12413,19 @@ try {
   function symbolIconHtml(token) {
     const key = String(token ?? '');
     if (probe.gameProfile === 'wuxia') {
-      // 保留真實 ID / 次數，尚未確認的對應不顯示其他遊戲圖案。
+      // 武俠獨立 PNG，不與賽特系列共用圖示；ID 對應依實機截圖初步核對。
+      const wuxiaFiles = {
+        '1':'wuxia_wild.png','2':'wuxia_female.png','3':'wuxia_male.png',
+        '4':'wuxia_gourd.png','5':'wuxia_jade.png','6':'wuxia_gold_ingots.png',
+        '7':'wuxia_blue_pouch.png','8':'wuxia_A.png','9':'wuxia_K.png',
+        '10':'wuxia_Q.png','11':'wuxia_J.png','12':'wuxia_10.png',
+        '13':'wuxia_jackpot.png','14':'wuxia_scatter.png'
+      };
+      const file = wuxiaFiles[key];
+      if (file) {
+        const label = WUXIA_SYMBOL_LABELS.get(key) || `ID ${key}`;
+        return `<span class="bp-icon-shell" title="${esc(label)}｜ID ${esc(key)}"><img class="bp-icon bp-icon-img bp-icon-clean" src="https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/main/assets/${file}" alt="${esc(label)}" draggable="false" decoding="async" loading="eager" style="image-rendering:auto!important;filter:none!important;object-fit:contain!important;"></span>`;
+      }
       return `<span class="bp-icon bp-unknown" title="武俠符號 ID ${esc(key)}" style="font-size:11px">ID ${esc(key)}</span>`;
     }
     if (probe.gameProfile === 'vampire') {
