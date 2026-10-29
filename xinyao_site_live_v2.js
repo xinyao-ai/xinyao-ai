@@ -310,14 +310,15 @@
     seth: 'https://hd5577.com/GameLobby?g=ATG&c=golden-seth',
     tiger: 'https://hd5577.com/GameLobby?g=ATG&c=tiger-princess&p=web&l=zh-cn',
     seth1: 'https://hd5577.com/GameLobby?g=ATG&c=egyptian-mythology',
-    baphomet: 'https://hd5577.com/GameLobby?g=ATG&c=hades'
+    baphomet: 'https://hd5577.com/GameLobby?g=ATG&c=hades',
+    vampire: 'https://hd5577.com/GameLobby?g=ATG&c=new-vampire-hunter'
   });
 
   const XIANYAO_GAME_WINDOW_KEY =
     'xinyao_atg_game_window_name_v1';
 
   function validSavedGameWindowName(value) {
-    return /^xinyao-hd-launch:(seth|tiger|seth1|baphomet):\d+:[a-z0-9]+$/i.test(String(value || ''));
+    return /^xinyao-hd-launch:(seth|tiger|seth1|baphomet|vampire):\d+:[a-z0-9]+$/i.test(String(value || ''));
   }
 
   function launchHuangDingGame(gameId) {
@@ -346,7 +347,9 @@
     } catch (_) {}
 
     const button =
-      id === 'baphomet'
+      id === 'vampire'
+        ? $('xinyaoLaunchVampire')
+        : id === 'baphomet'
         ? $('xinyaoLaunchBaphomet')
         : id === 'tiger'
         ? $('xinyaoLaunchTiger')
@@ -416,6 +419,12 @@
     if (baphometButton && baphometButton.dataset.bound !== '1') {
       baphometButton.dataset.bound = '1';
       baphometButton.addEventListener('click', () => launchHuangDingGame('baphomet'));
+    }
+
+    const vampireButton = $('xinyaoLaunchVampire');
+    if (vampireButton && vampireButton.dataset.bound !== '1') {
+      vampireButton.dataset.bound = '1';
+      vampireButton.addEventListener('click', () => launchHuangDingGame('vampire'));
     }
 
     const tigerButton = $('xinyaoLaunchTiger');
