@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.22
+// @version      4.1.23
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -12286,9 +12286,8 @@ try {
   }
 
   function gameProfileName(profile = probe.gameProfile) {
-    if (new URL(location.href).searchParams.get('gn') === 'hades') return '古神巴風特';
-    if (new URL(location.href).searchParams.get('gn') === 'egyptian-mythology') return '戰神賽特1';
-    return profile === 'tiger' ? '虎小妹' : '戰神賽特2';
+    const selected = GAME_PROFILE_OPTIONS.find(item => item.id === String(profile || ''));
+    return selected ? selected.label : '未知遊戲';
   }
 
   // 各遊戲符號表：相同 ID 在不同 ATG 遊戲可能代表不同圖案，所以不能共用名稱。
