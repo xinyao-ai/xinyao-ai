@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.21
+// @version      4.1.22
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -14866,7 +14866,7 @@ try {
 
     body.innerHTML = `
       ${profileSwitchMarkup()}
-      <div class="bp-status">● 已完成盤面偵測｜${esc(gameProfileName())}｜${esc(roomText())} 房</div>
+      <div class="bp-status">● 已完成盤面偵測｜${esc(gameProfileOption().label)}｜${esc(roomText())} 房</div>
       ${signalMarkup}
       <div class="bp-grid">${cards}</div>
       ${!isBaphometSymbols ? `
