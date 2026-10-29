@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.6
+// @version      4.1.7
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -14831,6 +14831,15 @@ try {
       ${profileSwitchMarkup()}
       <div class="bp-status">● 已完成盤面偵測｜${esc(gameProfileName())}｜${esc(roomText())} 房</div>
       ${signalMarkup}
+      ${isBaphometSymbols && Array.isArray(candidate.tokens) ? `
+        <div style="margin-top:7px;padding:7px;border:1px solid rgba(255,184,212,.38);border-radius:8px;background:rgba(28,18,35,.94)">
+          <div style="font-size:11px;font-weight:900;color:#ffd4e8;margin-bottom:5px">🔥 巴風特｜25格盤面 ID（逐行由左到右）</div>
+          <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px">
+            ${candidate.tokens.slice(0,25).map((token,index)=>`<div style="min-width:0;padding:5px 1px;text-align:center;border:1px solid rgba(255,255,255,.12);border-radius:5px;background:rgba(255,255,255,.06);color:#fff;font-weight:800;font-size:10px" title="第${index+1}格｜ID ${esc(token)}"><small style="display:block;opacity:.55;font-size:8px">${index+1}</small>${esc(token)}</div>`).join('')}
+          </div>
+          <div style="font-size:9px;color:#ffc8df;margin-top:5px">對照左側目前盤面截圖；資料僅用來核對，未套用其他遊戲的符號圖。</div>
+        </div>
+      ` : ''}
       <div class="bp-grid">${cards}</div>
       ${isBaphometSymbols ? '<div class="bp-path">🔥 巴風特專用 ID 對照｜目前僅顯示實際抓到的 ID，不使用賽特2圖案。請比對遊戲的已完成盤面。</div>' : ''}
       <button type="button" class="bp-board-toggle">${isBaphometSymbols ? '查看盤面 ID 順序' : '查看 30 格盤面'}</button>
