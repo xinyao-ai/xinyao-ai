@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.24
+// @version      4.1.25
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -12407,10 +12407,25 @@ try {
       return `<span class="bp-icon bp-unknown" title="惡魔血域符號 ID ${esc(key)}" style="font-size:11px">ID ${esc(key)}</span>`;
     }
     if (probe.gameProfile === 'baphomet') {
+      // 古神巴風特：獨立讀取會員上傳的 9 張高清 PNG 原圖，不再裁切小尺寸 sprite。
+      const baphometFiles = {
+        '1': 'baphomet_wild.png',
+        '2': 'baphomet_red_demon.png',
+        '3': 'baphomet_red_woman.png',
+        '4': 'baphomet_purple_wolf.png',
+        '5': 'baphomet_blue_skull.png',
+        '6': 'baphomet_letter_A.png',
+        '7': 'baphomet_letter_K.png',
+        '8': 'baphomet_letter_Q.png',
+        '9': 'baphomet_scatter.png'
+      };
+      const filename = baphometFiles[key];
       const label = BAPHOMET_SYMBOL_LABELS.get(key);
-      const index = Number(key) - 1;
-      const x = (index % 3) * 50, y = Math.floor(index / 3) * 50;
-      return label && index >= 0 && index < 9 ? `<span class="bp-icon-shell" title="${esc(label)}｜ID ${esc(key)}"><span class="bp-baphomet-original-art" style="display:block;flex:0 0 auto;width:32px;height:32px;min-width:32px;min-height:32px;aspect-ratio:1/1;margin:auto;image-rendering:-webkit-optimize-contrast;filter:contrast(1.14) saturate(1.09);background-image:url('${BAPHOMET_SPRITE}')!important;background-size:300% 300%!important;background-position:${x}% ${y}%!important;background-repeat:no-repeat!important;border-radius:4px"></span></span>` : '<span class="bp-icon bp-unknown">?</span>';
+      if (filename && label) {
+        const src = 'https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/main/assets/' + filename;
+        return `<span class="bp-icon-shell" title="${esc(label)}｜ID ${esc(key)}"><img class="bp-icon bp-icon-img bp-icon-clean" src="${src}" alt="${esc(label)}" draggable="false" decoding="async" loading="eager" style="image-rendering:auto!important;filter:none!important;object-fit:contain!important;"></span>`;
+      }
+      return '<span class="bp-icon bp-unknown">?</span>';
     }
 
     // test93：虎小妹清晰圖優先；錢袋、紅寶石、SCATTER 不再用 emoji / ? 替代。
