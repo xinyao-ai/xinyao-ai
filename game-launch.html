@@ -25,13 +25,14 @@
     seth1: 'https://hd5577.com/GameLobby?g=ATG&c=egyptian-mythology',
     baphomet: 'https://hd5577.com/GameLobby?g=ATG&c=hades',
     vampire: 'https://hd5577.com/GameLobby?g=ATG&c=new-vampire-hunter',
-    wuxia: 'https://hd5577.com/GameLobby?g=ATG&c=wuxia-caishen'
+    wuxia: 'https://hd5577.com/GameLobby?g=ATG&c=wuxia-caishen',
+    scarlet: 'https://hd5577.com/GameLobby?g=ATG&c=scarlet-three-kingdoms'
   };
 
   const q = new URLSearchParams(location.search);
   const game = String(q.get('game') || '').toLowerCase();
   const marker = String(q.get('marker') || '');
-  const validMarker = /^xinyao-hd-launch:(seth|tiger|seth1|baphomet|vampire|wuxia):\d+:[a-z0-9]+$/i.test(marker);
+  const validMarker = /^xinyao-hd-launch:(seth|tiger|seth1|baphomet|vampire|wuxia|scarlet):\d+:[a-z0-9]+$/i.test(marker);
 
   if (!routes[game] || !validMarker || !marker.toLowerCase().includes(':' + game + ':')) {
     document.getElementById('msg').textContent = '遊戲入口資料無效，請回會員頁重新點選。';
