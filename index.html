@@ -2975,22 +2975,26 @@ box-shadow:0 12px 30px rgba(0,0,0,.33)!important;color:#f0dbad!important;
    width:calc((100% - 10px)/2)!important;
  }
 }
-</style><!-- Match Son Go Ku and Scarlet card artwork to Wuxia and Tiger Girl -->
-<style>
-#xinyaoGameLauncher #xinyaoLaunchSongo .game-launcher-cover,
-#xinyaoGameLauncher #xinyaoLaunchScarlet .game-launcher-cover{
-  height:auto!important;
+</style><!-- Restore consistent full-size artwork for every game card -->
+<style id="oracle-all-game-cover-fullsize-20261029">
+#xinyaoGameLauncher .game-launcher-cover{
   aspect-ratio:1/1!important;
+  height:auto!important;
   overflow:hidden!important;
+  background-position:center!important;
 }
-#xinyaoGameLauncher #xinyaoLaunchSongo .game-launcher-img,
-#xinyaoGameLauncher #xinyaoLaunchScarlet .game-launcher-img{
+#xinyaoGameLauncher .game-launcher-cover .game-launcher-img{
   display:block!important;
   width:100%!important;
   height:100%!important;
-  object-fit:cover!important;
+  object-fit:contain!important;
   object-position:center!important;
-  transform:none!important;
+  transform:scale(1.45)!important;
+  transform-origin:center center!important;
+}
+#xinyaoGameLauncher #xinyaoLaunchSeth .game-launcher-cover{
+  background-size:145% auto!important;
+  background-position:center!important;
 }
 </style>
 </head>
