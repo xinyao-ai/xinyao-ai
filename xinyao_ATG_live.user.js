@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.16
+// @version      4.1.17
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -12335,7 +12335,10 @@ try {
     ['6','A'], ['7','K'], ['8','Q'], ['9','🔥']
   ]);
 
-  const VAMPIRE_SYMBOL_LABELS = new Map(); // 盤面符號 ID 尚未核對，避免誤套賽特圖片
+  const VAMPIRE_SYMBOL_LABELS = new Map([
+    ['2','黑髮男'], ['3','金髮男'], ['4','女孩'],
+    ['5','藥水'], ['6','聖經'], ['7','子彈'], ['8','木槌']
+  ]); // 以惡魔血域實機盤面 2026-10-29 符號出現次數核對；其他 ID 不亂配
   function activeSymbolLabels() {
     if (probe.gameProfile === 'vampire') return VAMPIRE_SYMBOL_LABELS;
     if (probe.gameProfile === 'baphomet') return BAPHOMET_SYMBOL_LABELS;
@@ -12395,6 +12398,12 @@ try {
   function symbolIconHtml(token) {
     const key = String(token ?? '');
     if (probe.gameProfile === 'vampire') {
+      // 共用一張由使用者提供素材組成的七符號精靈圖；未核對 ID 保留原數字。
+      const atlasIndex = ({'2':0,'3':1,'4':2,'6':3,'5':4,'7':5,'8':6})[key];
+      if (atlasIndex !== undefined) {
+        const percent = (atlasIndex * 100 / 6).toFixed(4);
+        return `<span class="bp-icon-shell" title="${esc(symbolLabel(key))}｜ID ${esc(key)}"><span style="display:block;width:32px;height:32px;flex:0 0 auto;margin:auto;max-width:100%;background-image:url('https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/main/assets/vampire-symbols-seven.svg');background-size:700% 100%;background-position:${percent}% 50%;background-repeat:no-repeat;"></span></span>`;
+      }
       return `<span class="bp-icon bp-unknown" title="惡魔血域符號 ID ${esc(key)}" style="font-size:11px">ID ${esc(key)}</span>`;
     }
     if (probe.gameProfile === 'baphomet') {
