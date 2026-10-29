@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.36
+// @version      4.1.37
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -14631,6 +14631,7 @@ try {
       #${PANEL_ID} .bp-grid.bp-wuxia-compact .bp-icon-shell{width:40px!important;height:40px!important;min-height:40px!important;flex:0 0 40px!important;margin:0 auto!important}
       #${PANEL_ID} .bp-grid.bp-wuxia-compact .bp-icon-img{width:40px!important;height:40px!important;max-width:40px!important;max-height:40px!important;object-fit:contain!important}
       #${PANEL_ID} .bp-grid.bp-wuxia-compact .bp-name{display:none!important}
+      #${PANEL_ID} .bp-grid.bp-songo-no-label .bp-name{display:none!important}
       #${PANEL_ID} .bp-grid.bp-wuxia-compact .bp-count{margin:0!important;line-height:19px!important;font-size:16px!important}
       /* 巴風特專屬緊湊排列：移除九宮格卡片下方的多餘留白 */
       #${PANEL_ID} .bp-grid.bp-baphomet-compact{grid-template-columns:repeat(3,minmax(0,1fr))!important;grid-auto-rows:min-content!important;align-items:start!important;gap:4px!important}
@@ -14944,7 +14945,7 @@ try {
       .slice(0, 12);
 
     const cards = sourceItems.map(item => `
-      <div class="bp-item" title="${esc(symbolLabel(item.token))}｜ID ${esc(item.token)}">
+      <div class="bp-item" title="${probe.gameProfile === 'songo' ? '孫行者符號' : esc(symbolLabel(item.token)) + '｜ID ' + esc(item.token)}">
         ${symbolIconHtml(item.token)}
         ${!isBaphometSymbols && !['scarlet','songo'].includes(probe.gameProfile) ? `<span class="bp-name">${esc(symbolLabel(item.token))}</span>` : ''}
         <span class="bp-count">×${item.count}</span>
@@ -14961,7 +14962,7 @@ try {
       ${profileSwitchMarkup()}
       <div class="bp-status">● 已完成盤面偵測｜${esc(gameProfileOption().label)}</div>
       ${signalMarkup}
-      <div class="bp-grid${isBaphometSymbols ? ' bp-baphomet-compact' : (['wuxia','scarlet','songo'].includes(probe.gameProfile) ? ' bp-wuxia-compact' : '')}">${cards}</div>
+      <div class="bp-grid${isBaphometSymbols ? ' bp-baphomet-compact' : (['wuxia','scarlet','songo'].includes(probe.gameProfile) ? (probe.gameProfile === 'songo' ? ' bp-wuxia-compact bp-songo-no-label' : ' bp-wuxia-compact') : '')}">${cards}</div>
       ${!isBaphometSymbols ? `
       <button type="button" class="bp-board-toggle">查看 30 格盤面</button>
       <div class="bp-board-wrap">
