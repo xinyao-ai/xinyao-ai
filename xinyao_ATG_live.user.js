@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.32
+// @version      4.1.33
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -88,7 +88,7 @@ function xinyaoResolveHuangDingAccess() {
   // test142：會員頁先選遊戲，再經皇鼎轉進 ATG 時，中間轉址可能讓 document.referrer
   // 不再是 hd5577.com。此時改用同一分頁 window.name 的短效接力標記確認來源流程。
   try {
-    const launch = String(window.name || '').match(/^xinyao-hd-launch:(seth|tiger|seth1|baphomet|vampire|wuxia):(\d+):([a-z0-9]+)$/i);
+    const launch = String(window.name || '').match(/^xinyao-hd-launch:(seth|tiger|seth1|baphomet|vampire|wuxia|scarlet):(\d+):([a-z0-9]+)$/i);
     if (launch) {
       const launchedAt = Number(launch[2] || 0);
       const fresh = Number.isFinite(launchedAt) && launchedAt > 0 &&
@@ -175,7 +175,7 @@ function xinyaoResolveHuangDingAccess() {
 
 const XIANYAO_HD_ONLY_ENABLED = xinyaoLoadRemoteHdOnly();
 const XIANYAO_HD_ACCESS_ALLOWED =
-  ['egyptian-mythology','hades','new-vampire-hunter','wuxia-caishen'].includes(new URL(location.href).searchParams.get('gn'))
+  ['egyptian-mythology','hades','new-vampire-hunter','wuxia-caishen','scarlet-three-kingdoms'].includes(new URL(location.href).searchParams.get('gn'))
   || !XIANYAO_HD_ONLY_ENABLED || xinyaoResolveHuangDingAccess();
 
 try {
@@ -219,7 +219,9 @@ if (XIANYAO_HD_ACCESS_ALLOWED) {
 // ===== test140：全域遊戲模式（掃描共用；盤面監測 / 進房分流） =====
 const XIANYAO_GAME_MODULE_KEY = 'xinyao_atg_active_game_module_v1';
 const XIANYAO_GAME_MODULES = Object.freeze({
-  wuxia:{ id:'wuxia', label:'武俠', shortLabel:'武俠', icon:'⚔️' },
+  scarlet:{ id:'scarlet', label:'赤三國', shortLabel:'赤三國', icon:'🔥' },
+  wuxia:{ id:'scarlet', label:'赤三國', shortLabel:'赤三國', icon:'🔥' },
+    { id:'wuxia', label:'武俠', shortLabel:'武俠', icon:'⚔️' },
   vampire:{ id:'vampire', label:'惡魔血域', shortLabel:'血域', icon:'🦇' },
   baphomet:{ id:'baphomet', label:'古神巴風特', shortLabel:'巴風特', icon:'🔥' },
   seth1:{ id:'seth1', label:'戰神賽特1', shortLabel:'賽特1', icon:'👁️' },
@@ -233,6 +235,7 @@ function xinyaoNormalizeGameModule(value) {
 }
 
 function xinyaoLoadActiveGameModule() {
+  if (new URL(location.href).searchParams.get('gn') === 'scarlet-three-kingdoms') return 'scarlet';
   if (new URL(location.href).searchParams.get('gn') === 'wuxia-caishen') return 'wuxia';
   if (new URL(location.href).searchParams.get('gn') === 'new-vampire-hunter') return 'vampire';
   if (new URL(location.href).searchParams.get('gn') === 'hades') return 'baphomet';
@@ -261,6 +264,7 @@ function xinyaoLoadActiveGameModule() {
 }
 
 function xinyaoActiveGameModule() {
+  if (new URL(location.href).searchParams.get('gn') === 'scarlet-three-kingdoms') return 'scarlet';
   if (new URL(location.href).searchParams.get('gn') === 'wuxia-caishen') return 'wuxia';
   if (new URL(location.href).searchParams.get('gn') === 'new-vampire-hunter') return 'vampire';
   if (new URL(location.href).searchParams.get('gn') === 'hades') return 'baphomet';
@@ -11475,6 +11479,7 @@ try {
   // 之後新增遊戲，只要新增一筆選項＋對應圖示辨識資料，不需要再改版面。
   const MANUAL_GAME_PROFILE_KEY = 'xinyao_atg_board_manual_profile_v1';
   const GAME_PROFILE_OPTIONS = Object.freeze([
+    { id:'scarlet', label:'赤三國', shortLabel:'赤三國', icon:'🔥' },
     { id:'wuxia', label:'武俠', shortLabel:'武俠', icon:'⚔️' },
     { id:'vampire', label:'惡魔血域', shortLabel:'血域', icon:'🦇' },
     { id:'baphomet', label:'古神巴風特', shortLabel:'巴風特', icon:'🔥' },
@@ -11493,7 +11498,8 @@ try {
   }
 
   function loadManualGameProfile() {
-    if (new URL(location.href).searchParams.get('gn') === 'wuxia-caishen') return 'wuxia';
+    if (new URL(location.href).searchParams.get('gn') === 'scarlet-three-kingdoms') return 'scarlet';
+  if (new URL(location.href).searchParams.get('gn') === 'wuxia-caishen') return 'wuxia';
   if (new URL(location.href).searchParams.get('gn') === 'new-vampire-hunter') return 'vampire';
   if (new URL(location.href).searchParams.get('gn') === 'hades') return 'baphomet';
     if (new URL(location.href).searchParams.get('gn') === 'egyptian-mythology') return 'seth1';
@@ -12354,6 +12360,7 @@ try {
     ['11','J'],['12','10'],['13','Jackpot'],['14','Scatter']
   ]); // 依使用者提供多張盤面與 ID 計數初步配對，待實機核對。
   function activeSymbolLabels() {
+    if (probe.gameProfile === 'scarlet') return new Map();
     if (probe.gameProfile === 'wuxia') return WUXIA_SYMBOL_LABELS;
     if (probe.gameProfile === 'vampire') return VAMPIRE_SYMBOL_LABELS;
     if (probe.gameProfile === 'baphomet') return BAPHOMET_SYMBOL_LABELS;
@@ -12412,6 +12419,9 @@ try {
   const BAPHOMET_SPRITE = 'data:image/webp;base64,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';
   function symbolIconHtml(token) {
     const key = String(token ?? '');
+    if (probe.gameProfile === 'scarlet') {
+      return `<span class="bp-icon bp-unknown" title="赤三國符號 ID ${esc(key)}" style="font-size:11px">ID ${esc(key)}</span>`;
+    }
     if (probe.gameProfile === 'wuxia') {
       // 武俠獨立 PNG，不與賽特系列共用圖示；ID 對應依實機截圖初步核對。
       const wuxiaFiles = {
