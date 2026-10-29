@@ -10464,9 +10464,7 @@ try {
           <b style="font-size:10.5px;color:#ffd3e4;">🔒 已固定：${option.icon} ${option.label}</b>
           <span style="font-size:9px;opacity:.68;">由會員頁入口決定</span>
         </div>
-        <div style="margin-top:5px;font-size:9.5px;line-height:1.5;color:${current === 'seth' ? '#bff5dd' : '#ffd8a3'};">
-          ${detail}
-        </div>
+
       </div>`;
   }
 
