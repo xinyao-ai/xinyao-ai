@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.38
+// @version      4.1.39
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -2582,7 +2582,7 @@ try {
         <div class="xinyaoRow"><span>本次完成轉數</span><b>${state.completedSpins}</b></div>
       </div>
 
-      <div class="xinyaoGroup xinyaoRiskGroup"><button id="xinyaoRiskOpen" type="button" style="width:100%;min-width:0;white-space:nowrap;word-break:keep-all;border:1px solid rgba(255,174,207,.38);border-radius:9px;background:rgba(255,95,158,.10);color:#ffd3e4;padding:8px 6px;font-size:10px;line-height:1.2;font-weight:900;cursor:pointer;">🛡️ 止盈／止損</button></div>
+      <div class="xinyaoGroup xinyaoRiskGroup"><button id="xinyaoRiskOpen" type="button" style="width:100%;min-width:0;white-space:nowrap;word-break:keep-all;border:1px solid #ffe6a6;border-radius:9px;background:linear-gradient(180deg,#ffe8a1 0%,#e8b955 48%,#c58c28 100%);color:#30200b;padding:8px 6px;box-shadow:inset 0 1px 0 #fff4ca,0 2px 8px rgba(212,158,52,.24);font-size:10px;line-height:1.2;font-weight:900;cursor:pointer;">🛡️ 止盈／止損</button></div>
 
       ${pairBox}
     `;
@@ -10950,7 +10950,7 @@ try {
 
     mini.id = 'xinyao-room-mini';
     mini.textContent = '🔎 全房分析';
-    mini.style.cssText = 'position:fixed;top:12px;right:12px;z-index:2147483647;border:0;border-radius:999px;padding:9px 12px;background:#ff5a9d;color:#fff;font-weight:800;display:none;cursor:pointer;';
+    mini.style.cssText = 'position:fixed;top:12px;right:12px;z-index:2147483647;border:1px solid #f6d78b;border-radius:999px;padding:9px 12px;background:linear-gradient(180deg,#ffe8a1,#d6a23e);color:#2d1b06;font-weight:800;box-shadow:0 3px 12px rgba(0,0,0,.3);display:none;cursor:pointer;';
     if (xinyaoIsPhoneUi()) {
       mini.style.top = '50px';
       mini.style.right = '6px';
