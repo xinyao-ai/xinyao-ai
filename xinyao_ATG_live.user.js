@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.44
+// @version      4.1.45
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -15537,13 +15537,13 @@ try {
         width:92px;
         box-sizing:border-box;
         padding:6px;
-        border:1px solid rgba(255,184,214,.72);
+        border:1px solid #ffd452;
         border-radius:14px;
         background:rgba(8,8,12,.72);
         color:#fff;
         box-shadow:
-          0 0 0 .5px rgba(255,205,225,.10) inset,
-          0 0 5px rgba(255,170,207,.16),
+          0 0 0 .5px rgba(255,225,135,.22) inset,
+          0 0 5px rgba(255,205,70,.28),
           0 8px 24px rgba(0,0,0,.30);
         backdrop-filter:blur(9px);
         -webkit-backdrop-filter:blur(9px);
@@ -15603,12 +15603,12 @@ try {
       }
       #${HUD_ID} .qh-top{display:flex;align-items:center;gap:4px;min-width:0}
       #${HUD_ID} .qh-dot{width:6px;height:6px;border-radius:50%;background:#7a7280;flex:0 0 auto;box-shadow:0 0 6px rgba(122,114,128,.48)}
-      #${HUD_ID} .qh-dot.on{background:#ffb6d3;box-shadow:0 0 5px rgba(255,182,211,.48)}
+      #${HUD_ID} .qh-dot.on{background:#ffd952;box-shadow:0 0 5px rgba(255,209,76,.54)}
       #${HUD_ID} .qh-pnl{min-width:0;flex:1;font-size:9px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       #${HUD_ID} .qh-pnl.pos{color:#a7f3c2}
-      #${HUD_ID} .qh-pnl.neg{color:#ff9fbe}
-      #${HUD_ID} .qh-signal{margin-top:4px;font-size:10px;font-weight:950;color:#ffc1d9;white-space:nowrap;text-shadow:0 0 3px rgba(255,180,211,.18)}
-      #${HUD_ID} .qh-signal.hot{color:#ff9fc4;text-shadow:0 0 4px rgba(255,170,205,.26)}
+      #${HUD_ID} .qh-pnl.neg{color:#ffd075}
+      #${HUD_ID} .qh-signal{margin-top:4px;font-size:10px;font-weight:950;color:#ffe075;white-space:nowrap;text-shadow:0 0 3px rgba(255,207,60,.24)}
+      #${HUD_ID} .qh-signal.hot{color:#ffeb96;text-shadow:0 0 4px rgba(255,207,60,.34)}
       #${HUD_ID} .qh-grid{
         display:grid;
         grid-template-columns:repeat(2,minmax(0,1fr));
@@ -15627,7 +15627,7 @@ try {
         width:100%;
         height:43px;
         padding:3px 2px;
-        border:1px solid rgba(255,188,215,.52);
+        border:1px solid #f3c64c;
         border-radius:9px;
         background:rgba(8,8,12,.48);
         color:#fff;
@@ -15675,7 +15675,7 @@ try {
         min-width:28px;
         height:20px;
         padding:0;
-        color:#ffd6e7;
+        color:#ffe27e;
         font-size:11px;
         font-weight:950;
         line-height:1;
