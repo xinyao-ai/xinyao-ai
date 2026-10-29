@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.7
+// @version      4.1.8
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -12325,7 +12325,18 @@ try {
     ['16', 'SCATTER']
   ]);
 
+  const BAPHOMET_SYMBOL_LABELS = new Map([
+    ['1','WILD'], ['2','紅色惡魔'], ['3','紅髮女王'],
+    ['4','紫色三頭狼'], ['5','藍焰骷髏'], ['6','A'],
+    ['7','K'], ['8','Q'], ['9','SCATTER']
+  ]);
+  const BAPHOMET_SYMBOL_FALLBACK = new Map([
+    ['1','🐏'], ['2','😈'], ['3','👑'], ['4','🐺'], ['5','💀'],
+    ['6','A'], ['7','K'], ['8','Q'], ['9','🔥']
+  ]);
+
   function activeSymbolLabels() {
+    if (probe.gameProfile === 'baphomet') return BAPHOMET_SYMBOL_LABELS;
     return probe.gameProfile === 'tiger' ? TIGER_SYMBOL_LABELS : SETH_SYMBOL_LABELS;
   }
 
@@ -12380,6 +12391,11 @@ try {
 
   function symbolIconHtml(token) {
     const key = String(token ?? '');
+    if (probe.gameProfile === 'baphomet') {
+      const label = BAPHOMET_SYMBOL_LABELS.get(key);
+      const marker = BAPHOMET_SYMBOL_FALLBACK.get(key);
+      return label ? `<span class="bp-icon-shell" title="${esc(label)}｜ID ${esc(key)}"><span class="bp-icon bp-text-icon" style="font-size:${['6','7','8'].includes(key) ? '26px' : '22px'};font-weight:900;color:#ffe3ab;text-shadow:0 0 7px #a04c44">${esc(marker)}</span></span>` : '<span class="bp-icon bp-unknown">?</span>';
+    }
 
     // test93：虎小妹清晰圖優先；錢袋、紅寶石、SCATTER 不再用 emoji / ? 替代。
     const clearSrc = probe.gameProfile === 'tiger'
@@ -14815,8 +14831,8 @@ try {
 
     const cards = sourceItems.map(item => `
       <div class="bp-item" title="${esc(symbolLabel(item.token))}｜ID ${esc(item.token)}">
-        ${isBaphometSymbols ? `<span class="bp-icon bp-unknown" style="font-size:14px">ID ${esc(item.token)}</span>` : symbolIconHtml(item.token)}
-        <span class="bp-name">${isBaphometSymbols ? `符號 ID ${esc(item.token)}` : esc(symbolLabel(item.token))}</span>
+        ${symbolIconHtml(item.token)}
+        <span class="bp-name">${esc(symbolLabel(item.token))}</span>
         <span class="bp-count">×${item.count}</span>
       </div>
     `).join('');
