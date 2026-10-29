@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.15
+// @version      4.1.16
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -10507,20 +10507,12 @@ try {
   function gameModuleSelectorHtml() {
     const current = xinyaoActiveGameModule();
     const option = XIANYAO_GAME_MODULES[current] || XIANYAO_GAME_MODULES.seth;
-    const detail = current === 'baphomet'
-      ? '古神巴風特獨立類別｜掃描可用，進房已接原生選房流程（待實機確認）'
-      : current === 'seth1'
-      ? '賽特一代獨立類別｜房號掃描已支援，盤面符號仍需實機核對'
-      : current === 'seth'
-        ? '盤面監測＋進入此房使用賽特2專屬機制'
-        : '盤面監測＋進入此房使用虎小妹專屬機制';
     return `
       <div style="margin-top:7px;padding:8px 9px;border:1px solid rgba(255,190,215,.18);border-radius:10px;background:rgba(255,255,255,.04);">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
           <b style="font-size:10.5px;color:#ffd3e4;">🔒 已固定：${option.icon} ${option.label}</b>
           <span style="font-size:9px;opacity:.68;">由會員頁入口決定</span>
         </div>
-
       </div>`;
   }
 
