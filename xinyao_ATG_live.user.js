@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.52
+// @version      4.1.53
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -15198,7 +15198,7 @@ try {
 
 
 /* ===== 芯瑤 ATG 止盈／止損 v1.0｜test186 ===== */
-(() => {
+const xinyaoStartRiskGuardAtReady = () => {
   'use strict';
   if (window.__XIANYAO_ATG_RISK_GUARD_V1__) return;
   window.__XIANYAO_ATG_RISK_GUARD_V1__ = true;
@@ -15485,7 +15485,13 @@ try {
     getState:()=>({settings:Object.assign({},cfg),session:Object.assign({},run),balance:balance(),pnl:pnl()})
   };
   update();
-})();
+};
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', xinyaoStartRiskGuardAtReady, {once:true});
+} else {
+  xinyaoStartRiskGuardAtReady();
+}
+
 
 
 /* ===== 芯瑤 ATG Mobile Quick HUD v1.0｜test87 超小懸浮工具 ===== */
