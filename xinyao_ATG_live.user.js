@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.46
+// @version      4.1.47
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -15697,13 +15697,13 @@ try {
       #${HUD_ID} .qh-btn.detail{color:#fff}
       #${HUD_ID} .qh-btn.board{color:#fff}
       #${HUD_ID} .qh-btn{
-        box-shadow:0 0 0 .5px rgba(255,200,223,.04) inset;
+        box-shadow:0 0 0 .5px rgba(255,223,130,.09) inset;
       }
       @media (hover:hover) and (pointer:fine){
         #${HUD_ID} .qh-btn:hover{
-          border-color:rgba(255,200,221,.72);
-          background:rgba(255,190,216,.07);
-          box-shadow:0 0 5px rgba(255,182,211,.12);
+          border-color:#ffe072;
+          background:rgba(255,208,73,.12);
+          box-shadow:0 0 7px rgba(255,213,76,.30);
         }
       }
 
