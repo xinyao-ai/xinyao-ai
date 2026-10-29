@@ -309,14 +309,15 @@
   const XIANYAO_HUANGDING_GAME_LINKS = Object.freeze({
     seth: 'https://hd5577.com/GameLobby?g=ATG&c=golden-seth',
     tiger: 'https://hd5577.com/GameLobby?g=ATG&c=tiger-princess&p=web&l=zh-cn',
-    seth1: 'https://hd5577.com/GameLobby?g=ATG&c=egyptian-mythology'
+    seth1: 'https://hd5577.com/GameLobby?g=ATG&c=egyptian-mythology',
+    baphomet: 'https://hd5577.com/GameLobby?g=ATG&c=elder-god-baphomet'
   });
 
   const XIANYAO_GAME_WINDOW_KEY =
     'xinyao_atg_game_window_name_v1';
 
   function validSavedGameWindowName(value) {
-    return /^xinyao-hd-launch:(seth|tiger|seth1):\d+:[a-z0-9]+$/i.test(String(value || ''));
+    return /^xinyao-hd-launch:(seth|tiger|seth1|baphomet):\d+:[a-z0-9]+$/i.test(String(value || ''));
   }
 
   function launchHuangDingGame(gameId) {
@@ -345,7 +346,9 @@
     } catch (_) {}
 
     const button =
-      id === 'tiger'
+      id === 'baphomet'
+        ? $('xinyaoLaunchBaphomet')
+        : id === 'tiger'
         ? $('xinyaoLaunchTiger')
         : id === 'seth1'
           ? $('xinyaoLaunchSeth1')
@@ -385,7 +388,9 @@
       const enter = button.querySelector('.game-launcher-enter span');
       if (enter) {
         enter.textContent =
-          id === 'tiger'
+          id === 'baphomet'
+            ? '進入皇鼎巴風特'
+            : id === 'tiger'
             ? '進入皇鼎虎小妹'
             : id === 'seth1'
               ? '進入皇鼎戰神賽特一代'
@@ -405,6 +410,12 @@
     if (seth1Button && seth1Button.dataset.bound !== '1') {
       seth1Button.dataset.bound = '1';
       seth1Button.addEventListener('click', () => launchHuangDingGame('seth1'));
+    }
+
+    const baphometButton = $('xinyaoLaunchBaphomet');
+    if (baphometButton && baphometButton.dataset.bound !== '1') {
+      baphometButton.dataset.bound = '1';
+      baphometButton.addEventListener('click', () => launchHuangDingGame('baphomet'));
     }
 
     const tigerButton = $('xinyaoLaunchTiger');
