@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.41
+// @version      4.1.42
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -10574,7 +10574,7 @@ try {
           class="xinyao-enter-room"
           data-room-number="${Math.trunc(r.number)}"
           data-room-id="${Math.trunc(r.roomId)}"
-          style="border:1px solid rgba(255,190,215,.5);border-radius:7px;background:rgba(255,95,158,.14);color:#ffd3e4;padding:5px 4px;font-size:9px;font-weight:900;cursor:pointer;">
+          style="border:1px solid #fff0b3;border-radius:7px;background:linear-gradient(180deg,#fff7c5 0%,#ffe06b 38%,#f8bf2c 100%);color:#2c1a04;box-shadow:inset 0 1px 0 #fff9df,0 2px 6px rgba(249,190,42,.26);padding:5px 4px;font-size:9px;font-weight:900;cursor:pointer;">
           進入此房
         </button>
       </div>`;
