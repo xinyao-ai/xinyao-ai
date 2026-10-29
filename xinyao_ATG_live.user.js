@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.1
+// @version      4.1.2
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -231,7 +231,7 @@ function xinyaoNormalizeGameModule(value) {
 }
 
 function xinyaoLoadActiveGameModule() {
-  if (new URL(location.href).searchParams.get('gn') === 'elder-god-baphomet') return 'baphomet';
+  if (new URL(location.href).searchParams.get('gn') === 'hades') return 'baphomet';
   if (new URL(location.href).searchParams.get('gn') === 'egyptian-mythology') return 'seth1';
   // 從芯瑤會員頁點遊戲進皇鼎時，會員頁會把選擇寫在同一 browsing context 的 window.name。
   // 優先使用這個入口標記，再保存到 ATG 自己的 localStorage，確保進房重載後仍維持同一遊戲機制。
@@ -257,7 +257,7 @@ function xinyaoLoadActiveGameModule() {
 }
 
 function xinyaoActiveGameModule() {
-  if (new URL(location.href).searchParams.get('gn') === 'elder-god-baphomet') return 'baphomet';
+  if (new URL(location.href).searchParams.get('gn') === 'hades') return 'baphomet';
   if (new URL(location.href).searchParams.get('gn') === 'egyptian-mythology') return 'seth1';
   const live = xinyaoNormalizeGameModule(window.__XIANYAO_ATG_ACTIVE_GAME_MODULE__);
   return live || xinyaoLoadActiveGameModule();
@@ -11484,7 +11484,7 @@ try {
   }
 
   function loadManualGameProfile() {
-    if (new URL(location.href).searchParams.get('gn') === 'elder-god-baphomet') return 'baphomet';
+    if (new URL(location.href).searchParams.get('gn') === 'hades') return 'baphomet';
     if (new URL(location.href).searchParams.get('gn') === 'egyptian-mythology') return 'seth1';
     // test140：盤面監測跟隨全域遊戲模式；不再自己猜目前是哪款。
     try {
@@ -12285,7 +12285,7 @@ try {
   }
 
   function gameProfileName(profile = probe.gameProfile) {
-    if (new URL(location.href).searchParams.get('gn') === 'elder-god-baphomet') return '古神巴風特';
+    if (new URL(location.href).searchParams.get('gn') === 'hades') return '古神巴風特';
     if (new URL(location.href).searchParams.get('gn') === 'egyptian-mythology') return '戰神賽特1';
     return profile === 'tiger' ? '虎小妹' : '戰神賽特2';
   }
