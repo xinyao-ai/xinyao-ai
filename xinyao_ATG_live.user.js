@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.34
+// @version      4.1.35
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -12419,7 +12419,12 @@ try {
   function symbolIconHtml(token) {
     const key = String(token ?? '');
     if (probe.gameProfile === 'scarlet') {
-      return `<span class="bp-icon bp-unknown" title="赤三國符號 ID ${esc(key)}" style="font-size:11px">ID ${esc(key)}</span>`;
+      const valid = /^(?:[1-9]|15)$/.test(key);
+      if (valid) {
+        const file = ({'1':'scarlet_id01_statue.png','2':'scarlet_id02_blue_fan.png','3':'scarlet_id03_green_blade.png','4':'scarlet_id04_wood_token.png','5':'scarlet_id05_yellow_bird.png','6':'scarlet_id06_red_ring.png','7':'scarlet_id07_purple_orb.png','8':'scarlet_id08_blue_c.png','9':'scarlet_id09_green_leaf.png','15':'scarlet_id15_scatter.png'})[key];
+        return `<span class="bp-icon-shell" title="赤三國 ID ${esc(key)}"><img class="bp-icon bp-icon-img bp-icon-clean" src="https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/main/assets/${file}" alt="赤三國符號" draggable="false" decoding="async" loading="eager" style="object-fit:contain!important;filter:none!important"></span>`;
+      }
+      return `<span class="bp-icon bp-unknown" title="赤三國 ID ${esc(key)}">ID ${esc(key)}</span>`;
     }
     if (probe.gameProfile === 'wuxia') {
       // 武俠獨立 PNG，不與賽特系列共用圖示；ID 對應依實機截圖初步核對。
@@ -14922,7 +14927,7 @@ try {
     const cards = sourceItems.map(item => `
       <div class="bp-item" title="${esc(symbolLabel(item.token))}｜ID ${esc(item.token)}">
         ${symbolIconHtml(item.token)}
-        ${!isBaphometSymbols ? `<span class="bp-name">${esc(symbolLabel(item.token))}</span>` : ''}
+        ${!isBaphometSymbols && probe.gameProfile !== 'scarlet' ? `<span class="bp-name">${esc(symbolLabel(item.token))}</span>` : ''}
         <span class="bp-count">×${item.count}</span>
       </div>
     `).join('');
@@ -14937,7 +14942,7 @@ try {
       ${profileSwitchMarkup()}
       <div class="bp-status">● 已完成盤面偵測｜${esc(gameProfileOption().label)}</div>
       ${signalMarkup}
-      <div class="bp-grid${isBaphometSymbols ? ' bp-baphomet-compact' : (probe.gameProfile === 'wuxia' ? ' bp-wuxia-compact' : '')}">${cards}</div>
+      <div class="bp-grid${isBaphometSymbols ? ' bp-baphomet-compact' : (['wuxia','scarlet'].includes(probe.gameProfile) ? ' bp-wuxia-compact' : '')}">${cards}</div>
       ${!isBaphometSymbols ? `
       <button type="button" class="bp-board-toggle">查看 30 格盤面</button>
       <div class="bp-board-wrap">
