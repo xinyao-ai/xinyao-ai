@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.45
+// @version      4.1.46
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -14615,7 +14615,7 @@ try {
         max-width:calc(100vw - 16px);
         box-sizing:border-box;
         padding:9px 10px;
-        border:1px solid rgba(255,255,255,.20);
+        border:1px solid rgba(245,202,85,.74);
         border-radius:14px;
         background:rgba(24,20,31,.92);
         color:#fff;
@@ -14631,17 +14631,17 @@ try {
       #${PANEL_ID} .bp-mini{display:flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:5px;background:rgba(255,255,255,.07);font-size:9px;opacity:.82}
       #${PANEL_ID} .bp-status{margin-top:6px;font-size:10px;color:#8deac1;font-weight:800}
       #${PANEL_ID} .bp-profile-switch{position:relative;margin-top:6px}
-      #${PANEL_ID} .bp-profile-main{width:100%;display:flex;align-items:center;justify-content:space-between;gap:7px;border:1px solid rgba(255,95,158,.45);border-radius:8px;background:rgba(255,95,158,.10);color:#ffd4e5;padding:6px 8px;font-size:9px;font-weight:900;cursor:pointer;box-shadow:0 0 0 1px rgba(255,95,158,.05) inset}
+      #${PANEL_ID} .bp-profile-main{width:100%;display:flex;align-items:center;justify-content:space-between;gap:7px;border:1px solid #f5ca55;border-radius:8px;background:rgba(255,215,89,.09);color:#ffe69b;padding:6px 8px;font-size:9px;font-weight:900;cursor:pointer;box-shadow:0 0 0 1px rgba(255,215,89,.08) inset}
       #${PANEL_ID} .bp-profile-main-label{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       #${PANEL_ID} .bp-profile-arrow{font-size:8px;opacity:.78}
-      #${PANEL_ID} .bp-profile-menu{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:30;padding:5px;border:1px solid rgba(255,184,212,.35);border-radius:9px;background:rgba(22,18,28,.985);box-shadow:0 8px 22px rgba(0,0,0,.42)}
+      #${PANEL_ID} .bp-profile-menu{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:30;padding:5px;border:1px solid rgba(245,202,85,.48);border-radius:9px;background:rgba(22,18,28,.985);box-shadow:0 8px 22px rgba(0,0,0,.42)}
       #${PANEL_ID} .bp-profile-menu.open{display:block}
       #${PANEL_ID} .bp-profile-option{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid transparent;border-radius:7px;background:transparent;color:rgba(255,255,255,.82);padding:7px 8px;margin:0 0 3px;font-size:9px;font-weight:850;text-align:left;cursor:pointer}
       #${PANEL_ID} .bp-profile-option:last-child{margin-bottom:0}
-      #${PANEL_ID} .bp-profile-option.active{border-color:rgba(255,95,158,.40);background:rgba(255,95,158,.13);color:#ffd4e5}
+      #${PANEL_ID} .bp-profile-option.active{border-color:rgba(255,95,158,.40);background:rgba(255,95,158,.13);color:#ffe69b}
       #${PANEL_ID} .bp-profile-check{color:#ff9fc4;font-weight:950}
       #${PANEL_ID} .bp-signal{margin-top:7px;padding:7px 8px;border:1px solid rgba(255,255,255,.10);border-radius:9px;background:rgba(255,255,255,.035)}
-      #${PANEL_ID} .bp-signal.hot{border-color:rgba(255,95,158,.62);background:rgba(255,95,158,.10);box-shadow:0 0 0 1px rgba(255,95,158,.08) inset}
+      #${PANEL_ID} .bp-signal.hot{border-color:rgba(255,95,158,.62);background:rgba(255,215,89,.09);box-shadow:0 0 0 1px rgba(255,95,158,.08) inset}
       #${PANEL_ID} .bp-signal-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:9px}
       #${PANEL_ID} .bp-signal-row b{font-size:10px;color:#ffb8d4}
       #${PANEL_ID} .bp-signal-state{font-weight:850;opacity:.82}
