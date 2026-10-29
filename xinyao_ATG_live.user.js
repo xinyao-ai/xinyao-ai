@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.33
+// @version      4.1.34
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -220,8 +220,7 @@ if (XIANYAO_HD_ACCESS_ALLOWED) {
 const XIANYAO_GAME_MODULE_KEY = 'xinyao_atg_active_game_module_v1';
 const XIANYAO_GAME_MODULES = Object.freeze({
   scarlet:{ id:'scarlet', label:'赤三國', shortLabel:'赤三國', icon:'🔥' },
-  wuxia:{ id:'scarlet', label:'赤三國', shortLabel:'赤三國', icon:'🔥' },
-    { id:'wuxia', label:'武俠', shortLabel:'武俠', icon:'⚔️' },
+  wuxia:{ id:'wuxia', label:'武俠', shortLabel:'武俠', icon:'⚔️' },
   vampire:{ id:'vampire', label:'惡魔血域', shortLabel:'血域', icon:'🦇' },
   baphomet:{ id:'baphomet', label:'古神巴風特', shortLabel:'巴風特', icon:'🔥' },
   seth1:{ id:'seth1', label:'戰神賽特1', shortLabel:'賽特1', icon:'👁️' },
