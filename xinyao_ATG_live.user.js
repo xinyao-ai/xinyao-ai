@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.42
+// @version      4.1.43
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -9457,13 +9457,13 @@ try {
       : '目前沒有可用空房';
 
     overlay.innerHTML =
-      '<div style="width:min(430px,calc(100vw - 28px));box-sizing:border-box;padding:22px 20px;border:1px solid rgba(255,184,212,.58);border-radius:20px;background:rgba(21,17,26,.98);color:#fff;box-shadow:0 20px 60px rgba(0,0,0,.55);text-align:center;">'+
-        '<div style="font-size:13px;font-weight:900;color:#ffb9d4;">'+game.icon+' '+game.label+'</div>'+
+      '<div style="width:min(430px,calc(100vw - 28px));box-sizing:border-box;padding:22px 20px;border:1px solid rgba(255,217,132,.72);border-radius:20px;background:rgba(21,17,26,.98);color:#fff;box-shadow:0 20px 60px rgba(0,0,0,.55);text-align:center;">'+
+        '<div style="font-size:13px;font-weight:900;color:#ffe08a;">'+game.icon+' '+game.label+'</div>'+
         '<div style="margin-top:8px;font-size:21px;font-weight:1000;color:#fff;">你挑的 #'+roomText+' 這房'+statusText+'</div>'+
         '<div style="margin-top:7px;font-size:12px;opacity:.7;">要怎麼處理？</div>'+
-        '<button type="button" data-room-choice="auto" '+(best?'':'disabled')+' style="width:100%;margin-top:18px;border:0;border-radius:12px;background:'+(best?'linear-gradient(135deg,#ff87b5,#ff5f9e)':'rgba(255,255,255,.09)')+';color:#fff;padding:13px 12px;font-size:13px;font-weight:950;cursor:'+(best?'pointer':'default')+';opacity:'+(best?'1':'.5')+';">⚡ 自動挑同遊戲「觀察分數」最高空房</button>'+
-        '<div style="margin-top:6px;font-size:10px;color:#ffd0e0;opacity:.78;">'+bestText+'</div>'+
-        '<button type="button" data-room-choice="back" style="width:100%;margin-top:12px;border:1px solid rgba(255,184,212,.46);border-radius:12px;background:rgba(255,255,255,.04);color:#fff;padding:12px;font-size:13px;font-weight:900;cursor:pointer;">↩️ 回到選房頁</button>'+
+        '<button type="button" data-room-choice="auto" '+(best?'':'disabled')+' style="width:100%;margin-top:18px;border:0;border-radius:12px;background:'+(best?'linear-gradient(180deg,#fff7cf 0%,#ffe277 37%,#f7be2e 100%)':'rgba(255,255,255,.09)')+';color:'+(best?'#2d1c05':'#fff')+';padding:13px 12px;font-size:13px;font-weight:950;cursor:'+(best?'pointer':'default')+';opacity:'+(best?'1':'.5')+';">⚡ 自動挑同遊戲「觀察分數」最高空房</button>'+
+        '<div style="margin-top:6px;font-size:10px;color:#f4d99c;opacity:.78;">'+bestText+'</div>'+
+        '<button type="button" data-room-choice="back" style="width:100%;margin-top:12px;border:1px solid rgba(235,192,107,.55);border-radius:12px;background:rgba(255,255,255,.04);color:#fff;padding:12px;font-size:13px;font-weight:900;cursor:pointer;">↩️ 回到選房頁</button>'+
       '</div>';
 
     (document.body || document.documentElement).appendChild(overlay);
