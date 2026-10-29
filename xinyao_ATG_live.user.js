@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.51
+// @version      4.1.52
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -15503,7 +15503,7 @@ try {
 
   // Windows 專屬 APP：保持桌面版頁面配置，僅解除六格助手的隱藏規則。
   const oracleDesktopApp = String(navigator.userAgent || '').includes('Electron/');
-  if (oracleDesktopApp) document.documentElement.classList.add('seth-oracle-desktop-app');
+  if (oracleDesktopApp && document.documentElement) document.documentElement.classList.add('seth-oracle-desktop-app');
   const isMobile = () => true;
 
   let side = 'left';
@@ -15922,8 +15922,14 @@ try {
     window.addEventListener('xinyao:board-signal', updateHud);
   } catch (_) {}
 
-  updateHud();
-  setInterval(updateHud, 250);
+  // At document-start the HTML root may not exist yet in Electron. Defer HUD mounting.
+  const bootHud = () => {
+    if (!document.documentElement) return;
+    updateHud();
+    setInterval(updateHud, 250);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootHud, {once:true});
+  else bootHud();
 })();
 
 }
