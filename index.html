@@ -2975,25 +2975,21 @@ box-shadow:0 12px 30px rgba(0,0,0,.33)!important;color:#f0dbad!important;
    width:calc((100% - 10px)/2)!important;
  }
 }
-</style><!-- Fix compact game cards: Son Go Ku and Scarlet -->
+</style><!-- Match Son Go Ku and Scarlet card artwork to Wuxia and Tiger Girl -->
 <style>
-/* Limit only these two launch artwork frames; keep original image quality and clicks. */
-@media(min-width:561px){
-  #xinyaoGameLauncher #xinyaoLaunchSongo .game-launcher-cover,
-  #xinyaoGameLauncher #xinyaoLaunchScarlet .game-launcher-cover{
-    height:150px!important;aspect-ratio:auto!important;
-  }
-}
-@media(max-width:560px){
-  #xinyaoGameLauncher #xinyaoLaunchSongo .game-launcher-cover,
-  #xinyaoGameLauncher #xinyaoLaunchScarlet .game-launcher-cover{
-    height:112px!important;aspect-ratio:auto!important;
-  }
+#xinyaoGameLauncher #xinyaoLaunchSongo .game-launcher-cover,
+#xinyaoGameLauncher #xinyaoLaunchScarlet .game-launcher-cover{
+  height:auto!important;
+  aspect-ratio:1/1!important;
+  overflow:hidden!important;
 }
 #xinyaoGameLauncher #xinyaoLaunchSongo .game-launcher-img,
 #xinyaoGameLauncher #xinyaoLaunchScarlet .game-launcher-img{
-  display:block!important;width:100%!important;height:100%!important;
-  object-fit:contain!important;object-position:center!important;
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  object-fit:cover!important;
+  object-position:center!important;
   transform:none!important;
 }
 </style>
