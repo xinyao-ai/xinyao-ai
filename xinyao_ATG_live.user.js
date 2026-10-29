@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.30
+// @version      4.1.31
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -14592,6 +14592,13 @@ try {
       #${PANEL_ID} .bp-autostop{margin-top:5px;width:100%;border:1px solid rgba(255,184,212,.20);border-radius:6px;background:rgba(255,255,255,.04);color:#fff;padding:3px;font-size:7px;font-weight:850;cursor:pointer}
       #${PANEL_ID} .bp-autostop.on{color:#ffcae0;border-color:rgba(255,95,158,.32)}
       #${PANEL_ID} .bp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:7px}
+      /* 武俠盤面專用：只保留高清符號及次數，不影響其他遊戲 */
+      #${PANEL_ID} .bp-grid.bp-wuxia-compact{grid-template-columns:repeat(3,minmax(0,1fr))!important;grid-auto-rows:min-content!important;align-items:start!important;gap:5px!important}
+      #${PANEL_ID} .bp-grid.bp-wuxia-compact .bp-item{box-sizing:border-box!important;height:88px!important;min-height:0!important;max-height:88px!important;padding:4px 2px!important;display:flex!important;flex-direction:column!important;justify-content:center!important;align-items:center!important;gap:3px!important}
+      #${PANEL_ID} .bp-grid.bp-wuxia-compact .bp-icon-shell{width:54px!important;height:54px!important;min-height:54px!important;flex:0 0 54px!important;margin:0 auto!important}
+      #${PANEL_ID} .bp-grid.bp-wuxia-compact .bp-icon-img{width:54px!important;height:54px!important;max-width:54px!important;max-height:54px!important;object-fit:contain!important}
+      #${PANEL_ID} .bp-grid.bp-wuxia-compact .bp-name{display:none!important}
+      #${PANEL_ID} .bp-grid.bp-wuxia-compact .bp-count{margin:0!important;line-height:19px!important;font-size:18px!important}
       /* 巴風特專屬緊湊排列：移除九宮格卡片下方的多餘留白 */
       #${PANEL_ID} .bp-grid.bp-baphomet-compact{grid-template-columns:repeat(3,minmax(0,1fr))!important;grid-auto-rows:min-content!important;align-items:start!important;gap:4px!important}
       #${PANEL_ID} .bp-grid.bp-baphomet-compact .bp-item{box-sizing:border-box!important;height:74px!important;min-height:0!important;max-height:74px!important;padding:3px 2px!important;display:flex!important;flex-direction:column!important;justify-content:center!important;align-items:center!important;gap:2px!important}
@@ -14921,7 +14928,7 @@ try {
       ${profileSwitchMarkup()}
       <div class="bp-status">● 已完成盤面偵測｜${esc(gameProfileOption().label)}</div>
       ${signalMarkup}
-      <div class="bp-grid${isBaphometSymbols ? ' bp-baphomet-compact' : ''}">${cards}</div>
+      <div class="bp-grid${isBaphometSymbols ? ' bp-baphomet-compact' : (probe.gameProfile === 'wuxia' ? ' bp-wuxia-compact' : '')}">${cards}</div>
       ${!isBaphometSymbols ? `
       <button type="button" class="bp-board-toggle">查看 30 格盤面</button>
       <div class="bp-board-wrap">
