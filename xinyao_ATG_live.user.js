@@ -14622,6 +14622,9 @@ try {
       #${PANEL_ID} .bp-autostop{margin-top:5px;width:100%;border:1px solid rgba(255,184,212,.20);border-radius:6px;background:rgba(255,255,255,.04);color:#fff;padding:3px;font-size:7px;font-weight:850;cursor:pointer}
       #${PANEL_ID} .bp-autostop.on{color:#ffcae0;border-color:rgba(255,95,158,.32)}
       #${PANEL_ID} .bp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:7px}
+      /* 孫行者：卡片使用一致正常尺寸，移除圖案 ID 與名稱，只留圖片和次數。 */
+      #${PANEL_ID} .bp-grid.bp-wuxia-compact .bp-icon{transform:none!important;max-width:40px!important;max-height:40px!important}
+      #${PANEL_ID} .bp-grid.bp-wuxia-compact .bp-icon-img{object-position:center!important;filter:none!important}
       /* 武俠盤面專用：只保留高清符號及次數，不影響其他遊戲 */
       #${PANEL_ID} .bp-grid.bp-wuxia-compact{grid-template-columns:repeat(3,minmax(0,1fr))!important;grid-auto-rows:min-content!important;align-items:start!important;gap:5px!important}
       #${PANEL_ID} .bp-grid.bp-wuxia-compact .bp-item{box-sizing:border-box!important;height:76px!important;min-height:0!important;max-height:76px!important;padding:4px 2px!important;display:flex!important;flex-direction:column!important;justify-content:center!important;align-items:center!important;gap:3px!important}
@@ -14943,7 +14946,7 @@ try {
     const cards = sourceItems.map(item => `
       <div class="bp-item" title="${esc(symbolLabel(item.token))}｜ID ${esc(item.token)}">
         ${symbolIconHtml(item.token)}
-        ${!isBaphometSymbols && probe.gameProfile !== 'scarlet' ? `<span class="bp-name">${esc(symbolLabel(item.token))}</span>` : ''}
+        ${!isBaphometSymbols && !['scarlet','songo'].includes(probe.gameProfile) ? `<span class="bp-name">${esc(symbolLabel(item.token))}</span>` : ''}
         <span class="bp-count">×${item.count}</span>
       </div>
     `).join('');
@@ -14958,7 +14961,7 @@ try {
       ${profileSwitchMarkup()}
       <div class="bp-status">● 已完成盤面偵測｜${esc(gameProfileOption().label)}</div>
       ${signalMarkup}
-      <div class="bp-grid${isBaphometSymbols ? ' bp-baphomet-compact' : (['wuxia','scarlet'].includes(probe.gameProfile) ? ' bp-wuxia-compact' : '')}">${cards}</div>
+      <div class="bp-grid${isBaphometSymbols ? ' bp-baphomet-compact' : (['wuxia','scarlet','songo'].includes(probe.gameProfile) ? ' bp-wuxia-compact' : '')}">${cards}</div>
       ${!isBaphometSymbols ? `
       <button type="button" class="bp-board-toggle">查看 30 格盤面</button>
       <div class="bp-board-wrap">
