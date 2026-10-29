@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.5
+// @version      4.1.6
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -14783,12 +14783,14 @@ try {
     if (!body) return;
 
     const candidate = probe.candidate;
+    const isBaphometSymbols = probe.gameProfile === 'baphomet';
 
     if (!candidate) {
       body.innerHTML = `
         ${profileSwitchMarkup()}
         <div class="bp-status">● ${esc(probe.status)}</div>
         <div class="bp-path">房號 ${esc(roomText())}｜完成一局後才分析已結束盤面</div>
+        ${isBaphometSymbols ? '<div class="bp-path">🔥 巴風特符號 ID 對照模式：等待已完成的盤面資料；不套用賽特2符號。</div>' : ''}
       `;
       bindProfileSwitch(body);
       return;
@@ -14813,15 +14815,15 @@ try {
 
     const cards = sourceItems.map(item => `
       <div class="bp-item" title="${esc(symbolLabel(item.token))}｜ID ${esc(item.token)}">
-        ${symbolIconHtml(item.token)}
-        <span class="bp-name">${esc(symbolLabel(item.token))}</span>
+        ${isBaphometSymbols ? `<span class="bp-icon bp-unknown" style="font-size:14px">ID ${esc(item.token)}</span>` : symbolIconHtml(item.token)}
+        <span class="bp-name">${isBaphometSymbols ? `符號 ID ${esc(item.token)}` : esc(symbolLabel(item.token))}</span>
         <span class="bp-count">×${item.count}</span>
       </div>
     `).join('');
 
     const sequence = Array.isArray(candidate.tokens)
       ? candidate.tokens.slice(0, 30).map((token, index) => `
-          <div class="bp-cell" title="ID ${esc(token)}"><i>${index + 1}</i>${['10','12','13'].includes(String(token)) ? '—' : esc(symbolLabel(token))}</div>
+          <div class="bp-cell" title="ID ${esc(token)}"><i>${index + 1}</i>${isBaphometSymbols ? `ID ${esc(token)}` : (['10','12','13'].includes(String(token)) ? '—' : esc(symbolLabel(token)))}</div>
         `).join('')
       : '';
 
@@ -14830,9 +14832,10 @@ try {
       <div class="bp-status">● 已完成盤面偵測｜${esc(gameProfileName())}｜${esc(roomText())} 房</div>
       ${signalMarkup}
       <div class="bp-grid">${cards}</div>
-      <button type="button" class="bp-board-toggle">查看 30 格盤面</button>
+      ${isBaphometSymbols ? '<div class="bp-path">🔥 巴風特專用 ID 對照｜目前僅顯示實際抓到的 ID，不使用賽特2圖案。請比對遊戲的已完成盤面。</div>' : ''}
+      <button type="button" class="bp-board-toggle">${isBaphometSymbols ? '查看盤面 ID 順序' : '查看 30 格盤面'}</button>
       <div class="bp-board-wrap">
-        ${sequence ? `<div class="bp-seq-title">30 格盤面順序（6 欄）</div><div class="bp-seq-grid">${sequence}</div>` : ''}
+        ${sequence ? `<div class="bp-seq-title">${isBaphometSymbols ? `巴風特 ID 順序（${candidate.tokens.length} 格，待核對）` : '30 格盤面順序（6 欄）'}</div><div class="bp-seq-grid">${sequence}</div>` : ''}
         <div class="bp-path">
           ${candidate.total} 格｜${candidate.unique} 種圖案<br>
           偵測來源：${esc(candidate.path)}
@@ -14850,7 +14853,7 @@ try {
         event.preventDefault();
         event.stopPropagation();
         const open = boardWrap.classList.toggle('open');
-        boardToggle.textContent = open ? '收起 30 格盤面' : '查看 30 格盤面';
+        boardToggle.textContent = isBaphometSymbols ? (open ? '收起盤面 ID 順序' : '查看盤面 ID 順序') : (open ? '收起 30 格盤面' : '查看 30 格盤面');
       };
     }
 
