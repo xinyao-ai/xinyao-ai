@@ -311,14 +311,15 @@
     tiger: 'https://hd5577.com/GameLobby?g=ATG&c=tiger-princess&p=web&l=zh-cn',
     seth1: 'https://hd5577.com/GameLobby?g=ATG&c=egyptian-mythology',
     baphomet: 'https://hd5577.com/GameLobby?g=ATG&c=hades',
-    vampire: 'https://hd5577.com/GameLobby?g=ATG&c=new-vampire-hunter'
+    vampire: 'https://hd5577.com/GameLobby?g=ATG&c=new-vampire-hunter',
+    wuxia: 'https://hd5577.com/GameLobby?g=ATG&c=wuxia-caishen'
   });
 
   const XIANYAO_GAME_WINDOW_KEY =
     'xinyao_atg_game_window_name_v1';
 
   function validSavedGameWindowName(value) {
-    return /^xinyao-hd-launch:(seth|tiger|seth1|baphomet|vampire):\d+:[a-z0-9]+$/i.test(String(value || ''));
+    return /^xinyao-hd-launch:(seth|tiger|seth1|baphomet|vampire|wuxia):\d+:[a-z0-9]+$/i.test(String(value || ''));
   }
 
   function launchHuangDingGame(gameId) {
@@ -347,7 +348,9 @@
     } catch (_) {}
 
     const button =
-      id === 'vampire'
+      id === 'wuxia'
+        ? $('xinyaoLaunchWuxia')
+        : id === 'vampire'
         ? $('xinyaoLaunchVampire')
         : id === 'baphomet'
         ? $('xinyaoLaunchBaphomet')
@@ -391,7 +394,11 @@
       const enter = button.querySelector('.game-launcher-enter span');
       if (enter) {
         enter.textContent =
-          id === 'baphomet'
+          id === 'wuxia'
+            ? '進入皇鼎武俠'
+            : id === 'vampire'
+            ? '進入皇鼎惡魔血域'
+            : id === 'baphomet'
             ? '進入皇鼎巴風特'
             : id === 'tiger'
             ? '進入皇鼎虎小妹'
@@ -419,6 +426,12 @@
     if (baphometButton && baphometButton.dataset.bound !== '1') {
       baphometButton.dataset.bound = '1';
       baphometButton.addEventListener('click', () => launchHuangDingGame('baphomet'));
+    }
+
+    const wuxiaButton = $('xinyaoLaunchWuxia');
+    if (wuxiaButton && wuxiaButton.dataset.bound !== '1') {
+      wuxiaButton.dataset.bound = '1';
+      wuxiaButton.addEventListener('click', () => launchHuangDingGame('wuxia'));
     }
 
     const vampireButton = $('xinyaoLaunchVampire');
