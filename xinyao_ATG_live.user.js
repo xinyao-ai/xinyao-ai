@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.49
+// @version      4.1.50
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -15531,7 +15531,7 @@ try {
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      html:not(.xinyao-phone-ui):not(.seth-oracle-desktop-app) #${HUD_ID}{display:none!important}
+      /* 六格快捷助手在 Windows 與手機皆顯示；不依賴 Electron userAgent。 */
       #${HUD_ID}{
         position:fixed;
         top:max(48px,calc(env(safe-area-inset-top,0px) + 8px));
