@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.40
+// @version      4.1.41
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -6956,7 +6956,7 @@ try {
   }
 
   function buttonStyle(extra = '') {
-    return `border:0;border-radius:9px;padding:6px;cursor:pointer;background:linear-gradient(180deg,#cba45e,#987239);color:#1b150d;font-weight:700;font-size:12px;${extra}`;
+    return `border:0;border-radius:9px;padding:6px;cursor:pointer;border:1px solid #fff1b7;background:linear-gradient(180deg,#fff8d1 0%,#ffe478 36%,#f9c437 69%,#e6a91f 100%);color:#322005;box-shadow:inset 0 2px 0 rgba(255,255,255,.8),0 3px 12px rgba(255,203,65,.32);font-weight:800;font-size:12px;${extra}`;
   }
 
   function secondaryButtonStyle(extra = '') {
