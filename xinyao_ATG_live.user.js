@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.26
+// @version      4.1.27
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -88,7 +88,7 @@ function xinyaoResolveHuangDingAccess() {
   // test142：會員頁先選遊戲，再經皇鼎轉進 ATG 時，中間轉址可能讓 document.referrer
   // 不再是 hd5577.com。此時改用同一分頁 window.name 的短效接力標記確認來源流程。
   try {
-    const launch = String(window.name || '').match(/^xinyao-hd-launch:(seth|tiger|seth1|baphomet|vampire):(\d+):([a-z0-9]+)$/i);
+    const launch = String(window.name || '').match(/^xinyao-hd-launch:(seth|tiger|seth1|baphomet|vampire|wuxia):(\d+):([a-z0-9]+)$/i);
     if (launch) {
       const launchedAt = Number(launch[2] || 0);
       const fresh = Number.isFinite(launchedAt) && launchedAt > 0 &&
@@ -175,7 +175,7 @@ function xinyaoResolveHuangDingAccess() {
 
 const XIANYAO_HD_ONLY_ENABLED = xinyaoLoadRemoteHdOnly();
 const XIANYAO_HD_ACCESS_ALLOWED =
-  ['egyptian-mythology','hades','new-vampire-hunter'].includes(new URL(location.href).searchParams.get('gn'))
+  ['egyptian-mythology','hades','new-vampire-hunter','wuxia-caishen'].includes(new URL(location.href).searchParams.get('gn'))
   || !XIANYAO_HD_ONLY_ENABLED || xinyaoResolveHuangDingAccess();
 
 try {
@@ -219,7 +219,9 @@ if (XIANYAO_HD_ACCESS_ALLOWED) {
 // ===== test140：全域遊戲模式（掃描共用；盤面監測 / 進房分流） =====
 const XIANYAO_GAME_MODULE_KEY = 'xinyao_atg_active_game_module_v1';
 const XIANYAO_GAME_MODULES = Object.freeze({
-  vampire:{ id:'vampire', label:'惡魔血域', shortLabel:'血域', icon:'🦇' },
+  wuxia:{ id:'wuxia', label:'武俠', shortLabel:'武俠', icon:'⚔️' },
+  vampire:{ id:'wuxia', label:'武俠', shortLabel:'武俠', icon:'⚔️' },
+    { id:'vampire', label:'惡魔血域', shortLabel:'血域', icon:'🦇' },
   baphomet:{ id:'baphomet', label:'古神巴風特', shortLabel:'巴風特', icon:'🔥' },
   seth1:{ id:'seth1', label:'戰神賽特1', shortLabel:'賽特1', icon:'👁️' },
   seth: { id:'seth', label:'戰神賽特2', shortLabel:'賽特2', icon:'👁️' },
@@ -232,6 +234,7 @@ function xinyaoNormalizeGameModule(value) {
 }
 
 function xinyaoLoadActiveGameModule() {
+  if (new URL(location.href).searchParams.get('gn') === 'wuxia-caishen') return 'wuxia';
   if (new URL(location.href).searchParams.get('gn') === 'new-vampire-hunter') return 'vampire';
   if (new URL(location.href).searchParams.get('gn') === 'hades') return 'baphomet';
   if (new URL(location.href).searchParams.get('gn') === 'egyptian-mythology') return 'seth1';
@@ -259,6 +262,7 @@ function xinyaoLoadActiveGameModule() {
 }
 
 function xinyaoActiveGameModule() {
+  if (new URL(location.href).searchParams.get('gn') === 'wuxia-caishen') return 'wuxia';
   if (new URL(location.href).searchParams.get('gn') === 'new-vampire-hunter') return 'vampire';
   if (new URL(location.href).searchParams.get('gn') === 'hades') return 'baphomet';
   if (new URL(location.href).searchParams.get('gn') === 'egyptian-mythology') return 'seth1';
@@ -10485,6 +10489,11 @@ try {
 
   function routeEnterRoomFromRanking(roomNumber, roomId) {
     const moduleId = xinyaoActiveGameModule();
+    if (moduleId === 'wuxia') {
+      // 武俠入口初期，原生進房後續實機核對；不影響其他遊戲。
+      enterRoomFromRanking(roomNumber, roomId);
+      return;
+    }
     if (moduleId === 'vampire') {
       // 新款遊戲只接 ATG 原生進房與核對機制，其他四款維持原樣。
       enterRoomFromRanking(roomNumber, roomId);
@@ -11467,6 +11476,7 @@ try {
   // 之後新增遊戲，只要新增一筆選項＋對應圖示辨識資料，不需要再改版面。
   const MANUAL_GAME_PROFILE_KEY = 'xinyao_atg_board_manual_profile_v1';
   const GAME_PROFILE_OPTIONS = Object.freeze([
+    { id:'wuxia', label:'武俠', shortLabel:'武俠', icon:'⚔️' },
     { id:'vampire', label:'惡魔血域', shortLabel:'血域', icon:'🦇' },
     { id:'baphomet', label:'古神巴風特', shortLabel:'巴風特', icon:'🔥' },
     { id:'seth1', label:'戰神賽特1', shortLabel:'賽特1', icon:'👁️' },
@@ -11484,7 +11494,8 @@ try {
   }
 
   function loadManualGameProfile() {
-    if (new URL(location.href).searchParams.get('gn') === 'new-vampire-hunter') return 'vampire';
+    if (new URL(location.href).searchParams.get('gn') === 'wuxia-caishen') return 'wuxia';
+  if (new URL(location.href).searchParams.get('gn') === 'new-vampire-hunter') return 'vampire';
   if (new URL(location.href).searchParams.get('gn') === 'hades') return 'baphomet';
     if (new URL(location.href).searchParams.get('gn') === 'egyptian-mythology') return 'seth1';
     // test140：盤面監測跟隨全域遊戲模式；不再自己猜目前是哪款。
