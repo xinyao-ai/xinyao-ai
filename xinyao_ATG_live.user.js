@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.37
+// @version      4.1.38
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -11,6 +11,35 @@
 // @downloadURL  https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/main/xinyao_ATG_live.user.js
 // @grant        none
 // ==/UserScript==
+
+/* 賽特神諭：ATG 面板黑金主題，只覆蓋顏色不修改進房或掃描邏輯 */
+(() => {
+  const applyOracleTheme = () => {
+    if (!document.head || document.getElementById('xinyao-oracle-hud-gold-theme')) return;
+    const style = document.createElement('style');
+    style.id = 'xinyao-oracle-hud-gold-theme';
+    style.textContent = `
+      #xinyaoATGLiveV200, #xinyao-atg-room-scanner{border-color:rgba(202,160,83,.56)!important}
+      #xinyaoATGLiveV200 button, #xinyao-atg-room-scanner button,
+      #xinyao-atg-room-scanner a[style*="background"]{border-color:rgba(202,160,83,.48)!important}
+      #xinyaoATGLiveV200 button[style*="255,95,158"],
+      #xinyao-atg-room-scanner button[style*="255,95,158"],
+      #xinyao-atg-room-scanner button[style*="#ff5a9d"],
+      #xinyao-atg-room-scanner a[style*="#ff5a9d"]{
+        background:linear-gradient(180deg,#cba45e,#987239)!important;color:#1b150d!important;
+      }
+      #xinyaoATGLiveV200 [style*="color:#ff"],
+      #xinyao-atg-room-scanner [style*="color:#ff"]{border-color:rgba(202,160,83,.35)!important}
+      #xinyaoATGLiveV200 img[alt="賽特神諭"], #xinyao-atg-room-scanner img[alt="賽特神諭"]{
+        height:30px!important;max-width:190px!important;object-fit:contain!important;
+      }
+    `;
+    document.head.appendChild(style);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',applyOracleTheme,{once:true});
+  else applyOracleTheme();
+})();
+
 
 
 
@@ -201,7 +230,7 @@ function xinyaoRenderHuangDingOnlyNotice() {
       ].join(';');
       notice.innerHTML = `
         <div style="width:min(360px,calc(100vw - 32px));box-sizing:border-box;padding:22px 20px;border:1px solid rgba(255,150,195,.5);border-radius:18px;background:rgba(30,22,35,.97);color:#fff;text-align:center;box-shadow:0 18px 50px rgba(0,0,0,.45);">
-          <div style="font-size:18px;font-weight:900;color:#ff9bc3;">🌸 芯瑤 ATG</div>
+          <div style="font-size:18px;font-weight:900;color:#ff9bc3;">賽特神諭</div>
           <div style="margin-top:10px;font-size:14px;font-weight:800;">僅限皇鼎娛樂城使用</div>
           <div style="margin-top:7px;font-size:11px;line-height:1.6;opacity:.76;">請由皇鼎平台進入 ATG 遊戲後再使用本輔助程式。</div>
         </div>`;
@@ -2539,7 +2568,7 @@ try {
 
     panel.innerHTML = `
       <div id="xinyaoHeader" style="display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer;">
-        <div style="font-size:14px;font-weight:800;">🌸 芯瑤 ATG 即時助手</div>
+        <div style="font-size:14px;font-weight:800;"><img src="https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/main/assets/oracle-title-gold.webp" alt="賽特神諭" style="display:block;width:auto;height:30px;max-width:190px;object-fit:contain"></div>
         <div style="font-size:12px;opacity:.7;">－</div>
       </div>
       <div class="xinyaoConn">${connectionText()}</div>
@@ -6927,7 +6956,7 @@ try {
   }
 
   function buttonStyle(extra = '') {
-    return `border:0;border-radius:9px;padding:6px;cursor:pointer;background:#ff5a9d;color:#fff;font-weight:700;font-size:12px;${extra}`;
+    return `border:0;border-radius:9px;padding:6px;cursor:pointer;background:linear-gradient(180deg,#cba45e,#987239);color:#1b150d;font-weight:700;font-size:12px;${extra}`;
   }
 
   function secondaryButtonStyle(extra = '') {
@@ -10699,7 +10728,7 @@ try {
 
     state.panel.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px;">
-        <div style="font-weight:800;font-size:14px;">🌸 芯瑤 ATG 全房分析</div>
+        <div style="font-weight:800;font-size:14px;"><img src="https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/main/assets/oracle-title-gold.webp" alt="賽特神諭" style="display:block;width:auto;height:30px;max-width:190px;object-fit:contain"></div>
         <button id="xinyao-room-hide" style="${secondaryButtonStyle('padding:4px 8px;')}">縮小</button>
       </div>
 
@@ -10718,7 +10747,7 @@ try {
         <button id="xinyao-scan-all" style="${buttonStyle()}">${state.scanRunning ? '掃描中…' : '一鍵掃描全部房間'}</button>
         <button id="xinyao-stop" style="${secondaryButtonStyle()}">停止掃描</button>
         <button id="xinyao-expand" style="${secondaryButtonStyle()}">${ui.expanded ? '收合分析' : '完整分析'}</button>
-        <a id="xinyao-sync-site" href="https://xinyao-ai.github.io/xinyao-ai/?atgRooms=1" target="xinyao-atg-ai" style="${buttonStyle('grid-column:1 / -1;display:block;text-decoration:none;text-align:center;box-sizing:border-box;')}">🌸 同步到芯瑤</a>
+        <a id="xinyao-sync-site" href="https://xinyao-ai.github.io/xinyao-ai/?atgRooms=1" target="xinyao-atg-ai" style="${buttonStyle('grid-column:1 / -1;display:block;text-decoration:none;text-align:center;box-sizing:border-box;')}">✦ 同步到賽特神諭</a>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 120px;gap:6px;margin-top:6px;align-items:center;">
