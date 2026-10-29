@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.12
+// @version      4.1.13
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -12396,7 +12396,7 @@ try {
       const label = BAPHOMET_SYMBOL_LABELS.get(key);
       const index = Number(key) - 1;
       const x = (index % 3) * 50, y = Math.floor(index / 3) * 50;
-      return label && index >= 0 && index < 9 ? `<span class="bp-icon-shell" title="${esc(label)}｜ID ${esc(key)}"><span class="bp-baphomet-original-art" style="display:block;flex:0 0 auto;width:38px;height:38px;min-width:38px;min-height:38px;aspect-ratio:1/1;margin:auto;background-image:url('${BAPHOMET_SPRITE}')!important;background-size:300% 300%!important;background-position:${x}% ${y}%!important;background-repeat:no-repeat!important;border-radius:4px"></span></span>` : '<span class="bp-icon bp-unknown">?</span>';
+      return label && index >= 0 && index < 9 ? `<span class="bp-icon-shell" title="${esc(label)}｜ID ${esc(key)}"><span class="bp-baphomet-original-art" style="display:block;flex:0 0 auto;width:32px;height:32px;min-width:32px;min-height:32px;aspect-ratio:1/1;margin:auto;image-rendering:-webkit-optimize-contrast;filter:contrast(1.14) saturate(1.09);background-image:url('${BAPHOMET_SPRITE}')!important;background-size:300% 300%!important;background-position:${x}% ${y}%!important;background-repeat:no-repeat!important;border-radius:4px"></span></span>` : '<span class="bp-icon bp-unknown">?</span>';
     }
 
     // test93：虎小妹清晰圖優先；錢袋、紅寶石、SCATTER 不再用 emoji / ? 替代。
@@ -14533,7 +14533,7 @@ try {
       #${PANEL_ID} .bp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:7px}
       /* 巴風特卡片獨立限制：正方形原圖，僅顯示圖片與次數，不影響其他遊戲 */
       #${PANEL_ID} .bp-item:has(.bp-baphomet-original-art) .bp-icon-shell{width:40px!important;height:40px!important;min-width:40px;min-height:40px;overflow:hidden!important}
-      #${PANEL_ID} .bp-item:has(.bp-baphomet-original-art) .bp-baphomet-original-art{width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important;aspect-ratio:1/1!important;flex-shrink:0!important}
+      #${PANEL_ID} .bp-item:has(.bp-baphomet-original-art) .bp-baphomet-original-art{width:32px!important;height:32px!important;min-width:32px!important;min-height:32px!important;aspect-ratio:1/1!important;flex-shrink:0!important;image-rendering:-webkit-optimize-contrast!important;filter:contrast(1.14) saturate(1.09)!important}
       #${PANEL_ID} .bp-item:has(.bp-baphomet-original-art) .bp-name{display:none!important}
       #${PANEL_ID} .bp-item{padding:5px 3px 6px;border:1px solid rgba(255,255,255,.07);border-radius:8px;background:rgba(255,255,255,.045);text-align:center;min-width:0;overflow:visible}
       #${PANEL_ID} .bp-icon-shell{display:flex;width:42px;height:42px;margin:0 auto;align-items:center;justify-content:center;overflow:visible;background:transparent!important}
