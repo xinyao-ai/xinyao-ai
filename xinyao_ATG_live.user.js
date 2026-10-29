@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.0
+// @version      4.1.1
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -10482,6 +10482,11 @@ try {
 
   function routeEnterRoomFromRanking(roomNumber, roomId) {
     const moduleId = xinyaoActiveGameModule();
+    if (moduleId === 'baphomet') {
+      state.enterRoomStatus = '古神巴風特進房尚未完成驗證，暫不呼叫賽特2進房程序。';
+      scheduleRender();
+      return;
+    }
     if (moduleId === 'tiger') {
       enterTigerRoomFromRanking(roomNumber, roomId);
       return;
