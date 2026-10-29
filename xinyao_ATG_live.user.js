@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.11
+// @version      4.1.12
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -12396,7 +12396,7 @@ try {
       const label = BAPHOMET_SYMBOL_LABELS.get(key);
       const index = Number(key) - 1;
       const x = (index % 3) * 50, y = Math.floor(index / 3) * 50;
-      return label && index >= 0 && index < 9 ? `<span class="bp-icon-shell" title="${esc(label)}｜ID ${esc(key)}"><span class="bp-baphomet-original-art" style="display:block;width:48px;height:48px;max-width:100%;margin:0 auto;background-image:url('${BAPHOMET_SPRITE}')!important;background-size:300% 300%!important;background-position:${x}% ${y}%!important;background-repeat:no-repeat!important;border-radius:4px"></span></span>` : '<span class="bp-icon bp-unknown">?</span>';
+      return label && index >= 0 && index < 9 ? `<span class="bp-icon-shell" title="${esc(label)}｜ID ${esc(key)}"><span class="bp-baphomet-original-art" style="display:block;flex:0 0 auto;width:38px;height:38px;min-width:38px;min-height:38px;aspect-ratio:1/1;margin:auto;background-image:url('${BAPHOMET_SPRITE}')!important;background-size:300% 300%!important;background-position:${x}% ${y}%!important;background-repeat:no-repeat!important;border-radius:4px"></span></span>` : '<span class="bp-icon bp-unknown">?</span>';
     }
 
     // test93：虎小妹清晰圖優先；錢袋、紅寶石、SCATTER 不再用 emoji / ? 替代。
@@ -14531,6 +14531,10 @@ try {
       #${PANEL_ID} .bp-autostop{margin-top:5px;width:100%;border:1px solid rgba(255,184,212,.20);border-radius:6px;background:rgba(255,255,255,.04);color:#fff;padding:3px;font-size:7px;font-weight:850;cursor:pointer}
       #${PANEL_ID} .bp-autostop.on{color:#ffcae0;border-color:rgba(255,95,158,.32)}
       #${PANEL_ID} .bp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:7px}
+      /* 巴風特卡片獨立限制：正方形原圖，僅顯示圖片與次數，不影響其他遊戲 */
+      #${PANEL_ID} .bp-item:has(.bp-baphomet-original-art) .bp-icon-shell{width:40px!important;height:40px!important;min-width:40px;min-height:40px;overflow:hidden!important}
+      #${PANEL_ID} .bp-item:has(.bp-baphomet-original-art) .bp-baphomet-original-art{width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important;aspect-ratio:1/1!important;flex-shrink:0!important}
+      #${PANEL_ID} .bp-item:has(.bp-baphomet-original-art) .bp-name{display:none!important}
       #${PANEL_ID} .bp-item{padding:5px 3px 6px;border:1px solid rgba(255,255,255,.07);border-radius:8px;background:rgba(255,255,255,.045);text-align:center;min-width:0;overflow:visible}
       #${PANEL_ID} .bp-icon-shell{display:flex;width:42px;height:42px;margin:0 auto;align-items:center;justify-content:center;overflow:visible;background:transparent!important}
       #${PANEL_ID} .bp-icon{display:block;width:48px;height:48px;max-width:48px;max-height:48px;margin:0 auto;border-radius:0!important;box-shadow:none!important;background:transparent!important}
@@ -14834,7 +14838,7 @@ try {
     const cards = sourceItems.map(item => `
       <div class="bp-item" title="${esc(symbolLabel(item.token))}｜ID ${esc(item.token)}">
         ${symbolIconHtml(item.token)}
-        <span class="bp-name">${esc(symbolLabel(item.token))}</span>
+        ${!isBaphometSymbols ? `<span class="bp-name">${esc(symbolLabel(item.token))}</span>` : ''}
         <span class="bp-count">×${item.count}</span>
       </div>
     `).join('');
