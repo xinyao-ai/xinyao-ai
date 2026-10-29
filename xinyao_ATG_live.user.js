@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.9
+// @version      4.1.10
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -12396,7 +12396,7 @@ try {
       const label = BAPHOMET_SYMBOL_LABELS.get(key);
       const index = Number(key) - 1;
       const x = (index % 3) * 50, y = Math.floor(index / 3) * 50;
-      return label && index >= 0 && index < 9 ? `<span class="bp-icon-shell" title="${esc(label)}｜ID ${esc(key)}"><span class="bp-icon bp-icon-img" style="display:block;width:36px;height:36px;max-width:100%;background-image:url('${BAPHOMET_SPRITE}');background-size:300% 300%;background-position:${x}% ${y}%;background-repeat:no-repeat;border-radius:4px"></span></span>` : '<span class="bp-icon bp-unknown">?</span>';
+      return label && index >= 0 && index < 9 ? `<span class="bp-icon-shell" title="${esc(label)}｜ID ${esc(key)}"><span class="bp-baphomet-original-art" style="display:block;width:48px;height:48px;max-width:100%;margin:0 auto;background-image:url('${BAPHOMET_SPRITE}')!important;background-size:300% 300%!important;background-position:${x}% ${y}%!important;background-repeat:no-repeat!important;border-radius:4px"></span></span>` : '<span class="bp-icon bp-unknown">?</span>';
     }
 
     // test93：虎小妹清晰圖優先；錢袋、紅寶石、SCATTER 不再用 emoji / ? 替代。
