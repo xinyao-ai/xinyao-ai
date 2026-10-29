@@ -12425,7 +12425,14 @@ try {
   function symbolIconHtml(token) {
     const key = String(token ?? '');
     if (probe.gameProfile === 'songo') {
-      return `<span class="bp-icon bp-unknown" title="孫行者符號 ID ${esc(key)}">ID ${esc(key)}</span>`;
+      // 孫行者：使用主分支根目錄的 9 張原始 PNG，保留解析度。
+      // 僅依已收到的盤面 ID 對應圖片；不干涉其他遊戲偵測或進房。
+      const id = Number(key);
+      if (Number.isInteger(id) && id >= 1 && id <= 9) {
+        const file = 'songo_symbol_' + String(id).padStart(2, '0') + '.png';
+        return `<span class="bp-icon-shell" title="孫行者 ID ${esc(key)}"><img class="bp-icon bp-icon-img bp-icon-clean" data-symbol-token="${esc(key)}" src="https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/main/${file}" alt="孫行者符號" draggable="false" decoding="async" loading="eager" style="object-fit:contain!important;filter:none!important"></span>`;
+      }
+      return `<span class="bp-icon bp-unknown" title="待核對符號 ID ${esc(key)}">ID ${esc(key)}</span>`;
     }
     if (probe.gameProfile === 'scarlet') {
       const valid = /^(?:[1-9]|15)$/.test(key);
