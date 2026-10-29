@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.43
+// @version      4.1.44
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -15564,9 +15564,9 @@ try {
         max-width:min(220px,calc(100vw - 24px));
         box-sizing:border-box;
         padding:7px 16px 8px;
-        border:1px solid rgba(255,126,178,.42);
+        border:1px solid rgba(255,221,143,.72);
         border-radius:16px;
-        background:rgba(26,21,32,.94);
+        background:linear-gradient(180deg,rgba(22,20,25,.97),rgba(10,13,19,.97));
         color:#fff;
         box-shadow:0 8px 22px rgba(0,0,0,.30);
         backdrop-filter:blur(10px);
@@ -15577,7 +15577,7 @@ try {
       #${RESULT_POPUP_ID} .rp-title{
         font-size:10px;
         font-weight:800;
-        color:rgba(255,255,255,.72);
+        color:#f0d99d;
         letter-spacing:.4px;
       }
       #${RESULT_POPUP_ID} .rp-value{
@@ -15585,7 +15585,7 @@ try {
         font-size:19px;
         line-height:1.15;
         font-weight:950;
-        color:#ff9fc4;
+        color:#ffe799;
         white-space:nowrap;
         overflow:hidden;
         text-overflow:ellipsis;
