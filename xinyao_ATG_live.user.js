@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.48
+// @version      4.1.49
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -15502,7 +15502,7 @@ try {
   const SPEEDS = [1, 3, 5, 8, 10, 12, 16];
 
   // Windows 專屬 APP：保持桌面版頁面配置，僅解除六格助手的隱藏規則。
-  const oracleDesktopApp = /Electron\\/\\d+/i.test(String(navigator.userAgent || ''));
+  const oracleDesktopApp = String(navigator.userAgent || '').includes('Electron/');
   if (oracleDesktopApp) document.documentElement.classList.add('seth-oracle-desktop-app');
   const isMobile = () => true;
 
