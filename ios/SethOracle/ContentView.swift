@@ -1,143 +1,127 @@
 import SwiftUI
 import WebKit
 
-final class OraclePageState: ObservableObject {
-    @Published var isATGGame = false
-    @Published var host = ""
-    @Published var loadError: String?
-}
+private let oracleHome = "https://xinyao-ai.github.io/xinyao-ai/"
+private let oracleScript = "https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/main/xinyao_ATG_live.user.js"
 
 struct ContentView: View {
-    @StateObject private var page = OraclePageState()
-    @State private var toolsVisible = false
-    @State private var leftSide = false
-    @State private var selected: Tool?
-    @State private var hudPosition = CGSize(width: -8, height: -260)
-    @GestureState private var hudDrag = CGSize.zero
-
-    enum Tool: String, CaseIterable, Identifiable {
-        case data = "📋 資料", speed = "🚀 極速", board = "🎯 盤面"
-        case rooms = "🏠 全房", result = "💎 結果", switchSide = "↔️ 換邊"
-        var id: String { rawValue }
-    }
+    @State private var script: String?
+    @State private var error: String?
+    @State private var loading = true
 
     var body: some View {
-        ZStack(alignment: leftSide ? .bottomLeading : .bottomTrailing) {
-            OracleWebView(page: page)
-                .ignoresSafeArea(edges: .bottom)
-
-            if page.isATGGame {
-                VStack(alignment: leftSide ? .leading : .trailing, spacing: 7) {
-                    Button(toolsVisible ? "收合工具" : "顯示工具") {
-                        toolsVisible.toggle()
-                    }
-                    .font(.system(size: 11, weight: .semibold))
-                    .padding(.horizontal, 12).padding(.vertical, 9)
-                    .background(.black.opacity(0.78), in: Capsule())
-                    .gesture(DragGesture(minimumDistance: 8)
-                        .updating($hudDrag) { value, state, _ in state = value.translation }
-                        .onEnded { value in
-                            hudPosition.width += value.translation.width
-                            hudPosition.height += value.translation.height
-                        })
-
-                    if toolsVisible {
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 5), count: 3), spacing: 5) {
-                            ForEach(Tool.allCases) { tool in
-                                Button(tool.rawValue) {
-                                    if tool == .switchSide { leftSide.toggle() }
-                                    else { selected = tool }
-                                }
-                                .font(.system(size: 11, weight: .medium))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.75)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                                .background(.black.opacity(0.77), in: RoundedRectangle(cornerRadius: 9))
-                                .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color(red: 0.94, green: 0.68, blue: 0.76).opacity(0.65), lineWidth: 0.7))
-                            }
-                        }
-                        .frame(width: 210)
-                    }
+        ZStack {
+            if let script = script {
+                OracleWebView(script: script)
+                    .ignoresSafeArea(edges: .bottom)
+            } else if loading {
+                VStack(spacing: 14) {
+                    ProgressView()
+                    Text("正在載入賽特神諭工具…").font(.footnote)
                 }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 9)
-                .padding(.bottom, 22)
-                .offset(x: hudPosition.width + hudDrag.width, y: hudPosition.height + hudDrag.height)
-                .onAppear { toolsVisible = true }
+            } else {
+                VStack(spacing: 14) {
+                    Text("工具載入失敗").font(.headline)
+                    Text(error ?? "無法取得 ATG 腳本").font(.footnote)
+                    Button("重新下載") { Task { await loadScript() } }
+                }.padding()
             }
         }
-        .onChange(of: page.isATGGame) { isGame in
-            toolsVisible = isGame
-            if !isGame { selected = nil }
+        .task { await loadScript() }
+    }
+
+    @MainActor private func loadScript() async {
+        loading = true
+        error = nil
+        guard let url = URL(string: oracleScript) else {
+            loading = false
+            error = "腳本網址無效"
+            return
         }
-        .alert(selected?.rawValue ?? "", isPresented: Binding(
-            get: { selected != nil },
-            set: { if !$0 { selected = nil } }
-        )) {
-            Button("關閉", role: .cancel) { selected = nil }
-        } message: {
-            Text("這項 ATG 功能目前尚未連接遊戲資料與操作，不能顯示預測結果或控制遊戲。這是 iOS 實機相容性測試版。")
+        do {
+            var request = URLRequest(url: url)
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            request.timeoutInterval = 20
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+                  data.count < 5_000_000,
+                  let text = String(data: data, encoding: .utf8),
+                  text.contains("// ==UserScript==") else {
+                throw URLError(.badServerResponse)
+            }
+            // Remove userscript metadata; execute actual implementation at document start.
+            script = text
+            loading = false
+        } catch {
+            self.error = error.localizedDescription
+            loading = false
         }
     }
 }
 
 struct OracleWebView: UIViewRepresentable {
-    @ObservedObject var page: OraclePageState
+    let script: String
 
-    func makeCoordinator() -> Coordinator { Coordinator(page: page) }
+    func makeCoordinator() -> Coordinator { Coordinator(script: script) }
 
     func makeUIView(context: Context) -> WKWebView {
-        let configuration = WKWebViewConfiguration()
-        configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
-        let webView = WKWebView(frame: .zero, configuration: configuration)
+        let config = WKWebViewConfiguration()
+        let controller = WKUserContentController()
+        // WKUserScripts apply to all origins; guard the execution to ATG host.
+        let guarded = """
+        if (location.protocol === 'https:' && location.hostname === 'play.godeebxp.com') {
+        \(script)
+        }
+        """
+        controller.addUserScript(WKUserScript(source: guarded,
+            injectionTime: .atDocumentStart, forMainFrameOnly: false,
+            in: .page))
+        config.userContentController = controller
+        config.preferences.javaScriptCanOpenWindowsAutomatically = true
+
+        let webView = WKWebView(frame: .zero, configuration: config)
         webView.allowsBackForwardNavigationGestures = true
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
-        if let url = URL(string: "https://xinyao-ai.github.io/xinyao-ai/") {
+        context.coordinator.webView = webView
+        if let url = URL(string: oracleHome) {
             webView.load(URLRequest(url: url))
         }
         return webView
     }
 
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
+    func updateUIView(_ webView: WKWebView, context: Context) {}
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
-        let page: OraclePageState
-        init(page: OraclePageState) { self.page = page }
+        let script: String
+        weak var webView: WKWebView?
+        private var popups: [WKWebView] = []
 
-        private func refresh(_ url: URL?) {
-            let host = url?.host?.lowercased() ?? ""
-            DispatchQueue.main.async {
-                self.page.host = host
-                // Only show HUD inside the actual ATG game; not the casino lobby.
-                self.page.isATGGame = (host == "play.godeebxp.com" ||
-                    (host.hasSuffix(".godeebxp.com") && host != "socket.godeebxp.com"))
-            }
-        }
+        init(script: String) { self.script = script }
 
-        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-            refresh(webView.url)
-        }
-        func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
-            refresh(webView.url)
-        }
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            refresh(webView.url)
-        }
-        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-            DispatchQueue.main.async { self.page.loadError = error.localizedDescription }
+        // Keep the newly opened game window as an actual WKWebView;
+        // redirecting its request to the original view drops window.name and opener.
+        func webView(_ webView: WKWebView,
+                     createWebViewWith configuration: WKWebViewConfiguration,
+                     for navigationAction: WKNavigationAction,
+                     windowFeatures: WKWindowFeatures) -> WKWebView? {
+            guard navigationAction.targetFrame == nil else { return nil }
+            let popup = WKWebView(frame: webView.bounds, configuration: configuration)
+            popup.navigationDelegate = self
+            popup.uiDelegate = self
+            popup.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            webView.addSubview(popup)
+            popups.append(popup)
+            return popup
         }
 
-        // The existing game-launch.html opens a window. Keep it inside the same app.
-        func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
-                     for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-            if navigationAction.targetFrame == nil, let url = navigationAction.request.url {
-                webView.load(URLRequest(url: url))
-            }
-            return nil
+        func webViewDidClose(_ webView: WKWebView) {
+            webView.removeFromSuperview()
+            popups.removeAll { $0 === webView }
         }
-        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+
+        func webView(_ webView: WKWebView,
+                     decidePolicyFor navigationAction: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             decisionHandler(.allow)
         }
