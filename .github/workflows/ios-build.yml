@@ -30,3 +30,20 @@ jobs:
             -destination 'generic/platform=iOS' \
             CODE_SIGNING_ALLOWED=NO \
             build
+
+      - name: Package unsigned iOS device build
+        if: success()
+        run: |
+          APP=$(find "$HOME/Library/Developer/Xcode/DerivedData" -path '*/Build/Products/Debug-iphoneos/SethOracle.app' -type d -print -quit)
+          test -n "$APP"
+          mkdir -p output
+          ditto -c -k --sequesterRsrc --keepParent "$APP" output/SethOracle-unsigned-device-app.zip
+
+      - name: Upload unsigned device build
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SethOracle-unsigned-iPhone-build
+          path: output/SethOracle-unsigned-device-app.zip
+          retention-days: 7
+          if-no-files-found: error
