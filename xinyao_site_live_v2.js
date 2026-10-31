@@ -1748,7 +1748,7 @@
                 width:${((iosStepIndex + 1) / total) * 100}%;
                 height:100%;
                 border-radius:999px;
-                background:#d9ae5f;
+                background:#f3c568!important;box-shadow:0 3px 12px rgba(243,197,104,.27)!important;border:1px solid #ffde94!important;
                 transition:width .2s ease;
               "
             ></div>
@@ -1797,9 +1797,9 @@
                     padding:12px 14px;
                     border:0;
                     border-radius:12px;
-                    background:#d9ae5f;
-                    color:#0e1d20;
-                    font-size:13px;
+                    background:#f3c568!important;box-shadow:0 3px 12px rgba(243,197,104,.27)!important;border:1px solid #ffde94!important;
+                    color:#172025!important;
+                    font-size:15px;
                     font-weight:900;
                     cursor:pointer;
                   "
@@ -1822,9 +1822,9 @@
                     padding:12px 14px;
                     border:0;
                     border-radius:12px;
-                    background:#d9ae5f;
-                    color:#0e1d20;
-                    font-size:13px;
+                    background:#f3c568!important;box-shadow:0 3px 12px rgba(243,197,104,.27)!important;border:1px solid #ffde94!important;
+                    color:#172025!important;
+                    font-size:15px;
                     font-weight:900;
                     cursor:pointer;
                   "
@@ -1854,9 +1854,10 @@
               padding:11px 12px;
               border:1px solid #947546;
               border-radius:12px;
-              background:#0e1d20;
-              color:${iosStepIndex === 0 ? '#d4cbb9' : '#e9c27b'};
-              font-size:13px;
+              background:${iosStepIndex === 0 ? '#263332' : '#243b3b'}!important;
+              color:${iosStepIndex === 0 ? '#9b9990' : '#ffe0a0'}!important;
+              box-shadow:inset 0 0 0 1px rgba(255,210,117,.35)!important;
+              font-size:15px;
               font-weight:900;
               cursor:${iosStepIndex === 0 ? 'default' : 'pointer'};
             "
@@ -1872,9 +1873,9 @@
               padding:11px 12px;
               border:0;
               border-radius:12px;
-              background:#d9ae5f;
-              color:#0e1d20;
-              font-size:13px;
+              background:#f3c568!important;box-shadow:0 3px 12px rgba(243,197,104,.27)!important;border:1px solid #ffde94!important;
+              color:#172025!important;
+              font-size:15px;
               font-weight:900;
               cursor:pointer;
             "
