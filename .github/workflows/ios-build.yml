@@ -26,7 +26,7 @@ jobs:
             -project ios/SethOracle.xcodeproj \
             -scheme SethOracle \
             -configuration Debug \
-            -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             CODE_SIGNING_ALLOWED=NO \
             build
