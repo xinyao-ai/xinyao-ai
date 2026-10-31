@@ -20,7 +20,7 @@ jobs:
         run: |
           find . -name "*.xcodeproj" -print
 
-      - name: Build iOS Simulator
+      - name: Build iOS Device (unsigned)
         run: |
           xcodebuild \
             -project ios/SethOracle.xcodeproj \
@@ -38,6 +38,10 @@ jobs:
           test -n "$APP"
           mkdir -p output
           ditto -c -k --sequesterRsrc --keepParent "$APP" output/SethOracle-unsigned-device-app.zip
+          mkdir -p output/Payload
+          ditto "$APP" output/Payload/SethOracle.app
+          (cd output && zip -qry SethOracle-AltStore-unsigned.ipa Payload)
+          rm -rf output/Payload
 
       - name: Upload unsigned device build
         if: success()
@@ -45,5 +49,14 @@ jobs:
         with:
           name: SethOracle-unsigned-iPhone-build
           path: output/SethOracle-unsigned-device-app.zip
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload AltStore IPA (unsigned, must be signed by AltStore)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SethOracle-AltStore-IPA
+          path: output/SethOracle-AltStore-unsigned.ipa
           retention-days: 7
           if-no-files-found: error
