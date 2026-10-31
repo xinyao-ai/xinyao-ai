@@ -193,7 +193,7 @@
     },
     {
       stepNumber: 5,
-      title: '用 Userscripts 安裝芯瑤共用程式',
+      title: '用 Userscripts 安裝賽特神諭摩斯密碼',
       bodyHtml: `
         <p>在共用程式頁面，依序操作：</p>
         <p><b>網址左側【拼圖／延伸功能符號】→【Userscripts】→ 黃色提示列【Tap to install】→【Install】</b>。</p>
