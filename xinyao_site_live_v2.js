@@ -151,9 +151,9 @@
   const IOS_GUIDE_STEPS = [
     {
       stepNumber: 1,
-      title: '先確認：娛樂城與芯瑤程式使用同一個 Safari',
+      title: '先確認：皇鼎娛樂城與賽特神諭使用同一個 Safari',
       bodyHtml: `
-        <p>請先確認 <b>HD 皇鼎娛樂城</b> 與 <b>芯瑤💕 ATG AI助手</b> 都使用 <b>同一個 Safari 瀏覽器</b> 開啟。</p>
+        <p>請先確認 <b>HD 皇鼎娛樂城</b> 與 <b>賽特神諭</b> 都使用 <b>同一個 Safari 瀏覽器</b> 開啟。</p>
         <p>不要一個用 Safari、另一個用其他瀏覽器，否則後面的安裝、配對與同步可能無法正常運作。</p>
       `,
       images: [
@@ -1699,7 +1699,14 @@
       const total =
         IOS_GUIDE_STEPS.length;
 
-      const imageHtml =
+      const imageHtml = (iosStepIndex === 0) ? `
+        <div style="position:relative;width:100%;margin-top:12px;border:1px solid #ffd5e6;border-radius:15px;overflow:hidden;background:white">
+          <img src="./ios_step1.png?v=204" alt="皇鼎娛樂城與賽特神諭共用 Safari" style="display:block;width:100%;height:auto">
+          <div style="position:absolute;right:0;top:0;width:35%;height:57%;background:white;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+            <img src="./icon-192.png?rev=ios-guide-20261101" alt="賽特神諭" style="width:73%;height:auto;aspect-ratio:1;object-fit:cover;border-radius:20%">
+            <b style="color:#111;font-size:clamp(11px,2.5vw,20px);font-weight:900">賽特神諭</b>
+          </div>
+        </div>` :
         step.images
           .map((src, index) => `
             <div
