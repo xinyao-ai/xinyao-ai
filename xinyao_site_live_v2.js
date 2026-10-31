@@ -1904,13 +1904,13 @@
           () => {
             const opened =
               window.open(
-                SCRIPT_URL,
+                './ios-install.html?v=5069',
                 '_blank'
               );
 
             if (!opened) {
               window.location.href =
-                SCRIPT_URL;
+                './ios-install.html?v=5069';
             }
           }
         );
