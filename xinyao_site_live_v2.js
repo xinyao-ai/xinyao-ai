@@ -2764,6 +2764,9 @@
       );
   }
 
+  // Login-page iOS guide shortcut: reuses the original six-step tutorial and images.
+  window.addEventListener('oracle:open-ios-guide', () => openInstallGuide('iOS'));
+
   async function copyPairCode() {
     if (!pairCode) {
       return;
