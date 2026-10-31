@@ -1243,7 +1243,7 @@
       justify-content:center;
       padding:14px;
       box-sizing:border-box;
-      background:rgba(45,30,40,.52);
+      background:rgba(0,8,10,.77);
       backdrop-filter:blur(7px);
       -webkit-backdrop-filter:blur(7px);
     `;
@@ -1253,7 +1253,7 @@
         id="xinyaoGuideDialog"
         role="dialog"
         aria-modal="true"
-        aria-label="芯瑤安裝教學"
+        aria-label="賽特神諭安裝教學"
         style="
           width:min(620px,100%);
           max-height:94vh;
@@ -1262,9 +1262,9 @@
           overflow:hidden;
           box-sizing:border-box;
           border-radius:22px;
-          background:#fff;
-          color:#594750;
-          box-shadow:0 18px 55px rgba(0,0,0,.22);
+          background:#0e1d20;
+          color:#ede3ce;
+          box-shadow:0 18px 55px rgba(0,0,0,.55);border:1px solid rgba(224,185,111,.42);
           font-family:-apple-system,BlinkMacSystemFont,'PingFang TC',sans-serif;
         "
       >
@@ -1283,7 +1283,7 @@
                 style="
                   font-size:19px;
                   font-weight:900;
-                  color:#d94c89;
+                  color:#e9c27b;
                 "
               ></div>
 
@@ -1293,7 +1293,7 @@
                   margin-top:3px;
                   font-size:11px;
                   line-height:1.5;
-                  color:#95858c;
+                  color:#b8b09d;
                 "
               ></div>
             </div>
@@ -1308,8 +1308,8 @@
                 height:36px;
                 border:0;
                 border-radius:50%;
-                background:#fff0f6;
-                color:#d94c89;
+                background:#202e2c;
+                color:#e9c27b;
                 font-size:20px;
                 cursor:pointer;
               "
@@ -1360,11 +1360,11 @@
 
     tabs.forEach(tab => {
       tab.style.cssText = `
-        border:1px solid #f3c1d5;
+        border:1px solid #9e7b43;
         border-radius:12px;
         padding:9px 5px;
-        background:#fff;
-        color:#d94c89;
+        background:#0e1d20;
+        color:#e9c27b;
         font-size:12px;
         font-weight:900;
         cursor:pointer;
@@ -1391,10 +1391,10 @@
             <div
               style="
                 margin-top:${index === 0 ? 12 : 10}px;
-                border:1px solid #ffd5e6;
+                border:1px solid #8e7041;
                 border-radius:15px;
                 overflow:hidden;
-                background:#fff7fb;
+                background:#101e20;
               "
             >
               <img
@@ -1404,7 +1404,7 @@
                   display:block;
                   width:100%;
                   height:auto;
-                  background:#fff;
+                  background:#0e1d20;
                 "
               >
             </div>
@@ -1429,8 +1429,8 @@
               gap:7px;
               padding:7px 11px;
               border-radius:999px;
-              background:#fff0f6;
-              color:#d94c89;
+              background:#202e2c;
+              color:#e9c27b;
               font-size:12px;
               font-weight:900;
             "
@@ -1444,7 +1444,7 @@
               height:7px;
               overflow:hidden;
               border-radius:999px;
-              background:#ffe5ef;
+              background:#334139;
             "
           >
             <div
@@ -1452,7 +1452,7 @@
                 width:${((desktopStepIndex + 1) / total) * 100}%;
                 height:100%;
                 border-radius:999px;
-                background:#ff5f9e;
+                background:#d9ae5f;
                 transition:width .2s ease;
               "
             ></div>
@@ -1462,9 +1462,9 @@
         <div
           style="
             padding:15px;
-            border:1px solid #ffd5e6;
+            border:1px solid #8e7041;
             border-radius:16px;
-            background:#fff9fc;
+            background:#101e20;
           "
         >
           <div
@@ -1472,7 +1472,7 @@
               font-size:18px;
               font-weight:950;
               line-height:1.45;
-              color:#d94c89;
+              color:#e9c27b;
             "
           >
             ${step.stepNumber}. ${step.title}
@@ -1483,7 +1483,7 @@
               margin-top:10px;
               font-size:13px;
               line-height:1.8;
-              color:#604e57;
+              color:#e0d6c4;
             "
           >
             ${step.bodyHtml}
@@ -1501,8 +1501,8 @@
                     padding:12px 14px;
                     border:0;
                     border-radius:12px;
-                    background:#ff5f9e;
-                    color:#fff;
+                    background:#d9ae5f;
+                    color:#0e1d20;
                     font-size:13px;
                     font-weight:900;
                     cursor:pointer;
@@ -1516,9 +1516,9 @@
                     margin-top:7px;
                     padding:8px 10px;
                     border-radius:10px;
-                    background:#fff;
-                    border:1px dashed #f2bfd3;
-                    color:#9b7e8a;
+                    background:#0e1d20;
+                    border:1px dashed #947546;
+                    color:#b8b09d;
                     font-size:10px;
                     line-height:1.5;
                     word-break:break-all;
@@ -1542,8 +1542,8 @@
                     padding:12px 14px;
                     border:0;
                     border-radius:12px;
-                    background:#ff5f9e;
-                    color:#fff;
+                    background:#d9ae5f;
+                    color:#0e1d20;
                     font-size:13px;
                     font-weight:900;
                     cursor:pointer;
@@ -1572,10 +1572,10 @@
             style="
               flex:1;
               padding:11px 12px;
-              border:1px solid #f2bfd3;
+              border:1px solid #947546;
               border-radius:12px;
-              background:#fff;
-              color:${desktopStepIndex === 0 ? '#c9bcc2' : '#d94c89'};
+              background:#0e1d20;
+              color:${desktopStepIndex === 0 ? '#d4cbb9' : '#e9c27b'};
               font-size:13px;
               font-weight:900;
               cursor:${desktopStepIndex === 0 ? 'default' : 'pointer'};
@@ -1592,8 +1592,8 @@
               padding:11px 12px;
               border:0;
               border-radius:12px;
-              background:#ff5f9e;
-              color:#fff;
+              background:#d9ae5f;
+              color:#0e1d20;
               font-size:13px;
               font-weight:900;
               cursor:pointer;
@@ -1700,7 +1700,7 @@
         IOS_GUIDE_STEPS.length;
 
       const imageHtml = (iosStepIndex === 0) ? `
-        <div style="margin-top:12px;border:1px solid #ffd5e6;border-radius:15px;overflow:hidden;background:#fff">
+        <div style="margin-top:12px;border:1px solid #8e7041;border-radius:15px;overflow:hidden;background:#0e1d20">
           <img src="./assets/ios_step1_safari.png?v=5061" alt="皇鼎娛樂城及賽特神諭請使用 Safari 開啟" style="display:block;width:100%;height:auto">
         </div>` :
         step.images
@@ -1708,10 +1708,10 @@
             <div
               style="
                 margin-top:${index === 0 ? 12 : 10}px;
-                border:1px solid #ffd5e6;
+                border:1px solid #8e7041;
                 border-radius:15px;
                 overflow:hidden;
-                background:#fff7fb;
+                background:#101e20;
               "
             >
               <img
@@ -1721,7 +1721,7 @@
                   display:block;
                   width:100%;
                   height:auto;
-                  background:#fff;
+                  background:#0e1d20;
                 "
               >
             </div>
@@ -1745,8 +1745,8 @@
               gap:7px;
               padding:7px 11px;
               border-radius:999px;
-              background:#fff0f6;
-              color:#d94c89;
+              background:#202e2c;
+              color:#e9c27b;
               font-size:12px;
               font-weight:900;
             "
@@ -1760,7 +1760,7 @@
               height:7px;
               overflow:hidden;
               border-radius:999px;
-              background:#ffe5ef;
+              background:#334139;
             "
           >
             <div
@@ -1768,7 +1768,7 @@
                 width:${((iosStepIndex + 1) / total) * 100}%;
                 height:100%;
                 border-radius:999px;
-                background:#ff5f9e;
+                background:#d9ae5f;
                 transition:width .2s ease;
               "
             ></div>
@@ -1778,9 +1778,9 @@
         <div
           style="
             padding:15px;
-            border:1px solid #ffd5e6;
+            border:1px solid #8e7041;
             border-radius:16px;
-            background:#fff9fc;
+            background:#101e20;
           "
         >
           <div
@@ -1788,7 +1788,7 @@
               font-size:18px;
               font-weight:950;
               line-height:1.45;
-              color:#d94c89;
+              color:#e9c27b;
             "
           >
             ${step.stepNumber}. ${step.title}
@@ -1799,7 +1799,7 @@
               margin-top:10px;
               font-size:13px;
               line-height:1.8;
-              color:#604e57;
+              color:#e0d6c4;
             "
           >
             ${step.bodyHtml}
@@ -1817,8 +1817,8 @@
                     padding:12px 14px;
                     border:0;
                     border-radius:12px;
-                    background:#ff5f9e;
-                    color:#fff;
+                    background:#d9ae5f;
+                    color:#0e1d20;
                     font-size:13px;
                     font-weight:900;
                     cursor:pointer;
@@ -1842,8 +1842,8 @@
                     padding:12px 14px;
                     border:0;
                     border-radius:12px;
-                    background:#ff5f9e;
-                    color:#fff;
+                    background:#d9ae5f;
+                    color:#0e1d20;
                     font-size:13px;
                     font-weight:900;
                     cursor:pointer;
@@ -1872,10 +1872,10 @@
             style="
               flex:1;
               padding:11px 12px;
-              border:1px solid #f2bfd3;
+              border:1px solid #947546;
               border-radius:12px;
-              background:#fff;
-              color:${iosStepIndex === 0 ? '#c9bcc2' : '#d94c89'};
+              background:#0e1d20;
+              color:${iosStepIndex === 0 ? '#d4cbb9' : '#e9c27b'};
               font-size:13px;
               font-weight:900;
               cursor:${iosStepIndex === 0 ? 'default' : 'pointer'};
@@ -1892,8 +1892,8 @@
               padding:11px 12px;
               border:0;
               border-radius:12px;
-              background:#ff5f9e;
-              color:#fff;
+              background:#d9ae5f;
+              color:#0e1d20;
               font-size:13px;
               font-weight:900;
               cursor:pointer;
@@ -1990,10 +1990,10 @@
             <div
               style="
                 margin-top:${index === 0 ? 12 : 10}px;
-                border:1px solid #ffd5e6;
+                border:1px solid #8e7041;
                 border-radius:15px;
                 overflow:hidden;
-                background:#fff7fb;
+                background:#101e20;
               "
             >
               <img
@@ -2003,7 +2003,7 @@
                   display:block;
                   width:100%;
                   height:auto;
-                  background:#fff;
+                  background:#0e1d20;
                 "
               >
             </div>
@@ -2027,8 +2027,8 @@
               gap:7px;
               padding:7px 11px;
               border-radius:999px;
-              background:#fff0f6;
-              color:#d94c89;
+              background:#202e2c;
+              color:#e9c27b;
               font-size:12px;
               font-weight:900;
             "
@@ -2042,7 +2042,7 @@
               height:7px;
               overflow:hidden;
               border-radius:999px;
-              background:#ffe5ef;
+              background:#334139;
             "
           >
             <div
@@ -2050,7 +2050,7 @@
                 width:${((androidStepIndex + 1) / total) * 100}%;
                 height:100%;
                 border-radius:999px;
-                background:#ff5f9e;
+                background:#d9ae5f;
                 transition:width .2s ease;
               "
             ></div>
@@ -2060,9 +2060,9 @@
         <div
           style="
             padding:15px;
-            border:1px solid #ffd5e6;
+            border:1px solid #8e7041;
             border-radius:16px;
-            background:#fff9fc;
+            background:#101e20;
           "
         >
           <div
@@ -2070,7 +2070,7 @@
               font-size:18px;
               font-weight:950;
               line-height:1.45;
-              color:#d94c89;
+              color:#e9c27b;
             "
           >
             ${step.stepNumber}. ${step.title}
@@ -2081,7 +2081,7 @@
               margin-top:10px;
               font-size:13px;
               line-height:1.8;
-              color:#604e57;
+              color:#e0d6c4;
             "
           >
             ${step.bodyHtml}
@@ -2099,8 +2099,8 @@
                     padding:12px 14px;
                     border:0;
                     border-radius:12px;
-                    background:#ff5f9e;
-                    color:#fff;
+                    background:#d9ae5f;
+                    color:#0e1d20;
                     font-size:13px;
                     font-weight:900;
                     cursor:pointer;
@@ -2124,8 +2124,8 @@
                     padding:12px 14px;
                     border:0;
                     border-radius:12px;
-                    background:#ff5f9e;
-                    color:#fff;
+                    background:#d9ae5f;
+                    color:#0e1d20;
                     font-size:13px;
                     font-weight:900;
                     cursor:pointer;
@@ -2149,8 +2149,8 @@
                     padding:12px 14px;
                     border:0;
                     border-radius:12px;
-                    background:#ff5f9e;
-                    color:#fff;
+                    background:#d9ae5f;
+                    color:#0e1d20;
                     font-size:13px;
                     font-weight:900;
                     cursor:pointer;
@@ -2179,10 +2179,10 @@
             style="
               flex:1;
               padding:11px 12px;
-              border:1px solid #f2bfd3;
+              border:1px solid #947546;
               border-radius:12px;
-              background:#fff;
-              color:${androidStepIndex === 0 ? '#c9bcc2' : '#d94c89'};
+              background:#0e1d20;
+              color:${androidStepIndex === 0 ? '#d4cbb9' : '#e9c27b'};
               font-size:13px;
               font-weight:900;
               cursor:${androidStepIndex === 0 ? 'default' : 'pointer'};
@@ -2199,8 +2199,8 @@
               padding:11px 12px;
               border:0;
               border-radius:12px;
-              background:#ff5f9e;
-              color:#fff;
+              background:#d9ae5f;
+              color:#0e1d20;
               font-size:13px;
               font-weight:900;
               cursor:pointer;
@@ -2306,10 +2306,10 @@
       body.innerHTML = `
         <div
           style="
-            border:1px solid #ffd5e6;
+            border:1px solid #8e7041;
             border-radius:16px;
             overflow:hidden;
-            background:#fff7fb;
+            background:#101e20;
           "
         >
           <img
@@ -2319,7 +2319,7 @@
               display:block;
               width:100%;
               height:auto;
-              background:#fff7fb;
+              background:#101e20;
             "
           >
         </div>
@@ -2329,11 +2329,11 @@
             margin-top:10px;
             padding:10px 12px;
             border-radius:13px;
-            background:#fff7fb;
-            border:1px solid #ffe0ec;
+            background:#101e20;
+            border:1px solid #334139;
             font-size:11px;
             line-height:1.6;
-            color:#8b7780;
+            color:#c1b9a6;
           "
         >
           第一次設定完成後不用重複安裝。之後直接開啟 ATG 即可。
@@ -2349,8 +2349,8 @@
             padding:13px 15px;
             border:0;
             border-radius:14px;
-            background:#ff5f9e;
-            color:#fff;
+            background:#d9ae5f;
+            color:#0e1d20;
             font-size:14px;
             font-weight:900;
             cursor:pointer;
@@ -2407,18 +2407,18 @@
 
         tab.style.background =
           selected
-            ? '#ff5f9e'
-            : '#fff';
+            ? '#d9ae5f'
+            : '#0e1d20';
 
         tab.style.color =
           selected
-            ? '#fff'
-            : '#d94c89';
+            ? '#0e1d20'
+            : '#e9c27b';
 
         tab.style.borderColor =
           selected
-            ? '#ff5f9e'
-            : '#f3c1d5';
+            ? '#d9ae5f'
+            : '#9e7b43';
       });
 
       const scroll =
@@ -2524,7 +2524,7 @@
           <div
             style="
               font-weight:900;
-              color:#f0ce83;
+              color:#d9ae5f;
               font-size:15px;
             "
           >
@@ -2534,7 +2534,7 @@
           <div
             style="
               font-size:11px;
-              color:#d3c7ae;
+              color:#bdb3a0;
               line-height:1.55;
               margin-top:4px;
             "
@@ -2551,13 +2551,13 @@
             border-radius:999px;
             background:${
               bound
-                ? '#e9fff1'
-                : '#fff0f6'
+                ? '#173627'
+                : '#202e2c'
             };
             color:${
               bound
-                ? '#219653'
-                : '#d94c89'
+                ? '#68d49d'
+                : '#e9c27b'
             };
           "
         >
@@ -2577,10 +2577,10 @@
                 margin-top:10px;
                 padding:10px;
                 border-radius:12px;
-                background:#12292c;
-                border:1px solid #a1834a;
+                background:#102326;
+                border:1px solid #e0b96f;
                 font-size:12px;
-                color:#e1d0ac;
+                color:#c2b290;
                 line-height:1.6;
               "
             >
@@ -2616,15 +2616,15 @@
                 margin-top:11px;
                 padding:12px;
                 border-radius:14px;
-                background:#12292c;
-                border:1px solid #a1834a;
+                background:#102326;
+                border:1px solid #e0b96f;
                 text-align:center;
               "
             >
               <div
                 style="
                   font-size:11px;
-                  color:#dfc998;
+                  color:#d1b67b;
                 "
               >
                 請到 ATG 畫面的
@@ -2637,7 +2637,7 @@
                   font-size:28px;
                   font-weight:1000;
                   letter-spacing:4px;
-                  color:#f0ce83;
+                  color:#d9ae5f;
                   margin:6px 0;
                 "
               >
@@ -2648,7 +2648,7 @@
                 id="xinyaoPairCountdown"
                 style="
                   font-size:10px;
-                  color:#beae95;
+                  color:#c4b69b;
                 "
               >
                 ${pairCountdownText()}
@@ -2662,8 +2662,8 @@
                   border:0;
                   border-radius:10px;
                   padding:8px 12px;
-                  background:#233a3a;
-                  color:#f0ce83;
+                  background:#192b2c;
+                  color:#d9ae5f;
                   font-weight:900;
                   cursor:pointer;
                 "
@@ -2692,9 +2692,9 @@
             text-decoration:none;
             border-radius:11px;
             padding:9px 12px;
-            background:#142d30;
-            border:1px solid #a1834a;
-            color:#f0ce83;
+            background:#0b191c;
+            border:1px solid #e0b96f;
+            color:#d9ae5f;
             font-size:12px;
             font-weight:900;
           "
@@ -2709,8 +2709,8 @@
             border:0;
             border-radius:11px;
             padding:9px 12px;
-            background:#b78b41;
-            color:#fff7de;
+            background:#d9ae5f;
+            color:#25332b;
             font-size:12px;
             font-weight:900;
             cursor:pointer;
@@ -2729,7 +2729,7 @@
         style="
           margin-top:8px;
           font-size:11px;
-          color:#bfb3a0;
+          color:#bdb3a0;
           line-height:1.55;
         "
       >
