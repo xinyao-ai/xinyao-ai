@@ -186,26 +186,20 @@
     },
     {
       stepNumber: 4,
-      title: '安裝賽特神諭摩斯密碼',
-      bodyHtml: `<p>點擊 <b>【安裝賽特神諭摩斯密碼】</b> → 返回此頁 → 點擊 <b>【下一步】</b>。</p><p>開啟共用程式頁面後，請繼續下一步安裝。</p>`,
-      images: [],
-      openSharedScript: true
-    },
-    {
-      stepNumber: 5,
       title: '用 Userscripts 安裝賽特神諭摩斯密碼',
       bodyHtml: `
-        <p>在共用程式頁面，依序操作：</p>
-        <p><b>網址左側【拼圖／延伸功能符號】→【Userscripts】→ 黃色提示列【Tap to install】→【Install】</b>。</p>
-        <p>看到綠色 <b>【Userscript Installed】</b> 後，再把上方右側的腳本開關打開。</p>
+        <p>先點擊下方 <b>【安裝賽特神諭摩斯密碼】</b>，開啟安裝頁。</p>
+        <p>在 Safari 開啟腳本後，點擊網址列的 <b>【拼圖／延伸功能】→【Userscripts】→【Tap to install】→【Install】</b>。</p>
+        <p>看到綠色 <b>【Userscript Installed】</b>，再開啟右上角的腳本開關；完成後返回教學，點擊 <b>【下一步】</b>。</p>
       `,
       images: [
         './ios_step5_1.png?v=204',
         './ios_step5_2.png?v=204'
-      ]
+      ],
+      openSharedScript: true
     },
     {
-      stepNumber: 6,
+      stepNumber: 5,
       title: 'ATG頁面重新整理',
       bodyHtml: `
         <p>回到 <b>【ATG頁面】</b>，點擊 <b>【重新整理】</b> 將立即顯示所有功能，預祝各位玩家遊玩愉快。</p>
