@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#140c16"><title>賽特神諭 · iOS 相容測試</title><style>
+*{box-sizing:border-box}body{margin:0;background:#100c14;color:#f8e6eb;font-family:-apple-system,BlinkMacSystemFont,"PingFang TC",sans-serif}.top{padding:calc(env(safe-area-inset-top) + 16px) 18px 13px;background:#1d1420;border-bottom:1px solid #70465d}.top strong{font-size:18px;color:#f1c77a}.top small{display:block;margin-top:6px;color:#d2b9c3}.bar{display:flex;gap:8px;padding:12px;flex-wrap:wrap}.bar button,.bar a{padding:11px 13px;border-radius:11px;border:1px solid #a77781;background:#3b2538;color:white;font-weight:700;text-decoration:none;font-size:14px}.bar button:first-child{background:#75344e}.info{font-size:13px;line-height:1.6;padding:8px 15px;color:#eacbcf}.info b{color:#ffd88a}.frame{position:relative;margin:8px 10px 20px;height:58vh;border:1px solid #a36a7b;border-radius:13px;overflow:hidden;background:#1b1921}.frame iframe{width:100%;height:100%;border:0;background:white}.cover{position:absolute;inset:0;display:grid;place-items:center;padding:22px;text-align:center;background:#19141c}.foot{padding:0 15px 35px;color:#c9b9c1;font-size:12px;line-height:1.7}code{overflow-wrap:anywhere}.state{padding:12px;background:#251a2a;border-radius:11px} </style></head><body><div class="top"><strong>✦ 賽特神諭 · iOS 相容測試</strong><small>獨立測試頁，不影響正式版或 Android</small></div>
+<div class="info">測試項目：<b>iPhone 能否在神諭頁面內嵌入 ATG，並讀取跨網域遊戲畫面。</b></div>
+<div class="bar"><button id="test">① 測試內嵌遊戲</button><button id="probe">② 檢查工具權限</button><button id="copy">複製測試結果</button></div>
+<div class="info state" id="result" aria-live="polite">狀態：尚未測試。請點「① 測試內嵌遊戲」。</div>
+<div class="frame"><iframe title="ATG 內嵌測試" id="game" sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-top-navigation-by-user-activation" referrerpolicy="no-referrer"></iframe><div id="cover" class="cover">只有這個測試頁，不會修改會員的遊戲設定。</div></div>
+<div class="foot">注意：遊戲如果禁止 iframe、第三方登入 Cookie，或跨網域腳本存取，即使顯示出畫面，網站版也無法直接獲取遊戲資料或啟用原 Android 六格工具。測試不會上傳登入憑證。請勿在本頁輸入帳號密碼。</div>
+<script>
+(()=>{'use strict';
+const origin='https://hd5577.com/GameLobby?g=ATG&c=golden-seth';
+const f=document.getElementById('game'), r=document.getElementById('result'), cover=document.getElementById('cover');
+let logs=['測試頁啟動：'+new Date().toLocaleString('zh-TW')];let loaded=false;
+function report(message){logs.push(message);r.textContent=message}
+document.getElementById('test').onclick=()=>{
+loaded=false;cover.style.display='none';report('內嵌測試啟動：正在載入遊戲入口。即使出現載入事件，也不代表畫面可以使用。');
+f.onload=()=>{loaded=true;report('內嵌頁觸發載入事件。請觀察下方是否真的出現遊戲；再點「② 檢查工具權限」。')};
+f.src=origin;
+setTimeout(()=>{if(!loaded) report('等待 12 秒未收到載入事件，可能被網路或遊戲網站限制；不代表已證實不能嵌入。')},12000);
+};
+document.getElementById('probe').onclick=()=>{try{const href=f.contentWindow.location.href;report('同網域存取成功：'+href)}catch(e){report('已確認跨網域保護：神諭網站無法直接讀取遊戲 iframe 內的資料，這種 Web Clip 無法直接移植 Android 注入工具。')}};
+document.getElementById('copy').onclick=async()=>{const txt=logs.join('\n');try{await navigator.clipboard.writeText(txt);report('測試結果已複製，可貼給我。')}catch(e){prompt('請複製以下測試結果',txt)}};})();
+</script></body></html>
