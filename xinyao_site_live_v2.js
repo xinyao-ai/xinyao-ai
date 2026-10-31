@@ -1702,9 +1702,9 @@
       const imageHtml = (iosStepIndex === 0) ? `
         <div style="position:relative;width:100%;margin-top:12px;border:1px solid #ffd5e6;border-radius:15px;overflow:hidden;background:white">
           <img src="./ios_step1.png?v=204" alt="皇鼎娛樂城與賽特神諭共用 Safari" style="display:block;width:100%;height:auto">
-          <div style="position:absolute;right:0;top:0;width:35%;height:57%;background:white;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
-            <img src="./icon-192.png?rev=ios-guide-20261101" alt="賽特神諭" style="width:73%;height:auto;aspect-ratio:1;object-fit:cover;border-radius:20%">
-            <b style="color:#111;font-size:clamp(11px,2.5vw,20px);font-weight:900">賽特神諭</b>
+          <div style="position:absolute;right:0;top:0;width:35%;height:57%;box-sizing:border-box;padding:5% 3% 1%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2%">
+            <img src="./icon-192.png?rev=ios-guide-20261101" alt="賽特神諭" style="display:block;width:79%;max-height:76%;height:auto;aspect-ratio:1;object-fit:contain;border-radius:19%;flex:0 1 auto">
+            <b style="color:#111;font-size:clamp(11px,2.5vw,20px);font-weight:900;white-space:nowrap;line-height:1.2">賽特神諭</b>
           </div>
         </div>` :
         step.images
