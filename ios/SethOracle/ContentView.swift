@@ -12,6 +12,8 @@ struct ContentView: View {
     @State private var toolsVisible = false
     @State private var leftSide = false
     @State private var selected: Tool?
+    @State private var hudPosition = CGSize(width: -8, height: -260)
+    @GestureState private var hudDrag = CGSize.zero
 
     enum Tool: String, CaseIterable, Identifiable {
         case data = "📋 資料", speed = "🚀 極速", board = "🎯 盤面"
@@ -32,6 +34,12 @@ struct ContentView: View {
                     .font(.system(size: 11, weight: .semibold))
                     .padding(.horizontal, 12).padding(.vertical, 9)
                     .background(.black.opacity(0.78), in: Capsule())
+                    .gesture(DragGesture(minimumDistance: 8)
+                        .updating($hudDrag) { value, state, _ in state = value.translation }
+                        .onEnded { value in
+                            hudPosition.width += value.translation.width
+                            hudPosition.height += value.translation.height
+                        })
 
                     if toolsVisible {
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 5), count: 3), spacing: 5) {
@@ -49,12 +57,13 @@ struct ContentView: View {
                                 .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color(red: 0.94, green: 0.68, blue: 0.76).opacity(0.65), lineWidth: 0.7))
                             }
                         }
-                        .frame(width: 244)
+                        .frame(width: 210)
                     }
                 }
                 .foregroundStyle(.white)
                 .padding(.horizontal, 9)
                 .padding(.bottom, 22)
+                .offset(x: hudPosition.width + hudDrag.width, y: hudPosition.height + hudDrag.height)
                 .onAppear { toolsVisible = true }
             }
         }
