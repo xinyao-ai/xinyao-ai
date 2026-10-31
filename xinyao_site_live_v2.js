@@ -1219,10 +1219,7 @@
       existing.remove();
     }
 
-    let activePlatform =
-      normalizeGuidePlatform(
-        initialPlatform
-      );
+    let activePlatform = "ios";
 
     let desktopStepIndex = 0;
     let iosStepIndex = 0;
@@ -1318,18 +1315,7 @@
             </button>
           </div>
 
-          <div
-            style="
-              display:grid;
-              grid-template-columns:repeat(3,1fr);
-              gap:7px;
-              margin-top:14px;
-            "
-          >
-            <button class="xinyaoGuideTab" data-platform="desktop" type="button">💻 電腦</button>
-            <button class="xinyaoGuideTab" data-platform="ios" type="button">🍎 iOS</button>
-            <button class="xinyaoGuideTab" data-platform="android" type="button">🤖 Android</button>
-          </div>
+
         </div>
 
         <div
