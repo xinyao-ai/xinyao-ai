@@ -58,7 +58,7 @@ struct ContentView: View {
                 .onAppear { toolsVisible = true }
             }
         }
-        .onChange(of: page.isATGGame) { _, isGame in
+        .onChange(of: page.isATGGame) { isGame in
             toolsVisible = isGame
             if !isGame { selected = nil }
         }
