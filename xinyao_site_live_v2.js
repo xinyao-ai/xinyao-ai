@@ -3178,8 +3178,8 @@
     const capturedText = Number.isNaN(captured.getTime()) ? String(snapshot.capturedAt || '') : captured.toLocaleString('zh-TW');
 
     const topHtml = ranked.map((r, i) => `
-      <div style="display:grid;grid-template-columns:42px 70px 85px 85px 80px 1fr;gap:6px;align-items:center;padding:9px 0;border-bottom:1px solid #f4dce7;font-size:12px;">
-        <b style="color:#d94c89;">#${i + 1}</b><b>${roomNo(r.number)}</b><span>${pct(r.todayRate)}</span><span>${pct(r.totalRate)}</span><b style="color:#d94c89;">${r.observationScore.toFixed(1)}</b><span style="color:#8c6d7a;">${esc(r.reason)}</span>
+      <div style="display:grid;grid-template-columns:42px 70px 85px 85px 80px 1fr;gap:6px;align-items:center;padding:9px 0;border-bottom:1px solid #4c432e;font-size:12px;color:#f1dfb5;">
+        <b style="color:#e6bc64;">#${i + 1}</b><b>${roomNo(r.number)}</b><span>${pct(r.todayRate)}</span><span>${pct(r.totalRate)}</span><b style="color:#e6bc64;">${r.observationScore.toFixed(1)}</b><span style="color:#d1c2a3;">${esc(r.reason)}</span>
       </div>`).join('');
 
     const rowsHtml = rooms.map(r => `<tr>
@@ -3198,9 +3198,9 @@
           <button id="xinyaoRoomClear" type="button" style="border:1px solid #efcddd;background:#fff;color:#d94c89;border-radius:12px;padding:9px 12px;font-weight:800;cursor:pointer;">清除此批資料</button>
         </div>
 
-        <div style="margin-top:14px;padding:14px;border:1px solid #ffd7e8;background:#fff8fb;border-radius:16px;overflow:auto;">
-          <div style="font-weight:900;color:#d94c89;margin-bottom:7px;">🌸 優先觀察 TOP 10 空房</div>
-          ${topHtml || '<div style="padding:10px;color:#9b7d89;">目前沒有空房資料。</div>'}
+        <div style="margin-top:14px;padding:14px;border:1px solid #b89653;background:#102326;border-radius:16px;overflow:auto;">
+          <div style="font-weight:900;color:#e6bc64;margin-bottom:7px;">🏆 優先觀察 TOP 10 空房</div>
+          ${topHtml || '<div style="padding:10px;color:#e1d2b2;">目前沒有空房資料。</div>'}
         </div>
 
         <div style="margin-top:14px;display:grid;grid-template-columns:minmax(160px,1fr) 120px 140px;gap:8px;">
