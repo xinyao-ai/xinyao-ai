@@ -382,8 +382,7 @@
   <p class="muted">此功能獨立運作，不影響會員、維護、數據與原有後台設定。發佈後首頁自動讀取，建議等 1 分鐘再重新整理。</p>
   <div class="oracle-size-guide"><div><strong>電腦版</strong><b>1920 × 660 px</b><small>橫幅比例約 2.91:1</small></div><div><strong>手機版</strong><b>1200 × 490 px</b><small>橫幅比例約 2.45:1</small></div></div>
   <p class="muted">PNG／JPG／WebP，建議單張小於 4 MB；可分別上傳電腦與手機圖片。未提供手機圖時會使用電腦圖。</p>
-  <label for="oracleGithubToken">GitHub 寫入權杖（只在此頁記憶體使用，不儲存到網站）</label>
-  <input class="input" type="password" autocomplete="off" id="oracleGithubToken" placeholder="貼上 GitHub fine-grained token（Contents: Read and write）">
+  <p class="muted">🔒 已連接安全發布服務，發布輪播圖不用輸入 GitHub Token。</p>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
    <button type="button" class="btn soft" onclick="oracleLoadSlides()">↻ 重新讀取</button>
    <button type="button" class="btn soft" onclick="oracleAddSlide()">＋ 新增輪播圖</button>
@@ -1509,14 +1508,21 @@ document.addEventListener("DOMContentLoaded",()=>{
  function esc(v){return String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
  function decodeText(t){return decodeURIComponent(Array.from(atob(t.replace(/\\s/g,'')),c=>'%'+c.charCodeAt(0).toString(16).padStart(2,'0')).join(''))}
  function encodeText(t){return btoa(Array.from(new TextEncoder().encode(t),c=>String.fromCharCode(c)).join(''))}
- function ghToken(){return ($('oracleGithubToken')?.value||'').trim()}
+
+ const PUBLISH_API='https://oracle-carousel-publisher.love06130430.workers.dev';
  async function gh(path,method='GET',data=null){
-  const token=ghToken();if(!token)throw Error('請先輸入 GitHub 寫入權杖。');
-  const res=await fetch(base+path,{method,headers:{Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28',Authorization:'Bearer '+token,...(data?{'Content-Type':'application/json'}:{})},...(data?{body:JSON.stringify(data)}:{})});
-  const json=await res.json().catch(()=>({}));
-  if(!res.ok)throw Error('GitHub '+res.status+'：'+(json.message||'寫入失敗'));
-  return json;
+  const adminToken=sessionStorage.getItem('atg_admin_token');
+  if(!adminToken)throw Error('請先登入管理後台');
+  const response=await fetch(PUBLISH_API+'/publish',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+adminToken},
+    body:JSON.stringify({path,method,body:data})
+  });
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||!result.ok)throw Error(result.error||'發布失敗');
+  return result.data;
  }
+
  function edit(id,key,value){let s=slides.find(x=>x.id===id);if(s)s[key]=value}
  function makeRow(item,i){
   const card=document.createElement('div');card.className='oracle-edit-row';card.dataset.id=item.id;
@@ -1543,7 +1549,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   return 'https://xinyao-ai.github.io/xinyao-ai/'+path;
  }
  window.oraclePublishSlides=async function(){
-  if(busy)return;if(!ghToken()){msg('先填 GitHub 寫入權杖才能發佈。');return}
+  if(busy)return;
   if(slides.some(x=>!x.desktop&&!x._desktopFile)){msg('每張輪播圖都需要電腦圖片。');return}
   if(slides.some(x=>x.link&&!validURL(x.link))){msg('點擊網址格式不正確，請修正或清空。');return}
   if(!confirm('確定發佈 '+slides.length+' 張輪播圖到網站？'))return;
