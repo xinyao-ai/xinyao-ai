@@ -1,8 +1,6 @@
-const CACHE_NAME = "seth-oracle-v3";
+const CACHE_NAME = "seth-oracle-v4-20261101";
 
 const ASSETS = [
-  "./",
-  "./index.html",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
