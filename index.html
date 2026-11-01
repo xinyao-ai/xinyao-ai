@@ -3045,7 +3045,7 @@ box-shadow:0 12px 30px rgba(0,0,0,.33)!important;color:#f0dbad!important;
 #appPage #oracleBannerCarousel .oracle-banner-prev,
 #appPage #oracleBannerCarousel .oracle-banner-next{width:27px;height:32px}
 }
-</style><style id="oracle-carousel-no-manual-5082">#appPage #oracleBannerCarousel .oracle-banner-prev,#appPage #oracleBannerCarousel .oracle-banner-next,#appPage #oracleBannerCarousel .oracle-banner-dots{display:none!important}</style></head>
+</style></head>
 
 <body>
 
@@ -3185,6 +3185,8 @@ box-shadow:0 12px 30px rgba(0,0,0,.33)!important;color:#f0dbad!important;
         <div class="oracle-banner-slide"><span class="oracle-banner-placeholder">輪播圖預留位置 02</span></div>
         <div class="oracle-banner-slide"><span class="oracle-banner-placeholder">輪播圖預留位置 03</span></div>
       </div>
+      <button class="oracle-banner-prev" type="button" aria-label="上一張">‹</button>
+      <button class="oracle-banner-next" type="button" aria-label="下一張">›</button>
       <div class="oracle-banner-dots" aria-hidden="true" style="display:none!important"></div>
     </section>
 
@@ -4593,6 +4595,8 @@ function redraw(items){
 }
 async function load(){try{const r=await fetch('./carousel-config.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const cfg=await r.json();const items=(Array.isArray(cfg.slides)?cfg.slides:[]).filter(x=>x.enabled!==false&&typeof x.desktop==='string'&&/^https?:\/\//.test(x.desktop));redraw(items)}catch(e){console.warn('Carousel config unavailable',e)}}
 
+el.querySelector('.oracle-banner-prev')?.addEventListener('click',()=>{if(active)show(index-1)});
+el.querySelector('.oracle-banner-next')?.addEventListener('click',()=>{if(active)show(index+1)});
 load();
 setInterval(()=>{if(active&&!document.hidden)show(index+1)},6500);
 })();
