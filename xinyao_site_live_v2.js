@@ -2637,8 +2637,9 @@
       <div
         style="
           display:flex;
+          flex-direction:column;
+          align-items:center;
           gap:12px;
-          flex-wrap:wrap;
           margin-top:16px;
         "
       >
@@ -2669,8 +2670,9 @@
             border:0;
             border-radius:12px;
             padding:15px 26px;
-            min-width:150px;min-height:50px;
-            background:#d9ae5f;
+            min-width:190px;min-height:54px;
+            background:linear-gradient(135deg,#f9df8f 0%,#d7a94e 100%);
+            box-shadow:0 3px 12px rgba(218,166,70,.22);
             color:#172323;
             font-size:16px;
             font-weight:900;
