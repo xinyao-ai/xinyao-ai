@@ -2499,19 +2499,9 @@
               font-size:15px;
             "
           >
-            🔗 連接此裝置
+            🔗 連接賽特神諭配對碼
           </div>
 
-          <div
-            style="
-              font-size:11px;
-              color:#bdb3a0;
-              line-height:1.55;
-              margin-top:4px;
-            "
-          >
-            ${installHint()}
-          </div>
         </div>
 
         <span
@@ -2545,14 +2535,14 @@
           ? `
             <div
               style="
-                margin-top:10px;
-                padding:10px;
+                margin-top:14px;
+                padding:15px 16px;
                 border-radius:12px;
                 background:#102326;
                 border:1px solid #e0b96f;
-                font-size:12px;
-                color:#c2b290;
-                line-height:1.6;
+                font-size:14px;
+                color:#e7d7b7;
+                line-height:1.8;
               "
             >
               目前裝置：
@@ -2569,11 +2559,9 @@
                   : ''
               }
 
-              <br>
-
-              如要換手機或換電腦，
-              直接按「更換裝置」，
-              新裝置會自動取代舊裝置。
+              <div style="margin-top:10px;color:#d5c39e;font-size:13px;line-height:1.75;">
+                如要換手機或換電腦，直接按「更換裝置」，新裝置會自動取代舊裝置。
+              </div>
             </div>
           `
           : ''
@@ -2689,8 +2677,8 @@
         >
           ${
             bound
-              ? '② 更換裝置'
-              : '② 產生配對碼'
+              ? '更換裝置'
+              : '產生配對碼'
           }
         </button>
       </div>
