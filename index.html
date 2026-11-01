@@ -3029,6 +3029,22 @@ box-shadow:0 12px 30px rgba(0,0,0,.33)!important;color:#f0dbad!important;
 #xinyaoLiveDataPanel > .atg-live-actions { display:none!important; }
 #xinyaoLiveDataPanel #xinyaoDeviceConnectV2 { margin:0!important; }
 #xinyaoLiveDataPanel #xinyaoInstallProgramV2 { display:none!important; }
+</style><style id="oracle-carousel-clean-5081">
+/* Clean banner: no distracting overlays on a single announcement */
+#appPage #oracleBannerCarousel{border-radius:14px;box-shadow:none;border:1px solid #ac8847;background:#0b1e21}
+#appPage #oracleBannerCarousel .oracle-banner-prev,
+#appPage #oracleBannerCarousel .oracle-banner-next{width:28px;height:34px;font-size:20px;background:rgba(8,25,27,.65);border-color:rgba(207,167,92,.7);opacity:.7;transition:opacity .15s}
+#appPage #oracleBannerCarousel .oracle-banner-prev{left:5px}
+#appPage #oracleBannerCarousel .oracle-banner-next{right:5px}
+#appPage #oracleBannerCarousel .oracle-banner-prev:hover,
+#appPage #oracleBannerCarousel .oracle-banner-next:hover{opacity:1}
+#appPage #oracleBannerCarousel.oracle-single-slide .oracle-banner-prev,
+#appPage #oracleBannerCarousel.oracle-single-slide .oracle-banner-next,
+#appPage #oracleBannerCarousel.oracle-single-slide .oracle-banner-dots{display:none!important}
+@media(max-width:700px){
+#appPage #oracleBannerCarousel .oracle-banner-prev,
+#appPage #oracleBannerCarousel .oracle-banner-next{width:27px;height:32px}
+}
 </style></head>
 
 <body>
@@ -4561,7 +4577,7 @@ box-shadow:0 12px 30px rgba(0,0,0,.33)!important;color:#f0dbad!important;
   run();
 })();
 </script>
-<script id="oracle-carousel-script-5031">(function(){function boot(){const root=document.getElementById('oracleBannerCarousel');if(!root)return;const slides=[...root.querySelectorAll('.oracle-banner-slide')],dots=[...root.querySelectorAll('.oracle-banner-dots button')];let current=0;function go(n){current=(n+slides.length)%slides.length;slides.forEach((el,i)=>el.classList.toggle('is-active',i===current));dots.forEach((el,i)=>el.classList.toggle('is-active',i===current));}root.querySelector('.oracle-banner-prev').addEventListener('click',()=>go(current-1));root.querySelector('.oracle-banner-next').addEventListener('click',()=>go(current+1));dots.forEach((el,i)=>el.addEventListener('click',()=>go(i)));setInterval(()=>{if(!document.hidden)go(current+1)},6500);}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();})();</script><script id="oracle-carousel-live-config-5038">
+<script id="oracle-carousel-live-config-5038">
 (function(){
 const el=document.getElementById('oracleBannerCarousel');if(!el)return;
 const track=el.querySelector('.oracle-banner-track'), dots=el.querySelector('.oracle-banner-dots');
@@ -4575,7 +4591,7 @@ function redraw(items){
  mobile.media='(max-width:700px)';mobile.srcset=item.mobile||item.desktop;picture.appendChild(mobile);img.src=item.desktop;img.alt=item.title||'賽特神諭輪播圖 '+(i+1);img.loading=i===0?'eager':'lazy';picture.appendChild(img);
  if(item.link&&/^https?:\/\//.test(item.link)){const a=document.createElement('a');a.href=item.link;a.target='_blank';a.rel='noopener noreferrer';a.appendChild(picture);slide.appendChild(a)}else{picture.className='oracle-carousel-image';slide.appendChild(picture)}
  track.appendChild(slide);const dot=document.createElement('button');dot.type='button';dot.setAttribute('aria-label','第'+(i+1)+'張');dot.addEventListener('click',()=>show(i));dots.appendChild(dot)}
- show(0);active=true;
+ show(0);active=true;el.classList.toggle("oracle-single-slide",items.length===1);
 }
 async function load(){try{const r=await fetch('./carousel-config.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const cfg=await r.json();const items=(Array.isArray(cfg.slides)?cfg.slides:[]).filter(x=>x.enabled!==false&&typeof x.desktop==='string'&&/^https?:\/\//.test(x.desktop));redraw(items)}catch(e){console.warn('Carousel config unavailable',e)}}
 el.querySelector('.oracle-banner-prev')?.addEventListener('click',()=>{if(active)show(index-1)},true);
