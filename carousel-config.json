@@ -1,5 +1,14 @@
 {
   "version": 1,
   "intervalMs": 6500,
-  "slides": []
+  "slides": [
+    {
+      "id": "slide-1793540252224-b6exk",
+      "title": "",
+      "link": "",
+      "desktop": "https://xinyao-ai.github.io/xinyao-ai/assets/carousel/1793540264971-0-desktop.png",
+      "mobile": "https://xinyao-ai.github.io/xinyao-ai/assets/carousel/1793540268896-0-mobile.png",
+      "enabled": true
+    }
+  ]
 }
