@@ -2496,7 +2496,7 @@
             style="
               font-weight:900;
               color:#d9ae5f;
-              font-size:15px;
+              font-size:20px;line-height:1.4;letter-spacing:.3px;
             "
           >
             🔗 連接賽特神諭配對碼
@@ -2506,9 +2506,9 @@
 
         <span
           style="
-            font-size:11px;
+            font-size:13px;
             font-weight:800;
-            padding:6px 9px;
+            padding:8px 12px;
             border-radius:999px;
             background:${
               bound
@@ -2535,14 +2535,14 @@
           ? `
             <div
               style="
-                margin-top:14px;
-                padding:15px 16px;
+                margin-top:16px;
+                padding:18px 18px;
                 border-radius:12px;
                 background:#102326;
                 border:1px solid #e0b96f;
-                font-size:14px;
-                color:#e7d7b7;
-                line-height:1.8;
+                font-size:16px;
+                color:#f3e2bb;
+                line-height:1.85;
               "
             >
               目前裝置：
@@ -2559,7 +2559,7 @@
                   : ''
               }
 
-              <div style="margin-top:10px;color:#d5c39e;font-size:13px;line-height:1.75;">
+              <div style="margin-top:12px;color:#e8d5ac;font-size:15px;line-height:1.8;">
                 如要換手機或換電腦，直接按「更換裝置」，新裝置會自動取代舊裝置。
               </div>
             </div>
@@ -2637,9 +2637,9 @@
       <div
         style="
           display:flex;
-          gap:8px;
+          gap:12px;
           flex-wrap:wrap;
-          margin-top:11px;
+          margin-top:16px;
         "
       >
         <a
@@ -2649,12 +2649,13 @@
           rel="noopener noreferrer"
           style="
             text-decoration:none;
-            border-radius:11px;
-            padding:9px 12px;
+            border-radius:12px;
+            padding:15px 20px;
+            min-height:50px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;
             background:#0b191c;
             border:1px solid #e0b96f;
-            color:#d9ae5f;
-            font-size:12px;
+            color:#f4d487;
+            font-size:15px;
             font-weight:900;
           "
         >
@@ -2666,11 +2667,12 @@
           type="button"
           style="
             border:0;
-            border-radius:11px;
-            padding:9px 12px;
+            border-radius:12px;
+            padding:15px 26px;
+            min-width:150px;min-height:50px;
             background:#d9ae5f;
-            color:#25332b;
-            font-size:12px;
+            color:#172323;
+            font-size:16px;
             font-weight:900;
             cursor:pointer;
           "
@@ -2686,9 +2688,9 @@
       <div
         id="xinyaoDeviceHintV2"
         style="
-          margin-top:8px;
-          font-size:11px;
-          color:#bdb3a0;
+          margin-top:12px;
+          font-size:13px;
+          color:#d2c39e;
           line-height:1.55;
         "
       >
