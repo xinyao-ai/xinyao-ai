@@ -1509,11 +1509,11 @@ document.addEventListener("DOMContentLoaded",()=>{
  function decodeText(t){return decodeURIComponent(Array.from(atob(t.replace(/\\s/g,'')),c=>'%'+c.charCodeAt(0).toString(16).padStart(2,'0')).join(''))}
  function encodeText(t){return btoa(Array.from(new TextEncoder().encode(t),c=>String.fromCharCode(c)).join(''))}
 
- const PUBLISH_API='https://YOUR-CAROUSEL-WORKER.workers.dev';
+ const PUBLISH_API='https://oracle-carousel-publisher.love06130430.workers.dev';
  async function gh(path,method='GET',data=null){
   const adminToken=sessionStorage.getItem('atg_admin_token');
   if(!adminToken)throw Error('請先登入管理後台');
-  if(PUBLISH_API.includes('YOUR-CAROUSEL-WORKER'))throw Error('請先設定 Cloudflare Worker 網址');
+  
   const response=await fetch(PUBLISH_API+'/publish',{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+adminToken},
