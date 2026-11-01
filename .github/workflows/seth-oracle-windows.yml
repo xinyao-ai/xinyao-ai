@@ -10,7 +10,7 @@ on:
       - .github/workflows/seth-oracle-windows.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -34,3 +34,18 @@ jobs:
           path: dist/*.exe
           if-no-files-found: error
           retention-days: 14
+      - name: Prepare stable installer filename
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -Path dist -Filter '*.exe' | Where-Object { $_.Name -notlike '*uninstaller*' } | Select-Object -First 1
+          if (-not $installer) { throw 'Windows installer not found' }
+          Copy-Item -LiteralPath $installer.FullName -Destination 'dist/SethOracle-Windows-Setup.exe' -Force
+      - name: Publish stable Windows download
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: windows-stable
+          name: Seth Oracle Windows Stable
+          make_latest: false
+          files: dist/SethOracle-Windows-Setup.exe
+          overwrite_files: true
+          fail_on_unmatched_files: true
