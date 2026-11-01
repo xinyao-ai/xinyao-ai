@@ -15,9 +15,21 @@
   "build": {
     "appId": "tw.sethoracle.desktop",
     "productName": "賽特神諭",
-    "directories": {"output":"dist"},
-    "files": ["main.js","package.json"],
-    "win": {"target":"nsis"},
-    "nsis": {"oneClick":false,"allowToChangeInstallationDirectory":true}
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "package.json",
+      "icon-512.png"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "icon-512.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }
