@@ -14808,7 +14808,7 @@ try {
     panel.id = PANEL_ID;
     panel.innerHTML = `
       <div class="bp-head">
-        <div class="bp-title">🌸 芯瑤 ATG 盤面監測</div>
+        <div class="bp-title">✦ 賽特神諭 盤面監測</div>
         <div class="bp-mini">－</div>
       </div>
       <div class="bp-body"></div>
@@ -14935,7 +14935,7 @@ try {
         const mobile = xinyaoIsPhoneUi();
         title.textContent = mobile && probe.minimized
           ? (probe.signalScore > 0 ? `📡 盤面 ${probe.signalScore}%` : '📡 盤面監測')
-          : '🌸 芯瑤 ATG 盤面監測';
+          : '✦ 賽特神諭 盤面監測';
       }
     }
 
