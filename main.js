@@ -1,5 +1,7 @@
 'use strict';
 const { app, BrowserWindow, net, dialog } = require('electron');
+const path = require('path');
+const APP_ICON = path.join(__dirname, 'icon-512.png');
 
 const SITE = 'https://xinyao-ai.github.io/xinyao-ai/';
 const SCRIPT_URL = 'https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/main/xinyao_ATG_live.user.js';
@@ -86,7 +88,7 @@ function setupInjection(contents) {
       return {
         action: 'allow',
         overrideBrowserWindowOptions: {
-          title: '賽特神諭｜ATG', autoHideMenuBar: true,
+          title: '賽特神諭｜ATG', icon: APP_ICON, autoHideMenuBar: true,
           width: 1180, height: 850,
           webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true }
         }
@@ -112,7 +114,7 @@ app.whenReady().then(async () => {
   // delegate the game to the operating system default browser.
   const mainWindow = new BrowserWindow({
     width: 1200, height: 850, minWidth: 400, minHeight: 650,
-    title: '賽特神諭', autoHideMenuBar: true,
+    title: '賽特神諭', icon: APP_ICON, autoHideMenuBar: true,
     webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true }
   });
   setupInjection(mainWindow.webContents);
@@ -121,7 +123,7 @@ app.whenReady().then(async () => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       const win = new BrowserWindow({
-        width: 1200, height: 850, title: '賽特神諭',
+        width: 1200, height: 850, title: '賽特神諭', icon: APP_ICON,
         webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true }
       });
       setupInjection(win.webContents);
