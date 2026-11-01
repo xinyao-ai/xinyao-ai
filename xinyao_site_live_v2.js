@@ -2673,8 +2673,11 @@
             width:100%;max-width:440px;min-height:56px;box-sizing:border-box;
             background:#e7bc64!important;
             box-shadow:0 3px 12px rgba(218,166,70,.22);
-            color:#172323;
-            font-size:16px;
+            color:#101b1b!important;
+            -webkit-text-fill-color:#101b1b!important;
+            text-shadow:none!important;
+            opacity:1!important;
+            font-size:18px!important;
             font-weight:900;
             cursor:pointer;
           "
