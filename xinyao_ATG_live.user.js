@@ -14638,18 +14638,18 @@ try {
       #${PANEL_ID} .bp-profile-menu.open{display:block}
       #${PANEL_ID} .bp-profile-option{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid transparent;border-radius:7px;background:transparent;color:rgba(255,255,255,.82);padding:7px 8px;margin:0 0 3px;font-size:9px;font-weight:850;text-align:left;cursor:pointer}
       #${PANEL_ID} .bp-profile-option:last-child{margin-bottom:0}
-      #${PANEL_ID} .bp-profile-option.active{border-color:rgba(255,95,158,.40);background:rgba(255,95,158,.13);color:#ffe69b}
-      #${PANEL_ID} .bp-profile-check{color:#ff9fc4;font-weight:950}
+      #${PANEL_ID} .bp-profile-option.active{border-color:rgba(218,170,72,.40);background:rgba(218,170,72,.13);color:#ffe69b}
+      #${PANEL_ID} .bp-profile-check{color:#e6b954;font-weight:950}
       #${PANEL_ID} .bp-signal{margin-top:7px;padding:7px 8px;border:1px solid rgba(255,255,255,.10);border-radius:9px;background:rgba(255,255,255,.035)}
-      #${PANEL_ID} .bp-signal.hot{border-color:rgba(255,95,158,.62);background:rgba(255,215,89,.09);box-shadow:0 0 0 1px rgba(255,95,158,.08) inset}
+      #${PANEL_ID} .bp-signal.hot{border-color:rgba(218,170,72,.62);background:rgba(255,215,89,.09);box-shadow:0 0 0 1px rgba(218,170,72,.08) inset}
       #${PANEL_ID} .bp-signal-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:9px}
-      #${PANEL_ID} .bp-signal-row b{font-size:10px;color:#ffb8d4}
+      #${PANEL_ID} .bp-signal-row b{font-size:10px;color:#f3c96d}
       #${PANEL_ID} .bp-signal-state{font-weight:850;opacity:.82}
       #${PANEL_ID} .bp-signal-bar{height:4px;margin-top:5px;border-radius:999px;background:rgba(255,255,255,.09);overflow:hidden}
-      #${PANEL_ID} .bp-signal-bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#ff7bac,#ff3d8b);transition:width .2s ease}
+      #${PANEL_ID} .bp-signal-bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#e8bd5c,#b88224);transition:width .2s ease}
       #${PANEL_ID} .bp-signal-reason{margin-top:5px;font-size:7px;line-height:1.35;opacity:.62}
-      #${PANEL_ID} .bp-autostop{margin-top:5px;width:100%;border:1px solid rgba(255,184,212,.20);border-radius:6px;background:rgba(255,255,255,.04);color:#fff;padding:3px;font-size:7px;font-weight:850;cursor:pointer}
-      #${PANEL_ID} .bp-autostop.on{color:#ffcae0;border-color:rgba(255,95,158,.32)}
+      #${PANEL_ID} .bp-autostop{margin-top:5px;width:100%;border:1px solid rgba(218,170,72,.20);border-radius:6px;background:rgba(255,255,255,.04);color:#fff;padding:3px;font-size:7px;font-weight:850;cursor:pointer}
+      #${PANEL_ID} .bp-autostop.on{color:#ffcae0;border-color:rgba(218,170,72,.32)}
       #${PANEL_ID} .bp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:7px}
       /* 孫行者：卡片使用一致正常尺寸，移除圖案 ID 與名稱，只留圖片和次數。 */
       #${PANEL_ID} .bp-grid.bp-wuxia-compact .bp-icon{transform:none!important;max-width:40px!important;max-height:40px!important}
@@ -14691,7 +14691,7 @@ try {
       #${PANEL_ID} .bp-unknown{display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);color:#9eb4c7;font-size:18px;font-weight:900}
       #${PANEL_ID} .bp-name{display:block;margin-top:2px;font-size:8px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.80}
       #${PANEL_ID} .bp-seq-title{margin-top:8px;font-size:9px;font-weight:850;opacity:.78}
-      #${PANEL_ID} .bp-board-toggle{width:100%;margin-top:7px;border:1px solid rgba(255,184,212,.26);border-radius:7px;background:rgba(255,95,158,.08);color:#ffd5e6;padding:5px;font-size:8px;font-weight:850;cursor:pointer}
+      #${PANEL_ID} .bp-board-toggle{width:100%;margin-top:7px;border:1px solid rgba(218,170,72,.26);border-radius:7px;background:rgba(218,170,72,.08);color:#f8e6bd;padding:5px;font-size:8px;font-weight:850;cursor:pointer}
       #${PANEL_ID} .bp-stop-learn{width:100%;margin-top:5px;border:1px solid rgba(125,236,183,.34);border-radius:7px;background:rgba(63,191,126,.10);color:#c8f8dc;padding:5px;font-size:8px;font-weight:900;cursor:pointer}
       #${PANEL_ID} .bp-stop-test{width:100%;margin-top:4px;border:1px solid rgba(255,210,96,.34);border-radius:7px;background:rgba(255,196,64,.08);color:#ffe2a0;padding:5px;font-size:8px;font-weight:900;cursor:pointer}
       #${PANEL_ID} .bp-board-wrap{display:none}
@@ -14699,7 +14699,7 @@ try {
       #${PANEL_ID} .bp-seq-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;margin-top:5px}
       #${PANEL_ID} .bp-cell{position:relative;display:flex;align-items:center;justify-content:center;min-height:26px;padding:3px;border-radius:7px;background:rgba(255,255,255,.06);font-size:9px;font-weight:900}
       #${PANEL_ID} .bp-cell i{position:absolute;top:1px;left:3px;font-size:6px;font-style:normal;opacity:.35}
-      #${PANEL_ID} .bp-count{display:block;margin-top:2px;color:#ffb8d4;font-size:12px;font-weight:950}
+      #${PANEL_ID} .bp-count{display:block;margin-top:2px;color:#f3c96d;font-size:12px;font-weight:950}
       #${PANEL_ID} .bp-path{margin-top:7px;padding-top:6px;border-top:1px solid rgba(255,255,255,.14);font-size:8px;line-height:1.35;opacity:.46;word-break:break-all}
       #${PANEL_ID}.min .bp-body{display:none}
       html.xinyao-phone-ui #${PANEL_ID}{
