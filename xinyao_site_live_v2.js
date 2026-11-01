@@ -3732,6 +3732,23 @@
       .xinyao-history-heading{font-size:12px;color:#e6bc64;font-weight:900;margin-bottom:7px}
       .xinyao-history-row{display:grid;grid-template-columns:90px repeat(6,minmax(72px,1fr)) 130px;gap:8px;align-items:center;padding:11px;border:1px solid #aa8747;border-radius:14px;background:#122526;margin-bottom:8px;font-size:12px;overflow:auto}
       .xinyao-history-row{color:#f1dfb5}.xinyao-history-row b{color:#f3deac}.xinyao-history-row>div{display:flex;flex-direction:column;gap:2px;white-space:nowrap}.xinyao-history-row small{font-size:10px;color:#c2b08e}.xinyao-history-status{font-size:10px;color:#e6bc64}.xinyao-history-time{color:#c8b489;font-size:10px}
+      /* v5074: 強制覆蓋舊版粉白色主題與外部卡片預設樣式 */
+      #xinyaoCurrentRoomPanel .xinyao-current-card,
+      #xinyaoPlayHistoryPanel .xinyao-history-row{background:#112326!important;background-color:#112326!important;border:1px solid #bc984f!important;color:#f3dfb1!important;box-shadow:none!important}
+      #xinyaoCurrentRoomPanel .xinyao-current-label,
+      #xinyaoPlayHistoryPanel .xinyao-history-row small,
+      #xinyaoPlayHistoryPanel .xinyao-history-time{color:#cbb58a!important}
+      #xinyaoCurrentRoomPanel .xinyao-current-value,
+      #xinyaoCurrentRoomPanel .xinyao-current-value b,
+      #xinyaoPlayHistoryPanel .xinyao-history-row b{color:#f7e2b2!important}
+      #xinyaoCurrentRoomPanel .xinyao-current-note{color:#cbb58a!important}
+      #xinyaoCurrentRoomPanel .xinyao-room-badge{background:#26352e!important;border-color:#b9914b!important;color:#f3c866!important}
+      #xinyaoPlayHistoryPanel .xinyao-history-heading,
+      #xinyaoPlayHistoryPanel .xinyao-history-status{color:#eac16b!important}
+      #xinyaoCurrentRoomPanel .xinyao-negative,
+      #xinyaoPlayHistoryPanel .xinyao-negative{color:#ff7777!important}
+      #xinyaoCurrentRoomPanel .xinyao-positive,
+      #xinyaoPlayHistoryPanel .xinyao-positive{color:#6bd7a9!important}
       @media(max-width:900px){.xinyao-current-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.xinyao-history-row{grid-template-columns:repeat(4,minmax(80px,1fr));}}
     `;
     document.head.appendChild(style);
