@@ -2670,8 +2670,8 @@
             border:0;
             border-radius:12px;
             padding:15px 26px;
-            min-width:190px;min-height:54px;
-            background:linear-gradient(135deg,#f9df8f 0%,#d7a94e 100%);
+            width:100%;max-width:440px;min-height:56px;box-sizing:border-box;
+            background:#e7bc64!important;
             box-shadow:0 3px 12px rgba(218,166,70,.22);
             color:#172323;
             font-size:16px;
