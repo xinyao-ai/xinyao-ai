@@ -15760,8 +15760,8 @@ if (document.readyState === 'loading') {
         <button type="button" class="qh-btn result" data-qh="result" title="下輪開獎結果" aria-label="下輪開獎結果">
           <span class="qh-icon">💎</span><span class="qh-label">結果</span>
         </button>
-        <button type="button" class="qh-btn side" data-qh="side" title="左右換邊" aria-label="左右換邊">
-          <span class="qh-icon">↔️</span><span class="qh-label">換邊</span>
+        <button type="button" class="qh-btn side" data-qh="home" title="返回賽特神諭首頁" aria-label="返回賽特神諭首頁">
+          <span class="qh-icon">🚪</span><span class="qh-label">首頁</span>
         </button>
       </div>
     `;
@@ -15821,10 +15821,9 @@ if (document.readyState === 'loading') {
         return;
       }
 
-      if (action === 'side') {
-        side = side === 'left' ? 'right' : 'left';
-        try { localStorage.setItem(SIDE_KEY, side); } catch (_) {}
-        hud.classList.toggle('right', side === 'right');
+      if (action === 'home') {
+        window.location.assign('https://xinyao-ai.github.io/xinyao-ai/');
+        return;
       }
     });
 
