@@ -3090,7 +3090,21 @@ document.addEventListener('click',function(ev){
 /* Disable logged-in top-left logo floating */
 #appPage .app-topbar .brand-icon{animation:none!important;transform:none!important;}
 </style>
-</head>
+<style id="oracle-login-header-carousel-5024">
+#loginPage .login-shell-539>.login-brand-539{order:0!important;display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:8px!important;padding:0 0 7px!important;margin:0!important;text-align:left!important;width:100%!important}
+#loginPage .login-brand-539 .login-logo-wrap-539{width:43px!important;height:43px!important;min-width:43px!important;margin:0!important;display:flex!important;align-items:center!important;justify-content:center!important}
+#loginPage .login-brand-539 .login-logo-539{width:42px!important;height:42px!important;min-width:42px!important;border-radius:9px!important;border:1px solid #b89450!important;animation:none!important;transform:none!important}
+#loginPage .login-brand-539 .login-main-title-539{margin:0!important;padding:0!important;line-height:1!important;display:flex!important;align-items:center!important;width:auto!important}
+#loginPage .login-brand-539 .oracle-login-hd-title{display:block!important;width:135px!important;max-width:35vw!important;height:auto!important;max-height:48px!important;animation:none!important;transform:none!important}
+#loginPage .login-shell-539>#oracleLoginBannerCarousel{order:1!important;width:100%!important;display:block!important;min-height:0!important;aspect-ratio:2.9/1!important;max-height:none!important;margin:0 0 14px!important;border-radius:14px!important;box-shadow:none!important}
+#loginPage .login-shell-539>.login-form-card-539{order:2!important}
+#loginPage .login-shell-539>.oracle-downloads{order:3!important}
+#loginPage .login-shell-539>.public-win-login{order:4!important}
+#loginPage .login-shell-539>.oracle-guide-card{order:5!important}
+#oracleLoginBannerCarousel .oracle-banner-slide picture,#oracleLoginBannerCarousel .oracle-banner-slide a{display:block;width:100%;height:100%}
+#oracleLoginBannerCarousel .oracle-banner-slide img{width:100%;height:100%;object-fit:cover}
+#oracleLoginBannerCarousel.oracle-single-slide .oracle-banner-prev,#oracleLoginBannerCarousel.oracle-single-slide .oracle-banner-next{display:none!important}
+</style></head>
 
 <body>
 
@@ -3142,7 +3156,12 @@ document.addEventListener('click',function(ev){
           <img src="./icon-192.png?rev=oracle-20261028-2" alt="賽特神諭" class="login-logo-539">
         </div>
         <h2 class="login-main-title-539"><img class="oracle-login-hd-title" src="./assets/oracle-title-hd.png?v=5042" alt="賽特神諭" width="2048" height="684"></h2>
-        
+      </section>
+      <section id="oracleLoginBannerCarousel" class="oracle-banner-carousel" aria-label="登入頁公告輪播">
+        <div class="oracle-banner-track"><div class="oracle-banner-slide is-active"><span class="oracle-banner-placeholder">公告輪播載入中</span></div></div>
+        <button class="oracle-banner-prev" type="button" aria-label="上一張">‹</button>
+        <button class="oracle-banner-next" type="button" aria-label="下一張">›</button>
+        <div class="oracle-banner-dots" aria-hidden="true" style="display:none!important"></div>
       </section>
 
       <section class="login-form-card-539">
@@ -4628,7 +4647,8 @@ document.addEventListener('click',function(ev){
 </script>
 <script id="oracle-carousel-live-config-5038">
 (function(){
-const el=document.getElementById('oracleBannerCarousel');if(!el)return;
+const carousels=[document.getElementById('oracleBannerCarousel'),document.getElementById('oracleLoginBannerCarousel')].filter(Boolean);
+carousels.forEach(function(el){
 const track=el.querySelector('.oracle-banner-track'), dots=el.querySelector('.oracle-banner-dots');
 let index=0,active=false;
 function show(n){const slides=[...track.children];if(!slides.length)return;index=(n+slides.length)%slides.length;slides.forEach((slide,i)=>slide.classList.toggle('is-active',i===index));[...dots.children].forEach((btn,i)=>btn.classList.toggle('is-active',i===index))}
@@ -4648,6 +4668,7 @@ el.querySelector('.oracle-banner-prev')?.addEventListener('click',()=>{if(active
 el.querySelector('.oracle-banner-next')?.addEventListener('click',()=>{if(active)show(index+1)});
 load();
 setInterval(()=>{if(active&&!document.hidden)show(index+1)},6500);
+});
 })();
 </script></body>
 </html>
