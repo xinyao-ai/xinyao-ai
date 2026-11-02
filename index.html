@@ -3050,7 +3050,36 @@ box-shadow:0 12px 30px rgba(0,0,0,.33)!important;color:#f0dbad!important;
 #appPage #oracleBannerCarousel .oracle-banner-prev,
 #appPage #oracleBannerCarousel .oracle-banner-next{width:27px;height:32px}
 }
-</style></head>
+</style><style>
+/* 賽特神諭｜登入頁使用流程（獨立樣式，不影響其他功能） */
+.oracle-guide-card{margin-top:18px;padding:16px;border:1px solid #bc9140;border-radius:22px;background:linear-gradient(155deg,#f0dfba,#e5d0a7);color:#463316;box-shadow:0 12px 24px rgba(0,0,0,.22);text-align:left}
+.oracle-guide-tabs{display:grid;grid-template-columns:1fr 1fr;overflow:hidden;border:1px solid #c79b48;border-radius:13px;background:#f9f0dd}
+.oracle-guide-tab{min-height:45px;border:0;border-radius:0;background:transparent;color:#795b2a;font-size:15px;font-weight:900;cursor:pointer;box-shadow:none}
+.oracle-guide-tab.is-active{background:linear-gradient(#f2d887,#cb9d39);color:#342407}
+.oracle-guide-intro{margin:16px 1px 14px;color:#795e38;font-size:13px;line-height:1.65}
+.oracle-guide-step{display:flex;align-items:flex-start;gap:12px;margin:11px 0;padding:16px 14px;border:1px solid #d3ae66;border-radius:13px;background:#fff7e9;box-shadow:0 2px 6px rgba(91,58,10,.06)}
+.oracle-guide-number{display:flex;justify-content:center;align-items:center;flex:0 0 31px;width:31px;height:31px;border-radius:50%;background:linear-gradient(#f0d786,#c99a36);color:#382808;font-weight:900}
+.oracle-guide-step strong,.oracle-guide-faq strong{display:block;font-size:15px;color:#4a3419}
+.oracle-guide-step p,.oracle-guide-faq p{margin:5px 0 0;color:#917248;font-size:13px;line-height:1.6}
+.oracle-guide-faq{margin:12px 0;padding:14px;border:1px solid #d3ae66;border-radius:13px;background:#fff7e9}
+.oracle-guide-primary{display:flex;align-items:center;justify-content:center;min-height:51px;margin-top:14px;border-radius:28px;background:linear-gradient(#f0d786,#c99a36);color:#382808!important;text-decoration:none;font-size:16px;font-weight:900}
+.oracle-guide-small{text-align:center;margin:13px 0 0;color:#805b26;font-size:12px;font-weight:800}
+.oracle-guide-line{display:flex;align-items:center;justify-content:center;min-height:42px;margin-top:10px;border:1px solid #1fa766;border-radius:25px;background:#0b9e5c;color:#fff!important;text-decoration:none;font-size:14px;font-weight:800}
+.oracle-guide-panel[hidden]{display:none!important}
+</style>
+<script>
+document.addEventListener('click',function(ev){
+  var btn=ev.target.closest('.oracle-guide-tab');
+  if(!btn)return;
+  var card=btn.closest('.oracle-guide-card');
+  if(!card)return;
+  card.querySelectorAll('.oracle-guide-tab').forEach(function(tab){
+    var active=tab===btn;tab.classList.toggle('is-active',active);tab.setAttribute('aria-selected',String(active));
+  });
+  card.querySelectorAll('.oracle-guide-panel').forEach(function(panel){panel.hidden=panel.dataset.guidePanel!==btn.dataset.guide;});
+});
+</script>
+</head>
 
 <body>
 
@@ -3144,16 +3173,26 @@ box-shadow:0 12px 30px rgba(0,0,0,.33)!important;color:#f0dbad!important;
         </div>
       </section>
 
-      <section class="login-notice-card login-notice-539">
-        <div class="login-notice-title">📣 登入須知</div>
-        <div class="login-notice-line">需完成 <strong>皇鼎平台註冊</strong> 才可登入分析系統</div>
-        <div class="login-notice-line">🔔 務必輸入您的【<strong>皇鼎會員帳號</strong>】</div>
-        <div class="login-notice-line line-contact-row">
-          <span class="contact-text">⚠️ 若無法登入，至 LINE 官方聯繫我即可</span>
-          <a class="login-line-button" href="https://lin.ee/OT3Ngd6" target="_blank" rel="noopener noreferrer">💬 官方LINE</a>
+      <section class="oracle-guide-card" aria-label="賽特神諭使用流程">
+        <div class="oracle-guide-tabs">
+          <button type="button" class="oracle-guide-tab is-active" data-guide="steps" aria-selected="true">使用流程</button>
+          <button type="button" class="oracle-guide-tab" data-guide="faq" aria-selected="false">常見問題</button>
         </div>
-        <a class="register-now-button" href="https://hd5577.com/" target="_blank" rel="noopener noreferrer">✨ 立即註冊</a>
-        <div class="agent-empty-tip">🔴【代理帳號】留空即可</div>
+        <div class="oracle-guide-panel" data-guide-panel="steps">
+          <p class="oracle-guide-intro">三步驟，輕鬆開始使用。需要協助可聯繫 LINE 官方客服。</p>
+          <div class="oracle-guide-step"><span class="oracle-guide-number">1</span><div><strong>註冊皇鼎會員帳號</strong><p>點選下方「開始自助開通」，依照平台指示完成註冊。</p></div></div>
+          <div class="oracle-guide-step"><span class="oracle-guide-number">2</span><div><strong>下載賽特神諭 APP</strong><p>上方提供 Windows、Android 下載與 iOS 安裝教學。</p></div></div>
+          <div class="oracle-guide-step"><span class="oracle-guide-number">3</span><div><strong>登入分析系統</strong><p>使用皇鼎會員帳號登入賽特神諭，開始使用分析功能。</p></div></div>
+          <a class="oracle-guide-primary" href="https://hd5577.com/" target="_blank" rel="noopener noreferrer">開始自助開通 ›</a>
+          <p class="oracle-guide-small">🔴【代理帳號】留空即可</p>
+        </div>
+        <div class="oracle-guide-panel" data-guide-panel="faq" hidden>
+          <div class="oracle-guide-faq"><strong>需要先註冊皇鼎嗎？</strong><p>是的，請先完成皇鼎會員註冊，再登入分析系統。</p></div>
+          <div class="oracle-guide-faq"><strong>登入時要輸入哪個帳號？</strong><p>請輸入皇鼎會員帳號，而不是暱稱。</p></div>
+          <div class="oracle-guide-faq"><strong>無法登入怎麼辦？</strong><p>可透過下方 LINE 官方客服聯繫協助。</p></div>
+          <a class="oracle-guide-primary" href="https://hd5577.com/" target="_blank" rel="noopener noreferrer">立即註冊 ›</a>
+        </div>
+        <a class="oracle-guide-line" href="https://lin.ee/OT3Ngd6" target="_blank" rel="noopener noreferrer">💬 LINE 客服開通</a>
       </section>
 
     </div>
