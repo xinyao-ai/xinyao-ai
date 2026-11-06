@@ -3202,14 +3202,8 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
 
       <section class="login-form-card-539">
         <h3>✨ 會員登入</h3>
-        <label for="memberAccount">會員帳號</label>
-        <div class="login-input-wrap-539">
-          <input id="memberAccount" type="text" placeholder="請輸入會員帳號" autocomplete="username">
-          <span class="login-user-icon-539" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="7.5" r="4.2" fill="#E8BC68"/><path d="M3.4 21c.2-5.1 3.8-8 8.6-8s8.4 2.9 8.6 8H3.4Z" fill="#E8BC68"/></svg></span>
-        </div>
-        <button id="oracleHdSsoLogin" type="button" aria-label="使用皇鼎會員帳號登入">🔐 皇鼎會員一鍵登入</button>
-        <div class="oracle-sso-hint">使用皇鼎會員帳號驗證，無需另設密碼</div>
-        <button id="loginButton" type="button">✨ 登入分析系統</button>
+        <div hidden style="display:none!important" aria-hidden="true"><label for="memberAccount">會員帳號</label><input id="memberAccount" type="text" autocomplete="username" tabindex="-1"><button id="loginButton" type="button" tabindex="-1">登入分析系統</button></div>
+        <button id="oracleHdSsoLogin" type="button" aria-label="使用皇鼎會員帳號登入" style="display:block!important;width:100%!important;margin:14px 0 4px!important;padding:18px 14px!important;border:1px solid #f6d782!important;border-radius:14px!important;background:linear-gradient(110deg,#fbe398,#d8a640 52%,#f2d47a)!important;color:#241806!important;font-size:18px!important;font-weight:900!important;text-align:center!important;cursor:pointer!important">🔐 皇鼎會員一鍵登入</button>
         <div id="loginMessage" class="login-message-539"></div>
       </section>
 
