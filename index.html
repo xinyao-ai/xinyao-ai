@@ -3125,6 +3125,21 @@ document.addEventListener('click',function(ev){
 #loginPage #oracleHdSsoLogin:disabled{opacity:.7;cursor:wait}
 #loginPage .oracle-sso-hint{text-align:center;font-size:12px;color:#d6c39a;margin:6px 0 2px}
 </style>
+<style id="oracle-hd-sso-single-button-5083">
+/* 登入區只顯示皇鼎 SSO 按鈕；保留原有登入邏輯供相容使用。 */
+#loginPage .login-form-card-539 label[for="memberAccount"],
+#loginPage .login-form-card-539 .login-input-wrap-539,
+#loginPage .login-form-card-539 #loginButton,
+#loginPage .login-form-card-539 .oracle-sso-hint{display:none!important}
+#loginPage .login-form-card-539 #oracleHdSsoLogin{
+display:block!important;width:100%!important;margin:14px 0 4px!important;
+padding:17px 14px!important;border:1px solid #f6d782!important;
+border-radius:14px!important;background:linear-gradient(110deg,#fbe398 0%,#d8a640 52%,#f2d47a 100%)!important;
+color:#241806!important;font-weight:900!important;font-size:17px!important;letter-spacing:.3px!important;
+text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(218,168,70,.25)!important}
+#loginPage .login-form-card-539 #oracleHdSsoLogin:hover{filter:brightness(1.08)}
+#loginPage .login-form-card-539 #oracleHdSsoLogin:disabled{opacity:.7;cursor:wait!important}
+</style>
 </head>
 
 <body>
