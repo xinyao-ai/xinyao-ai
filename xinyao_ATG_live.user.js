@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.55
+// @version      4.1.56
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -15266,24 +15266,24 @@ const xinyaoStartRiskGuardAtReady = () => {
     const el=document.createElement('style');
     el.id=STYLE_ID;
     el.textContent=
-      '#'+PANEL_ID+'{position:fixed;z-index:2147483647;left:50%;top:50%;transform:translate(-50%,-50%);width:min(560px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto;box-sizing:border-box;padding:18px;border:1px solid rgba(234,190,91,.65);border-radius:20px;background:rgba(17,15,22,.965);color:#fff;box-shadow:0 22px 70px rgba(0,0,0,.55);backdrop-filter:blur(14px);font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif}'+
+      '#'+PANEL_ID+'{position:fixed;z-index:2147483647;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,calc(100vw - 28px));max-height:min(650px,calc(100dvh - 36px));overflow:auto;box-sizing:border-box;padding:13px;border:1px solid rgba(234,190,91,.65);border-radius:16px;background:rgba(17,15,22,.965);color:#fff;box-shadow:0 22px 70px rgba(0,0,0,.55);backdrop-filter:blur(14px);font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif}'+
       '#'+PANEL_ID+' .rg-head{display:flex;align-items:center;justify-content:space-between;gap:12px}'+
-      '#'+PANEL_ID+' .rg-title{font-size:18px;font-weight:950;color:#f5d784}'+
-      '#'+PANEL_ID+' .rg-close{border:0;background:transparent;color:#fff;font-size:24px;cursor:pointer;opacity:.7}'+
-      '#'+PANEL_ID+' .rg-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-top:1px solid rgba(255,255,255,.08)}'+
-      '#'+PANEL_ID+' .rg-label{font-size:13px;font-weight:900}'+
+      '#'+PANEL_ID+' .rg-title{font-size:16px;font-weight:950;color:#f5d784}'+
+      '#'+PANEL_ID+' .rg-close{border:0;background:transparent;color:#fff;font-size:21px;cursor:pointer;opacity:.7}'+
+      '#'+PANEL_ID+' .rg-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.08)}'+
+      '#'+PANEL_ID+' .rg-label{font-size:12px;font-weight:900}'+
       '#'+PANEL_ID+' .rg-sub{font-size:10px;opacity:.62;margin-top:3px}'+
-      '#'+PANEL_ID+' .rg-switch{position:relative;width:54px;height:30px;flex:0 0 54px;border:0;border-radius:999px;background:rgba(255,255,255,.13);cursor:pointer}'+
-      '#'+PANEL_ID+' .rg-switch:after{content:"";position:absolute;left:4px;top:4px;width:22px;height:22px;border-radius:50%;background:#d9d0d4;transition:.18s}'+
+      '#'+PANEL_ID+' .rg-switch{position:relative;width:48px;height:27px;flex:0 0 48px;border:0;border-radius:999px;background:rgba(255,255,255,.13);cursor:pointer}'+
+      '#'+PANEL_ID+' .rg-switch:after{content:"";position:absolute;left:4px;top:4px;width:19px;height:19px;border-radius:50%;background:#d9d0d4;transition:.18s}'+
       '#'+PANEL_ID+' .rg-switch.on{background:linear-gradient(135deg,#f4d472,#c99231)}'+
-      '#'+PANEL_ID+' .rg-switch.on:after{transform:translateX(24px);background:#fff}'+
-      '#'+PANEL_ID+' .rg-pnl{font-size:36px;font-weight:1000;text-align:center;margin:12px 0 14px}'+
+      '#'+PANEL_ID+' .rg-switch.on:after{transform:translateX(21px);background:#fff}'+
+      '#'+PANEL_ID+' .rg-pnl{font-size:29px;font-weight:1000;text-align:center;margin:8px 0 10px}'+
       '#'+PANEL_ID+' .rg-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}'+
-      '#'+PANEL_ID+' .rg-btn{border:1px solid rgba(230,184,83,.55);border-radius:11px;background:rgba(220,170,66,.11);color:#fff;padding:10px;font-size:13px;font-weight:950;cursor:pointer}'+
+      '#'+PANEL_ID+' .rg-btn{border:1px solid rgba(230,184,83,.55);border-radius:11px;background:rgba(220,170,66,.11);color:#fff;padding:8px;font-size:12px;font-weight:950;cursor:pointer}'+
       '#'+PANEL_ID+' .rg-btn.primary{background:linear-gradient(135deg,#ffe58b,#d9a139);border-color:#f1ce76;color:#211708}'+
-      '#'+PANEL_ID+' .rg-number{display:grid;grid-template-columns:40px 1fr 40px;gap:6px;margin-top:7px}'+
-      '#'+PANEL_ID+' .rg-number button{height:36px;border:1px solid rgba(230,184,83,.35);border-radius:9px;background:rgba(255,255,255,.045);color:#fff;font-size:20px;font-weight:900;cursor:pointer}'+
-      '#'+PANEL_ID+' .rg-number input{height:36px;box-sizing:border-box;border:1px solid rgba(230,184,83,.32);border-radius:9px;background:rgba(255,255,255,.055);color:#fff;text-align:center;font-size:16px;font-weight:950;outline:none;width:100%}'+
+      '#'+PANEL_ID+' .rg-number{display:grid;grid-template-columns:34px minmax(0,1fr) 34px;gap:6px;margin-top:5px}'+
+      '#'+PANEL_ID+' .rg-number button{height:32px;border:1px solid rgba(230,184,83,.35);border-radius:9px;background:rgba(255,255,255,.045);color:#fff;font-size:20px;font-weight:900;cursor:pointer}'+
+      '#'+PANEL_ID+' .rg-number input{height:32px;box-sizing:border-box;border:1px solid rgba(230,184,83,.32);border-radius:9px;background:rgba(255,255,255,.055);color:#fff;text-align:center;font-size:16px;font-weight:950;outline:none;width:100%}'+
       '#'+PANEL_ID+' .rg-status{margin-top:12px;padding:9px 10px;border:1px solid rgba(230,184,83,.20);border-radius:10px;background:rgba(255,255,255,.035);font-size:11px;line-height:1.55;color:#f2d99d}'+
       '#'+MINI_ID+'{position:fixed;z-index:2147483645;left:10px;bottom:10px;min-width:126px;padding:8px 10px;border:1px solid rgba(230,184,83,.52);border-radius:12px;background:rgba(18,16,23,.90);color:#fff;box-shadow:0 8px 25px rgba(0,0,0,.35);font:800 11px -apple-system,BlinkMacSystemFont,"PingFang TC",sans-serif;cursor:pointer}'+
       '#'+MINI_ID+' b{font-size:15px;color:#f2d58a}'+
