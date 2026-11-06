@@ -3119,6 +3119,12 @@ document.addEventListener('click',function(ev){
  transform:none!important;
 }
 </style>
+<style id="oracle-hd-sso-login-5081">
+#loginPage #oracleHdSsoLogin{display:block;width:100%;margin:10px 0 0;padding:14px 12px;border:1px solid #f7d77e;border-radius:13px;background:linear-gradient(110deg,#fbe294,#e0b24f,#f6d77d);color:#201609;font-size:16px;font-weight:900;cursor:pointer;box-shadow:0 3px 14px rgba(213,164,61,.18)}
+#loginPage #oracleHdSsoLogin:hover{filter:brightness(1.07)}
+#loginPage #oracleHdSsoLogin:disabled{opacity:.7;cursor:wait}
+#loginPage .oracle-sso-hint{text-align:center;font-size:12px;color:#d6c39a;margin:6px 0 2px}
+</style>
 </head>
 
 <body>
@@ -3186,6 +3192,8 @@ document.addEventListener('click',function(ev){
           <input id="memberAccount" type="text" placeholder="請輸入會員帳號" autocomplete="username">
           <span class="login-user-icon-539" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="7.5" r="4.2" fill="#E8BC68"/><path d="M3.4 21c.2-5.1 3.8-8 8.6-8s8.4 2.9 8.6 8H3.4Z" fill="#E8BC68"/></svg></span>
         </div>
+        <button id="oracleHdSsoLogin" type="button" aria-label="使用皇鼎會員帳號登入">🔐 皇鼎會員一鍵登入</button>
+        <div class="oracle-sso-hint">使用皇鼎會員帳號驗證，無需另設密碼</div>
         <button id="loginButton" type="button">✨ 登入分析系統</button>
         <div id="loginMessage" class="login-message-539"></div>
       </section>
@@ -4479,6 +4487,7 @@ document.addEventListener('click',function(ev){
 
     logoutButton.addEventListener("click", () => {
       sessionStorage.removeItem("memberAccount");
+      sessionStorage.removeItem(ORACLE_SSO_ACCESS_KEY);
       loggedInMember = "";
       memberDisplay.textContent = "--";
       memberAccountInput.value = "";
@@ -4509,10 +4518,86 @@ document.addEventListener('click',function(ev){
       }
     });
 
-    if (loggedInMember) {
-      memberAccountInput.value = loggedInMember;
-      openAnalyzer(loggedInMember);
+    // 皇鼎 SSO：後端驗證與原本會員權限檢查皆成功才開啟系統。
+    const ORACLE_HD_SSO = 'https://seth-oracle-sso.love06130430.workers.dev';
+    const oracleSsoLoginButton = $('oracleHdSsoLogin');
+    const ORACLE_SSO_ACCESS_KEY = 'oracle_hd_sso_access_v1';
+    async function oracleVerifyAccess(memberAccount) {
+      const response = await fetch(WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify', memberAccount })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || data.error || '此皇鼎會員尚未開通賽特神諭使用權限');
     }
+    async function oracleSsoFetch(path, options) {
+      const response = await fetch(ORACLE_HD_SSO + path, { cache: 'no-store', ...options });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || '皇鼎登入驗證失敗');
+      return result;
+    }
+    async function oracleHandleSsoReturn() {
+      const match = location.hash.match(/(?:^#|&)sso_code=([a-f0-9]{64})(?:&|$)/);
+      if (match) {
+        history.replaceState(null, '', location.pathname + location.search);
+        oracleSsoLoginButton.disabled = true;
+        oracleSsoLoginButton.textContent = '皇鼎會員驗證中…';
+        try {
+          const exchanged = await oracleSsoFetch('/exchange', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: match[1] })
+          });
+          const token = exchanged.access_token;
+          if (!token) throw new Error('未取得登入憑證');
+          const me = await oracleSsoFetch('/me', {
+            headers: { Authorization: 'Bearer ' + token }
+          });
+          if (!me.username) throw new Error('皇鼎未提供會員帳號');
+          await oracleVerifyAccess(me.username);
+          sessionStorage.setItem(ORACLE_SSO_ACCESS_KEY, token);
+          memberAccountInput.value = me.username;
+          openAnalyzer(me.username);
+        } catch (err) {
+          sessionStorage.removeItem(ORACLE_SSO_ACCESS_KEY);
+          showLoginMessage(err.message || '登入失敗，請重新使用皇鼎會員登入');
+        } finally {
+          oracleSsoLoginButton.disabled = false;
+          oracleSsoLoginButton.textContent = '🔐 皇鼎會員一鍵登入';
+        }
+        return;
+      }
+      const saved = sessionStorage.getItem(ORACLE_SSO_ACCESS_KEY);
+      if (saved) {
+        try {
+          const me = await oracleSsoFetch('/me', {
+            headers: { Authorization: 'Bearer ' + saved }
+          });
+          if (!me.username) throw new Error('登入已失效');
+          await oracleVerifyAccess(me.username);
+          memberAccountInput.value = me.username;
+          openAnalyzer(me.username);
+        } catch (_) {
+          sessionStorage.removeItem(ORACLE_SSO_ACCESS_KEY);
+          sessionStorage.removeItem('memberAccount');
+          loggedInMember = '';
+          loginPage.style.display = 'flex';
+          appPage.style.display = 'none';
+          showLoginMessage('皇鼎登入已過期，請重新登入');
+        }
+        return;
+      }
+      if (loggedInMember) {
+        memberAccountInput.value = loggedInMember;
+        openAnalyzer(loggedInMember);
+      }
+    }
+    oracleSsoLoginButton.addEventListener('click', () => {
+      window.location.assign(ORACLE_HD_SSO + '/start');
+    });
+
+    oracleHandleSsoReturn();
 
     // 停用 Service Worker，避免 GitHub Pages 長期讀到舊版快取。
 
