@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.56
+// @version      4.1.57
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -15266,7 +15266,7 @@ const xinyaoStartRiskGuardAtReady = () => {
     const el=document.createElement('style');
     el.id=STYLE_ID;
     el.textContent=
-      '#'+PANEL_ID+'{position:fixed;z-index:2147483647;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,calc(100vw - 28px));max-height:min(650px,calc(100dvh - 36px));overflow:auto;box-sizing:border-box;padding:13px;border:1px solid rgba(234,190,91,.65);border-radius:16px;background:rgba(17,15,22,.965);color:#fff;box-shadow:0 22px 70px rgba(0,0,0,.55);backdrop-filter:blur(14px);font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif}'+
+      '#'+PANEL_ID+'{position:fixed;z-index:2147483647;left:50%;top:50%;transform:translate(-50%,-50%) scale(.70);transform-origin:center center;width:min(390px,calc(100vw - 28px));max-height:min(620px,calc(100dvh - 36px));overflow:auto;box-sizing:border-box;padding:13px;border:1px solid rgba(234,190,91,.65);border-radius:16px;background:rgba(17,15,22,.965);color:#fff;box-shadow:0 22px 70px rgba(0,0,0,.55);backdrop-filter:blur(14px);font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif}'+
       '#'+PANEL_ID+' .rg-head{display:flex;align-items:center;justify-content:space-between;gap:12px}'+
       '#'+PANEL_ID+' .rg-title{font-size:16px;font-weight:950;color:#f5d784}'+
       '#'+PANEL_ID+' .rg-close{border:0;background:transparent;color:#fff;font-size:21px;cursor:pointer;opacity:.7}'+
