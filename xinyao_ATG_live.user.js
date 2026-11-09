@@ -6767,7 +6767,7 @@ try {
     syncHandshakeTimer = setTimeout(() => {
       syncHandshakeTimer = null;
       if (!pendingSyncPayload) return;
-      state.scanError = '芯瑤頁面尚未回應同步要求；請回到此頁再按一次「同步到芯瑤」。';
+      state.scanError = '芯瑤頁面尚未回應同步要求；請回到此頁再按一次「同步到賽特神諭」。';
       state.scanMessage = `同步等待中｜資料仍保留 ${pendingSyncPayload.rooms.length} 房`;
       scheduleRender();
     }, 20000);
