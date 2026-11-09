@@ -3173,7 +3173,7 @@
           <h2 class="section-title">📊 全房分析</h2>
           <div style="padding:16px;border-radius:16px;background:#10272b;border:1px solid #b89653;line-height:1.8;color:#ead5aa;">
             尚未收到 ATG 全房資料。<br>
-            請先在 ATG 按 <b>【一鍵掃描 4100 房】</b>，完成後再按 <b>【同步到芯瑤】</b>。
+            請先在 ATG 按 <b>【一鍵掃描 4100 房】</b>，完成後再按 <b>【同步到賽特神諭】</b>。
           </div>
         </div>`;
       return;
