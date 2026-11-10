@@ -4564,7 +4564,7 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
             headers: { Authorization: 'Bearer ' + token }
           });
           if (!me.username) throw new Error('皇鼎未提供會員帳號');
-          await oracleVerifyAccess(me.username);
+          // 皇鼎 SSO 已驗證會員身分；不再要求舊後台另外開通。
           sessionStorage.setItem(ORACLE_SSO_ACCESS_KEY, token);
           memberAccountInput.value = me.username;
           openAnalyzer(me.username);
@@ -4584,7 +4584,7 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
             headers: { Authorization: 'Bearer ' + saved }
           });
           if (!me.username) throw new Error('登入已失效');
-          await oracleVerifyAccess(me.username);
+          // 皇鼎 SSO 已驗證會員身分；不再要求舊後台另外開通。
           memberAccountInput.value = me.username;
           openAnalyzer(me.username);
         } catch (_) {
