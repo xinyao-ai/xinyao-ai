@@ -730,7 +730,10 @@
               body:
                 JSON.stringify({
                   memberAccount:
-                    account
+                    account,
+                  // HD SSO-issued token, validated server-side by ATG Live Worker.
+                  ssoAccessToken:
+                    sessionStorage.getItem('oracle_hd_sso_access_v1') || ''
                 })
             }
           );
