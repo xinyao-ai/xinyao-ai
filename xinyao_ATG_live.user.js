@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.59
+// @version      4.1.60
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -1284,6 +1284,30 @@ try {
     })();
     const previousRoomId = currentRoomIdFromState();
 
+    // 固定本金：畫面辨識 / 派彩資料 / 通用傳輸只能更新房號顯示，
+    // 不能宣稱會員換房。只有已確認的選房事件才能切換本房盈虧基準。
+    const explicitSelection = identity.source === 'socketio:getSlotTableDetail' ||
+      identity.source === 'scanner:getSlotTableDetail';
+    const knownSameRoom = Boolean(
+      (previousRoomId !== null && nextRoomId !== null && previousRoomId === nextRoomId) ||
+      (state.currentRoomNumber !== null && nextRoomNumber !== null &&
+       Number(state.currentRoomNumber) === Number(nextRoomNumber))
+    );
+    if (state.roomEntryBalance !== null && !explicitSelection &&
+        state.currentRoomKey && !String(state.currentRoomKey).startsWith('runtime:') &&
+        !knownSameRoom && nextKey !== state.currentRoomKey) {
+      return false;
+    }
+    // SSO / refresh / Socket.IO 事件可能在同房反覆宣告同一機台；
+    // 沒有真正的新機台 ID 時禁止重設本金。
+    if (state.roomEntryBalance !== null && explicitSelection &&
+        previousRoomId !== null && nextRoomId === null &&
+        state.currentRoomNumber !== null && nextRoomNumber !== null &&
+        state.currentRoomNumber !== nextRoomNumber) {
+      // 當前已知 server ID，卻只收到不同顯示號碼：無法證明真正換房。
+      return false;
+    }
+
     // 同一個房間會在 roomId / roomNumber / Cocos 標籤之間切換表示法。
     // 只改辨識名稱不能重置進房金額，否則原本正盈虧會突然歸零。
     const samePhysicalRoom = Boolean(
@@ -1300,10 +1324,13 @@ try {
       samePhysicalRoom
     );
     const genuineRoomChange = Boolean(
-      state.currentRoomKey && state.currentRoomKey !== nextKey && !upgradingRuntimeIdentity
+      state.currentRoomKey && state.currentRoomKey !== nextKey && !upgradingRuntimeIdentity &&
+      explicitSelection && !knownSameRoom
     );
+    // 不讓非權威來源因 key 變化而觸發 evolveRoomPlaySession 的 roomChanged 分支。
+    const stableBaselineKey = genuineRoomChange ? state.currentRoomKey : nextKey;
     const roomMoney = evolveRoomPlaySession({
-      roomKey: upgradingRuntimeIdentity ? nextKey : state.currentRoomKey,
+      roomKey: stableBaselineKey,
       roomNumber: state.currentRoomNumber,
       entryBalance: state.roomEntryBalance
     }, {
@@ -1342,7 +1369,7 @@ try {
     state.currentRoomNumber = nextRoomNumber;
     state.roomEntryBalance = roomMoney.entryBalance;
     state.roomProfit = roomMoney.profit;
-    if (!upgradingRuntimeIdentity) {
+    if (genuineRoomChange) {
       state.roomFreeGameEntries = 0;
       state.roomFreeGameInProgress = false;
       state.roomFreeGameLastEntrySpinId = '';
@@ -2585,7 +2612,7 @@ try {
       <div class="xinyaoConn">${connectionText()}</div>
 
       <div class="xinyaoGroup xinyaoStatsGrid">
-        <div class="xinyaoRow"><span>進房金額</span><b>${money(state.roomEntryBalance)}</b></div>
+        <div class="xinyaoRow"><span>進房金額</span><b id="xinyaoEditEntryBalance" title="點擊校正本房實際進房金額" style="cursor:pointer;text-decoration:underline dotted #cba45e;text-underline-offset:3px;">${money(state.roomEntryBalance)} ✎</b></div>
         <div class="xinyaoRow"><span>目前點數</span><b>${money(state.balance)}</b></div>
         <div class="xinyaoRow"><span>本房盈虧</span><b style="color:${state.roomProfit > 0 ? '#8ff0ad' : state.roomProfit < 0 ? '#ff8da8' : '#fff'};">${signedMoney(state.roomProfit)}</b></div>
         <div class="xinyaoRow"><span>下輪開獎結果</span><b>${money(state.latestPayout)}</b></div>
@@ -2602,6 +2629,25 @@ try {
   }
 
   function bindPanelEvents() {
+    const entryEdit = panel?.querySelector('#xinyaoEditEntryBalance');
+    if (entryEdit) {
+      entryEdit.onclick = event => {
+        event.stopPropagation();
+        const input = window.prompt('請輸入本房實際進房金額（例如 5000）：', state.roomEntryBalance ?? '');
+        if (input === null) return;
+        const amount = Number(String(input).replace(/,/g, '').trim());
+        if (!Number.isFinite(amount) || amount < 0 || !String(input).trim()) {
+          window.alert('請輸入有效的進房金額');
+          return;
+        }
+        state.roomEntryBalance = Math.round(amount * 100) / 100;
+        state.roomProfit = state.balance === null ? null :
+          Math.round((state.balance - state.roomEntryBalance) * 100) / 100;
+        saveRoomFreeEntrySession();
+        sync();
+      };
+    }
+
     const header = panel?.querySelector('#xinyaoHeader');
     if (header) {
       header.onclick = () => {
