@@ -74,7 +74,7 @@ function render(){
  count.textContent='步驟 '+(ix+1)+' / '+IOS_GUIDE_STEPS.length;
  fill.style.width=((ix+1)*100/IOS_GUIDE_STEPS.length)+'%';
  const imgs=(ix===0?['./assets/ios_step1_safari.png?v=5061']:s.images).map(src=>'<img loading="lazy" src="'+src+'" alt="步驟 '+(ix+1)+' 教學圖片">').join('');
- const links=(s.openUserscriptsAppStore?'<a class="ios-guide-action" href="https://apps.apple.com/tw/app/userscripts/id1463298887" onclick="window.location.href=this.href;return false;">前往 App Store 安裝 Userscripts</a>':'')+(s.openSharedScript?'<a class="ios-guide-action" href="./xinyao_ATG_live.user.js?v=158" target="_blank" rel="noopener noreferrer">安裝賽特神諭摩斯密碼</a>':'');
+ const links=(s.openUserscriptsAppStore?'<a class="ios-guide-action" href="https://apps.apple.com/tw/app/userscripts/id1463298887" onclick="window.location.href=this.href;return false;">前往 App Store 安裝 Userscripts</a>':'')+(s.openSharedScript?'<a class="ios-guide-action" href="./xinyao_ATG_live.user.js?v=165" target="_blank" rel="noopener noreferrer">安裝賽特神諭摩斯密碼</a>':'');
  content.innerHTML='<h3>'+s.stepNumber+'. '+s.title+'</h3>'+s.bodyHtml+links+imgs;
  prev.disabled=ix===0;next.textContent=ix===IOS_GUIDE_STEPS.length-1?'完成':'下一步 →';next.onclick=ix===IOS_GUIDE_STEPS.length-1?function(){window.location.replace(window.location.pathname+window.location.search+'#downloadTop');}:function(){ix++;render();};
 }
