@@ -1284,15 +1284,26 @@ try {
     })();
     const previousRoomId = currentRoomIdFromState();
 
+    // 同一個房間會在 roomId / roomNumber / Cocos 標籤之間切換表示法。
+    // 只改辨識名稱不能重置進房金額，否則原本正盈虧會突然歸零。
+    const samePhysicalRoom = Boolean(
+      (previousRoomId !== null && nextRoomId !== null && previousRoomId === nextRoomId) ||
+      (state.currentRoomNumber !== null && nextRoomNumber !== null &&
+       Number(state.currentRoomNumber) === Number(nextRoomNumber))
+    );
+    // Cocos 標籤是啟發式辨識；已有伺服器 roomId 時，
+    // 不允許未經 getSlotTableDetail 確認的不同 Cocos 房號重新設定進房金額。
+    if (identity.source === 'cocos' && previousRoomId !== null &&
+        nextRoomId === null && !samePhysicalRoom) return false;
     const upgradingRuntimeIdentity = Boolean(
       (String(state.currentRoomKey || '').startsWith('runtime:') && state.currentRoomKey !== nextKey) ||
-      (state.currentRoomNumber === null && previousRoomId !== null && nextRoomId !== null && previousRoomId === nextRoomId && state.currentRoomKey !== nextKey)
+      samePhysicalRoom
     );
     const genuineRoomChange = Boolean(
       state.currentRoomKey && state.currentRoomKey !== nextKey && !upgradingRuntimeIdentity
     );
     const roomMoney = evolveRoomPlaySession({
-      roomKey: state.currentRoomKey,
+      roomKey: upgradingRuntimeIdentity ? nextKey : state.currentRoomKey,
       roomNumber: state.currentRoomNumber,
       entryBalance: state.roomEntryBalance
     }, {
