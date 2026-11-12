@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.61
+// @version      4.1.62
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -2178,6 +2178,67 @@ try {
     return '';
   }
 
+  // 資料監測專用的被動辨識，不調整掃房與進房演算法。
+  function oracleRecordedGameName(hint = '') {
+    try {
+      const stored = window.__XIANYAO_ATG_SELECTED_GAME_PROFILE__ ||
+        JSON.parse(localStorage.getItem('xinyao_atg_selected_game_profile_v2') || 'null');
+      const age = Date.now() - Number(stored?.at || 0);
+      if (age >= 0 && age < 30 * 60 * 1000) {
+        if (stored.profile === 'tiger') return '虎小妹';
+        if (stored.profile === 'seth') return '戰神賽特（代數未確認）';
+      }
+    } catch (_) {}
+    // 僅使用「目前視窗」名稱/網址，不使用跨遊戲快取或猜測。
+    try {
+      for (const w of collectSameOriginLiveWindows()) {
+        const title = String(w.document?.title || '');
+        const path = String(w.location?.pathname || '');
+        const label = title + ' ' + path;
+        if (/虎小妹|tiger.?girl/i.test(label)) return '虎小妹';
+        if (/戰神賽特\s*2|战神赛特\s*2|seth[_-]?2|覺醒之力/i.test(label)) return '戰神賽特2';
+        if (/戰神賽特\s*1|战神赛特\s*1|seth[_-]?1/i.test(label)) return '戰神賽特1';
+        if (/戰神賽特|战神赛特/i.test(label)) return '戰神賽特（代數未確認）';
+      }
+    } catch (_) {}
+    const confirmed = String(hint || '');
+    if (confirmed === 'tiger') return '虎小妹';
+    if (confirmed === 'seth') return '戰神賽特（代數未確認）';
+    return '未識別遊戲';
+  }
+
+  function oracleRecordedRoomNumber() {
+    const n = Number(state.currentRoomNumber);
+    if (Number.isInteger(n) && n >= 1 && n <= 4100) return n;
+    // 房號與 roomId 可能不同步；只接受原有掃房表裡實際對應的號碼。
+    const id = currentRoomIdFromState();
+    if (id !== null) {
+      const mapped = fullScanRoomNumberByRoomId(id);
+      if (Number.isInteger(mapped) && mapped >= 1 && mapped <= 4100) return mapped;
+    }
+    // 畫面上能確認目前機台時再附上房號，禁止將 runtime/roomId 當房號。
+    const current = resolveRoomIdentityFromCocos();
+    const candidate = Number(current?.roomNumber);
+    return Number.isInteger(candidate) && candidate >= 1 && candidate <= 4100 ? candidate : null;
+  }
+
+  // 免遊只有「明確購買動作且遊戲端確認成功」才列為付費購買。
+  // 免費觸發、開始免遊或僅出現 buyFeatureType 的資料，都不計數。
+  function oracleConfirmedPaidFreeBuy(engine, finalState) {
+    const candidates = [finalState, engine];
+    return candidates.some(item => {
+      if (!item || typeof item !== 'object') return false;
+      const action = String(item.action || item.eventName || '').toLowerCase();
+      const hasBuyAction = /(?:buy|purchase).*(?:feature|free|bonus)|(?:feature|free|bonus).*(?:buy|purchase)/i.test(action);
+      const hasBuyType = item.buyFeatureType !== null && item.buyFeatureType !== undefined &&
+        String(item.buyFeatureType).trim() !== '';
+      const status = String(item.status ?? item.result ?? '').toLowerCase();
+      const confirmed = item.purchaseSuccess === true || item.buySuccess === true ||
+        (hasBuyAction && /^(?:success|confirmed|completed|ok)$/.test(status));
+      return Boolean(hasBuyAction && hasBuyType && confirmed);
+    });
+  }
+
   function processEngine(engine) {
     if (!engine?.spinId) return false;
 
@@ -2270,15 +2331,13 @@ try {
       // 僅使用同局 finalState 的 totalStake 與 totalWinnings。
       const eventBet = toNumber(finalState.totalStake);
       if (deviceToken && eventBet !== null && payout !== null && eventBet >= 0 && payout >= 0) {
-        const maybeProfile = String(gameProfileHint || '');
-        const eventGame = maybeProfile === 'tiger' ? '虎小妹' :
-          maybeProfile === 'seth' ? '戰神賽特（版本未確認）' : '未識別遊戲';
-        const eventRoom = Number.isInteger(Number(state.currentRoomNumber)) &&
-          Number(state.currentRoomNumber) >= 1 && Number(state.currentRoomNumber) <= 4100
-          ? Number(state.currentRoomNumber) : null;
+        const eventGame = oracleRecordedGameName(gameProfileHint);
+        const eventRoom = oracleRecordedRoomNumber();
+        const buyConfirmed = oracleConfirmedPaidFreeBuy(engine, finalState);
         const body = {
           spinId, stake: eventBet, payout,
           roomNumber: eventRoom, game: eventGame,
+          freeBuyCount: buyConfirmed ? 1 : 0,
           occurredAt: Date.now()
         };
         Promise.resolve().then(async () => {
