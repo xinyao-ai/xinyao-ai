@@ -27,7 +27,7 @@
       overlay.innerHTML = `
         <div style="width:min(520px,100%);background:#fff;border:1px solid #f2dbe6;border-radius:24px;padding:30px 24px;box-shadow:0 24px 80px rgba(118,45,78,.18);text-align:center;">
           <div style="font-size:42px;margin-bottom:8px;">🛠️</div>
-          <div style="font-size:22px;font-weight:900;color:#513d47;">芯瑤 ATG 系統維護中</div>
+          <div style="font-size:22px;font-weight:900;color:#513d47;">賽特神諭 ATG 系統維護中</div>
           <div id="xinyaoSiteMaintenanceMessage" style="margin-top:12px;color:#806773;font-size:14px;line-height:1.8;"></div>
           <div style="margin-top:18px;font-size:12px;color:#b08d9d;">維護完成後將自動恢復，不需要重新安裝程式。</div>
         </div>`;
@@ -82,9 +82,9 @@
   const DESKTOP_GUIDE_STEPS = [
     {
       stepNumber: 1,
-      title: '先確認：娛樂城與芯瑤程式使用同一個瀏覽器',
+      title: '先確認：娛樂城與賽特神諭程式使用同一個瀏覽器',
       bodyHtml: `
-        <p>請先確認 <b>HD 皇鼎娛樂城</b> 與 <b>芯瑤💕 ATG AI助手</b> 都使用 <b>同一個 Chrome 瀏覽器</b> 開啟。</p>
+        <p>請先確認 <b>HD 皇鼎娛樂城</b> 與 <b>賽特神諭💕 ATG AI助手</b> 都使用 <b>同一個 Chrome 瀏覽器</b> 開啟。</p>
         <p>不要一個用 Chrome、另一個用其他瀏覽器，否則後面的安裝與綁定可能無法正常運作。</p>
       `,
       images: [
@@ -105,9 +105,9 @@
     },
     {
       stepNumber: 3,
-      title: '安裝芯瑤 ATG 共用程式',
+      title: '安裝賽特神諭 ATG 共用程式',
       bodyHtml: `
-        <p>回到 <b>【芯瑤💕 ATG AI助手】</b>。</p>
+        <p>回到 <b>【賽特神諭💕 ATG AI助手】</b>。</p>
         <p>依序操作：<b>【安裝共用程式／查看教學】→ 往下滑 →【我看完教學｜開啟共用程式】→【安裝】</b>。</p>
         <p>安裝完成後再回到這個教學頁，繼續下一步。</p>
       `,
@@ -124,7 +124,7 @@
       bodyHtml: `
         <p>登入 <b>ATG</b> 後，依序點擊：</p>
         <p><b>右上【⋮】→【擴充功能】→【管理擴充功能】→【Tampermonkey／竄改猴】→【詳細資料】</b></p>
-        <p>最後把 <b>【允許使用者指令碼】</b> 的開關打開。這一步一定要完成，不然芯瑤助手不會在 ATG 頁面執行。</p>
+        <p>最後把 <b>【允許使用者指令碼】</b> 的開關打開。這一步一定要完成，不然賽特神諭助手不會在 ATG 頁面執行。</p>
       `,
       images: [
         './pc_step4_1.png?v=203',
@@ -136,8 +136,8 @@
       stepNumber: 5,
       title: '產生配對碼並完成綁定',
       bodyHtml: `
-        <p>回到 <b>【芯瑤💕 ATG AI助手】</b>，點擊 <b>【產生配對碼】→【複製配對碼】</b>。</p>
-        <p>再回到 ATG：<b>重新整理頁面</b> → 左上角出現 <b>【芯瑤 ATG 即時助手】</b> → 貼上配對碼 → 點擊 <b>【綁定】</b>。</p>
+        <p>回到 <b>【賽特神諭💕 ATG AI助手】</b>，點擊 <b>【產生配對碼】→【複製配對碼】</b>。</p>
+        <p>再回到 ATG：<b>重新整理頁面</b> → 左上角出現 <b>【賽特神諭 ATG 即時助手】</b> → 貼上配對碼 → 點擊 <b>【綁定】</b>。</p>
         <p>看到綁定成功後，就可以開始遊戲了 ✅</p>
       `,
       images: [
@@ -213,7 +213,7 @@
       stepNumber: 1,
       title: '安裝 Firefox 瀏覽器',
       bodyHtml: `
-        <p>先安裝 <b>Firefox</b>，之後娛樂城與芯瑤都會使用 Firefox 開啟。</p>
+        <p>先安裝 <b>Firefox</b>，之後娛樂城與賽特神諭都會使用 Firefox 開啟。</p>
         <p>點下方按鈕可以直接前往 Google Play 的 Firefox 官方安裝頁，不需要自己搜尋。</p>
       `,
       images: [
@@ -223,9 +223,9 @@
     },
     {
       stepNumber: 2,
-      title: '娛樂城與芯瑤程式要使用同一個 Firefox',
+      title: '娛樂城與賽特神諭程式要使用同一個 Firefox',
       bodyHtml: `
-        <p>請確認 <b>HD 皇鼎娛樂城</b> 與 <b>芯瑤💕 ATG AI助手</b> 都使用 <b>同一個 Firefox 瀏覽器</b> 開啟。</p>
+        <p>請確認 <b>HD 皇鼎娛樂城</b> 與 <b>賽特神諭💕 ATG AI助手</b> 都使用 <b>同一個 Firefox 瀏覽器</b> 開啟。</p>
         <p>不要一個用 Chrome、另一個用 Firefox，否則後面的安裝、配對與同步可能無法正常運作。</p>
       `,
       images: [
@@ -246,9 +246,9 @@
     },
     {
       stepNumber: 4,
-      title: '回到芯瑤頁面，安裝共用程式',
+      title: '回到賽特神諭頁面，安裝共用程式',
       bodyHtml: `
-        <p>回到 <b>【芯瑤💕 ATG AI助手】</b>。</p>
+        <p>回到 <b>【賽特神諭💕 ATG AI助手】</b>。</p>
         <p>依序操作：<b>【安裝共用程式／查看教學】→ 往下滑 →【我看完教學｜開啟共用程式】→【安裝】</b>。</p>
         <p>安裝完成後，再回到這個教學頁繼續下一步。</p>
       `,
@@ -261,8 +261,8 @@
       stepNumber: 5,
       title: '產生配對碼並完成綁定',
       bodyHtml: `
-        <p>回到 <b>【芯瑤💕 ATG AI助手】</b>，點擊 <b>【產生配對碼】→【複製配對碼】</b>。</p>
-        <p>再回到 ATG：<b>重新整理頁面</b> → 左上角出現 <b>【芯瑤 ATG 即時助手】</b> → 貼上剛剛複製的 <b>配對碼</b> → 點擊 <b>【綁定】</b>。</p>
+        <p>回到 <b>【賽特神諭💕 ATG AI助手】</b>，點擊 <b>【產生配對碼】→【複製配對碼】</b>。</p>
+        <p>再回到 ATG：<b>重新整理頁面</b> → 左上角出現 <b>【賽特神諭 ATG 即時助手】</b> → 貼上剛剛複製的 <b>配對碼</b> → 點擊 <b>【綁定】</b>。</p>
         <p>看到綁定成功後，就可以開始遊戲了 ✅</p>
       `,
       images: [
@@ -673,7 +673,7 @@
 
     if (!account) {
       throw new Error(
-        '請先登入芯瑤會員帳號'
+        '請先登入賽特神諭會員帳號'
       );
     }
 
@@ -2311,7 +2311,7 @@
           "
         >
           第一次設定完成後不用重複安裝。之後直接開啟 ATG 即可。
-          如要換手機或換電腦，回到芯瑤按「更換裝置」重新綁定即可。
+          如要換手機或換電腦，回到賽特神諭按「更換裝置」重新綁定即可。
         </div>
 
         <button
@@ -2590,7 +2590,7 @@
                 "
               >
                 請到 ATG 畫面的
-                「芯瑤 ATG 即時助手」
+                「賽特神諭 ATG 即時助手」
                 輸入這組配對碼
               </div>
 
@@ -3028,7 +3028,7 @@
     start();
   }
 })();
-/* ===== 芯瑤 ATG 全房推薦整合 v2｜恢復第4分頁 ===== */
+/* ===== 賽特神諭 ATG 全房推薦整合 v2｜恢復第4分頁 ===== */
 (() => {
   'use strict';
 
@@ -3328,7 +3328,7 @@
   else start();
 })();
 
-/* ===== 芯瑤 ATG 精簡主介面 v328｜全房分析 / 本房狀態 / 遊玩紀錄 ===== */
+/* ===== 賽特神諭 ATG 精簡主介面 v328｜全房分析 / 本房狀態 / 遊玩紀錄 ===== */
 (() => {
   'use strict';
 
