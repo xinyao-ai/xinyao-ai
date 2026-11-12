@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.62
+// @version      4.1.63
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -2180,6 +2180,14 @@ try {
 
   // 資料監測專用的被動辨識，不調整掃房與進房演算法。
   function oracleRecordedGameName(hint = '') {
+    // 與既有盤面辨識系統共用結果，避免兩套系統判斷不一致。
+    try {
+      const bridge = window.__XIANYAO_ATG_TELEMETRY_PROFILE_BRIDGE__;
+      const result = typeof bridge === 'function' ? String(bridge() || '') : '';
+      if (result === 'tiger') return '虎小妹';
+      if (result === 'seth') return '戰神賽特（代數未確認）';
+    } catch (_) {}
+
     try {
       const stored = window.__XIANYAO_ATG_SELECTED_GAME_PROFILE__ ||
         JSON.parse(localStorage.getItem('xinyao_atg_selected_game_profile_v2') || 'null');
@@ -12277,6 +12285,19 @@ try {
     if (seth >= 6 && seth >= tiger + 3) return 'seth';
     return '';
   }
+
+  // 對外提供既有遊戲辨識器的可靠提示；不使用原本「預設虎小妹」回退值。
+  try {
+    window.__XIANYAO_ATG_TELEMETRY_PROFILE_BRIDGE__ = () => {
+      const selected = recentSelectedGameProfile();
+      if (selected === 'tiger' || selected === 'seth') return selected;
+      const live = detectLiveSceneProfile();
+      if (live === 'tiger' || live === 'seth') return live;
+      const canvas = detectCanvasThemeProfile();
+      if (canvas === 'tiger' || canvas === 'seth') return canvas;
+      return '';
+    };
+  } catch (_) {}
 
   function resolveGameProfileForSpin(detail = {}) {
     // test98：最優先採用使用者「實際點選遊戲」的結果。
