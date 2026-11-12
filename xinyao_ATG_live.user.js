@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.60
+// @version      4.1.61
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -2265,6 +2265,33 @@ try {
       state.completedSpinIds.add(spinId);
       state.completedSpins += 1;
       changed = true;
+
+      // 獨立送出已結算 spin 的讀值，不修改遊戲/進房/掃房邏輯。
+      // 僅使用同局 finalState 的 totalStake 與 totalWinnings。
+      const eventBet = toNumber(finalState.totalStake);
+      if (deviceToken && eventBet !== null && payout !== null && eventBet >= 0 && payout >= 0) {
+        const maybeProfile = String(gameProfileHint || '');
+        const eventGame = maybeProfile === 'tiger' ? '虎小妹' :
+          maybeProfile === 'seth' ? '戰神賽特（版本未確認）' : '未識別遊戲';
+        const eventRoom = Number.isInteger(Number(state.currentRoomNumber)) &&
+          Number(state.currentRoomNumber) >= 1 && Number(state.currentRoomNumber) <= 4100
+          ? Number(state.currentRoomNumber) : null;
+        const body = {
+          spinId, stake: eventBet, payout,
+          roomNumber: eventRoom, game: eventGame,
+          occurredAt: Date.now()
+        };
+        Promise.resolve().then(async () => {
+          try {
+            const response = await cloudFetch(`${WORKER}/push/spin`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${deviceToken}` },
+              body: JSON.stringify(body)
+            });
+            if (!response.ok) console.warn('oracle_spin_event_not_saved',response.status);
+          } catch (_) {}
+        });
+      }
     }
 
     return changed;
