@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.64
+// @version      4.1.65
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -2226,10 +2226,16 @@ try {
     const engineIdentity = engine ? resolveRoomIdentityFromEngine(engine) : null;
     const engineRoom = valid(engineIdentity?.roomNumber);
     if (engineRoom !== null) return engineRoom;
+    const lookup = id => {
+      try {
+        const fn = window.__XIANYAO_ATG_ROOM_NUMBER_LOOKUP__;
+        return typeof fn === 'function' ? valid(fn(id)) : null;
+      } catch (_) { return null; }
+    };
 
     const engineId = engine ? findNamedNumber(engine, new Set(['roomid','tableid'])) : null;
     if (engineId !== null) {
-      const mapped = valid(fullScanRoomNumberByRoomId(engineId));
+      const mapped = valid(fullScanRoomNumberByRoomId(engineId)) ?? lookup(engineId);
       // 結算封包帶有其他房間 ID 時，不沿用上一房號。
       if (mapped !== null) return mapped;
       const currentId = currentRoomIdFromState();
@@ -2243,7 +2249,7 @@ try {
     if (sceneRoom !== null && currentId === null) return sceneRoom;
 
     if (currentId !== null) {
-      const mapped = valid(fullScanRoomNumberByRoomId(currentId));
+      const mapped = valid(fullScanRoomNumberByRoomId(currentId)) ?? lookup(currentId);
       if (mapped !== null) return mapped;
     }
 
@@ -5382,6 +5388,17 @@ try {
     }
     return null;
   }
+
+  // 僅提供掃描器已取得的 roomId -> 真實顯示房號對照，
+  // 逐局紀錄可讀取；不會更動選房、掃描或進房流程。
+  try {
+    window.__XIANYAO_ATG_ROOM_NUMBER_LOOKUP__ = roomId => {
+      const id = finiteNumber(roomId);
+      if (id === null) return null;
+      const num = roomNumberByRoomIdFromScanner(id);
+      return num !== null && num >= 1 && num <= 4100 ? num : null;
+    };
+  } catch (_) {}
 
   function publishCurrentRoomSelection(roomId, source = 'scanner') {
     const id = finiteNumber(roomId);
