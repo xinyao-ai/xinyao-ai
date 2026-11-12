@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         芯瑤💕 ATG 虎小妹進房探測器 DEV
+// @name         賽特神諭💕 ATG 虎小妹進房探測器 DEV
 // @namespace    xinyao-atg-tiger-room-probe
 // @version      0.1.5
 // @description  虎小妹專屬只讀探測器：只觀察 roomId / getSlotTableDetail / SlotTableView，不修改 test142、不自動進房。
