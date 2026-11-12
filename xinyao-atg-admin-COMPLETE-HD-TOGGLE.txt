@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>芯瑤💕ATG 管理後台</title>
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>賽特神諭💕ATG 管理後台</title>
 <style>
 :root{--p:#ef4d91;--bg:#fff6fa;--line:#f2dbe6;--muted:#8b7882;--red:#e84c69}*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei",sans-serif;background:var(--bg);color:#302830}.app{display:grid;grid-template-columns:235px 1fr;min-height:100vh}.side{background:#fff;padding:20px 14px;border-right:1px solid var(--line)}.brand{font-size:19px;font-weight:900;padding:10px}.nav{display:grid;gap:7px}.nav button{border:0;background:transparent;padding:12px;text-align:left;border-radius:12px;font-weight:800}.nav button.active{background:linear-gradient(135deg,#ff91bc,var(--p));color:#fff}.main{padding:22px}.top{display:flex;justify-content:space-between;align-items:center}.panel{display:none}.panel.active{display:block}.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px;margin:14px 0;box-shadow:0 10px 30px #d9548b10}.stat b{display:block;font-size:28px;margin-top:6px}.muted{font-size:12px;color:var(--muted)}.row{display:flex;gap:8px;flex-wrap:wrap}.input,select,textarea{border:1px solid var(--line);border-radius:11px;padding:10px;background:#fffafd}.btn{border:0;border-radius:11px;padding:10px 12px;font-weight:850;cursor:pointer}.primary{background:var(--p);color:#fff}.soft{background:#fff0f6;color:#d83d7d}.danger{background:var(--red);color:#fff}.table{overflow:auto;border:1px solid var(--line);border-radius:13px;margin-top:12px}table{width:100%;border-collapse:collapse;min-width:720px}th,td{padding:10px;border-bottom:1px solid #f6e8ee;text-align:left;font-size:13px}.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}.win{border:1px solid var(--line);border-radius:12px;padding:10px;margin:8px 0}.win img{max-width:180px;max-height:130px;border-radius:9px;display:block;margin-top:8px}@media(max-width:850px){.app{grid-template-columns:1fr}.nav{grid-template-columns:repeat(3,1fr)}.stats{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}.main{padding:14px}}
 </style>
@@ -318,7 +318,7 @@
 <div id="adminLogin">
   <div class="loginCard">
     <div class="loginLogo">💕</div>
-    <h2>芯瑤 ATG 管理後台</h2>
+    <h2>賽特神諭 ATG 管理後台</h2>
     <p>管理員登入</p>
     <input id="adminUser" autocomplete="username" placeholder="管理員帳號">
     <input id="adminPass" type="password" autocomplete="current-password" placeholder="管理員密碼">
@@ -326,7 +326,7 @@
     <div id="loginError"></div>
   </div>
 </div>
-<div class="app"><aside class="side"><div class="brand">💕 芯瑤 ATG 後台</div><nav class="nav">
+<div class="app"><aside class="side"><div class="brand">💕 賽特神諭 ATG 後台</div><nav class="nav">
 <button class="active" data-tab="overview">📊 總覽</button><button data-tab="members">👥 會員管理</button><button data-tab="detail">🪪 會員詳細</button><button data-tab="kick">🚪 強制登出</button><button data-tab="batch">➕ 批次新增</button><button data-tab="wins">🎉 恭喜會員</button><button data-tab="system">🟢 系統狀態</button><button data-tab="logs">🧾 操作紀錄</button><button data-tab="activity">👀 上線／操作</button></nav></aside>
 <main class="main"><div class="top"><h2 id="title">總覽儀表板</h2><div class="row"><button class="btn soft" onclick="refreshAll()">↻ 更新</button><button id="logoutBtn" class="btn danger" onclick="adminLogout()">登出</button></div></div>
 <section id="overview" class="panel active"><div class="stats"><div class="card stat"><span class="muted">會員總數</span><b id="total">—</b></div><div class="card stat"><span class="muted">正常會員</span><b id="active">—</b></div><div class="card stat"><span class="muted">停用會員</span><b id="disabled">—</b></div><div class="card stat"><span class="muted">目前上線</span><b id="online">—</b></div><div class="card stat"><span class="muted">今日新增</span><b id="today_new">—</b></div></div><div class="card"><b>最近會員操作</b><div id="recent" class="muted">載入中...</div></div></section>
@@ -1048,7 +1048,7 @@ let hdOnlyBusy=false;
 
 let maintenanceStateCache={
   enabled:false,
-  message:"芯瑤 ATG 系統升級維護中，完成後將立即開放使用。",
+  message:"賽特神諭 ATG 系統升級維護中，完成後將立即開放使用。",
   updatedAt:null
 };
 
@@ -1065,7 +1065,7 @@ function maintenanceVisibleMessage(message){
     .replace(new RegExp("\\n{3,}","g"),"\n\n")
     .trim();
 
-  return cleaned||"芯瑤 ATG 系統升級維護中，完成後將立即開放使用。";
+  return cleaned||"賽特神諭 ATG 系統升級維護中，完成後將立即開放使用。";
 }
 
 function maintenanceMessageWithHdOnly(message,enabled){
@@ -1127,7 +1127,7 @@ function renderMaintenanceControl(state={},error=""){
               ${hdOnly?'🔒 目前：只允許皇鼎':'🌐 目前：任一娛樂城皆可使用'}
             </div>
             <div class="muted" style="margin-top:6px;line-height:1.6">
-              關閉後，可從其他娛樂城進入 ATG 使用芯瑤助手進行測試。<br>
+              關閉後，可從其他娛樂城進入 ATG 使用賽特神諭助手進行測試。<br>
               再次開啟後，就會恢復只允許皇鼎來源。
             </div>
           </div>
@@ -1223,8 +1223,8 @@ async function setHuangDingOnly(enabled){
   if(hdOnlyBusy)return;
 
   const actionText=enabled
-    ?"開啟後只允許從皇鼎娛樂城使用芯瑤 ATG。\n\n確定開啟？"
-    :"關閉後，其他娛樂城進入 ATG 也可以使用芯瑤助手。\n\n確定暫時關閉皇鼎限制？";
+    ?"開啟後只允許從皇鼎娛樂城使用賽特神諭 ATG。\n\n確定開啟？"
+    :"關閉後，其他娛樂城進入 ATG 也可以使用賽特神諭助手。\n\n確定暫時關閉皇鼎限制？";
 
   if(!confirm(actionText))return;
 
