@@ -270,7 +270,7 @@ function xinyaoLoadActiveGameModule() {
   if (new URL(location.href).searchParams.get('gn') === 'new-vampire-hunter') return 'vampire';
   if (new URL(location.href).searchParams.get('gn') === 'hades') return 'baphomet';
   if (new URL(location.href).searchParams.get('gn') === 'egyptian-mythology') return 'seth1';
-  // 從芯瑤會員頁點遊戲進皇鼎時，會員頁會把選擇寫在同一 browsing context 的 window.name。
+  // 從賽特神諭會員頁點遊戲進皇鼎時，會員頁會把選擇寫在同一 browsing context 的 window.name。
   // 優先使用這個入口標記，再保存到 ATG 自己的 localStorage，確保進房重載後仍維持同一遊戲機制。
   try {
     const launchName = String(window.name || '');
@@ -322,7 +322,7 @@ function xinyaoSetActiveGameModule(value, source = 'ui') {
 
 try { window.__XIANYAO_ATG_ACTIVE_GAME_MODULE__ = xinyaoLoadActiveGameModule(); } catch (_) {}
 
-// ===== 芯瑤 ATG 全域維護控制 =====
+// ===== 賽特神諭 ATG 全域維護控制 =====
 const XIANYAO_MAINTENANCE_ENDPOINT = 'https://xinyao-atg-live.love06130430.workers.dev/maintenance';
 window.__XIANYAO_MAINTENANCE_STATE__ = window.__XIANYAO_MAINTENANCE_STATE__ || {
   enabled: false,
@@ -331,7 +331,7 @@ window.__XIANYAO_MAINTENANCE_STATE__ = window.__XIANYAO_MAINTENANCE_STATE__ || {
 };
 
 function xinyaoMaintenanceMessage(state) {
-  return String(state?.message || '芯瑤 ATG 系統升級維護中，完成後將立即開放使用。')
+  return String(state?.message || '賽特神諭 ATG 系統升級維護中，完成後將立即開放使用。')
     .replace(XIANYAO_HD_ONLY_MARK_RE, '')
     .trim();
 }
@@ -376,7 +376,7 @@ function xinyaoRenderMaintenance(state) {
       notice.setAttribute('aria-live','polite');
       document.body.appendChild(notice);
     }
-    notice.innerHTML = `<b>🛠️ 芯瑤 ATG 系統維護中</b><span></span>`;
+    notice.innerHTML = `<b>🛠️ 賽特神諭 ATG 系統維護中</b><span></span>`;
     const text = notice.querySelector('span');
     if (text) text.textContent = xinyaoMaintenanceMessage(state);
     return true;
@@ -2731,7 +2731,7 @@ try {
 
     if (minimized) {
       panel.innerHTML = `
-        <div id="xinyaoHeader" style="font-weight:800;font-size:13px;cursor:pointer;">🌸 芯瑤 ATG</div>
+        <div id="xinyaoHeader" style="font-weight:800;font-size:13px;cursor:pointer;">🌸 賽特神諭 ATG</div>
         <div style="font-size:10px;margin-top:2px;opacity:.8;">${connectionText()}</div>
       `;
       bindPanelEvents();
@@ -3905,7 +3905,7 @@ try {
         if (typeof proto.onevent === 'function' && !proto.onevent.__xinyaoLiveV200Wrapped) {
           const nativeOnevent = proto.onevent;
           const wrappedOnevent = function(packet) {
-            // 先讓芯瑤讀完整原始回包，保留最終贏分 / 診斷資料；
+            // 先讓賽特神諭讀完整原始回包，保留最終贏分 / 診斷資料；
             // 再於 ATG 自己的 handler 執行前折疊免遊中間 view。
             try { if (packet?.data) inspectObject(packet.data); } catch (_) {}
             try { if (packet?.data) xinyaoCollapsePreloadedFreeGamePacket(packet.data); } catch (_) {}
@@ -4124,7 +4124,7 @@ try {
 })();
 
 
-/* ===== 芯瑤 ATG 全房分析 v3.1.4｜全裝置自適應＋免彈窗同步＋掃描結果持久化 ===== */
+/* ===== 賽特神諭 ATG 全房分析 v3.1.4｜全裝置自適應＋免彈窗同步＋掃描結果持久化 ===== */
 (() => {
   'use strict';
 
@@ -6994,14 +6994,14 @@ try {
 
     pendingSyncPayload = buildSyncPayload(rooms, state);
     state.scanError = '';
-    state.scanMessage = `準備同步 ${pendingSyncPayload.rooms.length} 房｜正在開啟芯瑤…`;
+    state.scanMessage = `準備同步 ${pendingSyncPayload.rooms.length} 房｜正在開啟賽特神諭…`;
     scheduleRender();
 
     if (syncHandshakeTimer) clearTimeout(syncHandshakeTimer);
     syncHandshakeTimer = setTimeout(() => {
       syncHandshakeTimer = null;
       if (!pendingSyncPayload) return;
-      state.scanError = '芯瑤頁面尚未回應同步要求；請回到此頁再按一次「同步到賽特神諭」。';
+      state.scanError = '賽特神諭頁面尚未回應同步要求；請回到此頁再按一次「同步到賽特神諭」。';
       state.scanMessage = `同步等待中｜資料仍保留 ${pendingSyncPayload.rooms.length} 房`;
       scheduleRender();
     }, 20000);
@@ -7017,7 +7017,7 @@ try {
       try {
         event.source?.postMessage(pendingSyncPayload, SITE_ORIGIN);
         state.scanError = '';
-        state.scanMessage = `正在同步 ${pendingSyncPayload.rooms.length} 房到芯瑤…`;
+        state.scanMessage = `正在同步 ${pendingSyncPayload.rooms.length} 房到賽特神諭…`;
         scheduleRender();
       } catch (_) {}
       return;
@@ -7031,7 +7031,7 @@ try {
         syncHandshakeTimer = null;
       }
       state.scanError = '';
-      state.scanMessage = `✅ 已同步 ${rooms} 房｜芯瑤「全房推薦」已更新`;
+      state.scanMessage = `✅ 已同步 ${rooms} 房｜賽特神諭「全房推薦」已更新`;
       scheduleRender();
     }
   }, true);
@@ -11270,7 +11270,7 @@ try {
   }
 })();
 
-/* ===== 芯瑤 ATG Unified Speed v1.0｜整合至即時助手 ===== */
+/* ===== 賽特神諭 ATG Unified Speed v1.0｜整合至即時助手 ===== */
 (() => {
   'use strict';
 
@@ -11621,7 +11621,7 @@ try {
     return `
       <div id="xinyaoUnifiedSpeedSection">
         <div class="xinyaoSpeedTitle">
-          <span>⚡ 芯瑤 ATG 極速模式</span>
+          <span>⚡ 賽特神諭 ATG 極速模式</span>
           <b id="xinyaoSpeedCurrent">${maintenance ? '維護中' : `${effective}×`}</b>
         </div>
         <div class="xinyaoSpeedGrid">${buttons}</div>
@@ -11695,7 +11695,7 @@ try {
 })();
 
 
-/* ===== 芯瑤 ATG HUD Lab｜盤面圖案偵測測試 v0.1 ===== */
+/* ===== 賽特神諭 ATG HUD Lab｜盤面圖案偵測測試 v0.1 ===== */
 (() => {
   'use strict';
 
@@ -15448,7 +15448,7 @@ try {
 
 
 
-/* ===== 芯瑤 ATG 止盈／止損 v1.0｜test186 ===== */
+/* ===== 賽特神諭 ATG 止盈／止損 v1.0｜test186 ===== */
 const xinyaoStartRiskGuardAtReady = () => {
   'use strict';
   if (window.__XIANYAO_ATG_RISK_GUARD_V1__) return;
@@ -15745,7 +15745,7 @@ if (document.readyState === 'loading') {
 
 
 
-/* ===== 芯瑤 ATG Mobile Quick HUD v1.0｜test87 超小懸浮工具 ===== */
+/* ===== 賽特神諭 ATG Mobile Quick HUD v1.0｜test87 超小懸浮工具 ===== */
 (() => {
   'use strict';
 
@@ -16190,7 +16190,7 @@ if (document.readyState === 'loading') {
 
 }
 
-/* ===== 芯瑤 ATG Free Game Helper v1.0｜test159 ===== */
+/* ===== 賽特神諭 ATG Free Game Helper v1.0｜test159 ===== */
 (() => {
   'use strict';
 
@@ -16891,7 +16891,7 @@ if (document.readyState === 'loading') {
       </div>
 
       <div class="fg-sub">
-        ATG 一旦先回傳本次免遊的最終贏分，芯瑤會立即顯示結果卡。<br>
+        ATG 一旦先回傳本次免遊的最終贏分，賽特神諭會立即顯示結果卡。<br>
         不修改 ATG 的免遊播放、派彩或結算流程；遊戲動畫會在背景正常完成。
       </div>
 
@@ -16961,7 +16961,7 @@ if (document.readyState === 'loading') {
 
 
 
-/* ===== 芯瑤 ATG Free Packet Trace v1.0｜test168 ===== */
+/* ===== 賽特神諭 ATG Free Packet Trace v1.0｜test168 ===== */
 (() => {
   'use strict';
 
@@ -17350,7 +17350,7 @@ if (document.readyState === 'loading') {
 })();
 
 
-/* ===== 芯瑤 ATG Native Free Result Curtain v1.0｜test177 ===== */
+/* ===== 賽特神諭 ATG Native Free Result Curtain v1.0｜test177 ===== */
 (() => {
   'use strict';
 
@@ -17511,7 +17511,7 @@ if (document.readyState === 'loading') {
   };
 })();
 
-/* ===== 芯瑤 ATG Free Result Probe v1.0｜test166 ===== */
+/* ===== 賽特神諭 ATG Free Result Probe v1.0｜test166 ===== */
 (() => {
   'use strict';
 
