@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>芯瑤 ATG｜系統控制</title>
+<title>賽特神諭 ATG｜系統控制</title>
 <style>
 :root{--pink:#ff5f9e;--pink2:#ffb7d3;--bg:#fff6fa;--card:#fff;--text:#3c2b35;--muted:#927c88;--line:#f4bfd4;--green:#24945b;--red:#d94c68}
 *{box-sizing:border-box}
@@ -33,7 +33,7 @@ label{display:block;margin:12px 0 6px;font-size:12px;font-weight:800;color:var(-
   <div class="brand">
     <div class="topbar">
       <div>
-        <h1>🌸 芯瑤 ATG｜系統控制</h1>
+        <h1>🌸 賽特神諭 ATG｜系統控制</h1>
         <p>全站維護＋皇鼎來源限制</p>
       </div>
       <button id="logoutBtn" class="soft hidden">登出</button>
@@ -67,7 +67,7 @@ label{display:block;margin:12px 0 6px;font-size:12px;font-weight:800;color:var(-
       <div>
         <div class="title">👑 僅限皇鼎使用</div>
         <div id="hdStatus" class="status">讀取中…</div>
-        <div class="desc">關掉後，從其他娛樂城進入同一個 ATG 也能使用芯瑤助手；重新開啟就恢復皇鼎限制。</div>
+        <div class="desc">關掉後，從其他娛樂城進入同一個 ATG 也能使用賽特神諭助手；重新開啟就恢復皇鼎限制。</div>
       </div>
       <button id="hdBtn">讀取中…</button>
     </div>
@@ -85,13 +85,13 @@ const LIVE_API="https://xinyao-atg-live.love06130430.workers.dev";
 const TOKEN_KEY="atg_admin_token";
 const MARK_RE=/\[\[XIANYAO_HD_ONLY=(0|1)\]\]/i;
 
-let current={enabled:false,message:"芯瑤 ATG 系統升級維護中，完成後將立即開放使用。",updatedAt:null};
+let current={enabled:false,message:"賽特神諭 ATG 系統升級維護中，完成後將立即開放使用。",updatedAt:null};
 let busy=false;
 const $=id=>document.getElementById(id);
 
 function visibleMessage(message){
   return String(message||"").replace(MARK_RE,"").replace(/\n{3,}/g,"\n\n").trim()||
-    "芯瑤 ATG 系統升級維護中，完成後將立即開放使用。";
+    "賽特神諭 ATG 系統升級維護中，完成後將立即開放使用。";
 }
 function hdOnly(message){
   const m=String(message||"").match(MARK_RE);
