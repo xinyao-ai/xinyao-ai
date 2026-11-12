@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         芯瑤💕 ATG 即時助手
+// @name         賽特神諭💕 ATG 即時助手
 // @namespace    xinyao-atg-ios
 // @version      1.3.0
 // @description  ATG iPhone Safari 即時資料助手＋雲端同步
@@ -1139,7 +1139,7 @@
             cursor:pointer;
           "
         >
-          🌸 芯瑤 ATG
+          🌸 賽特神諭 ATG
         </div>
 
         <div
@@ -1175,7 +1175,7 @@
             font-weight:800;
           "
         >
-          🌸 芯瑤 ATG 即時助手
+          🌸 賽特神諭 ATG 即時助手
         </div>
 
         <div
