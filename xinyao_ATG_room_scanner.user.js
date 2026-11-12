@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         芯瑤💕 ATG 全房分析
+// @name         賽特神諭💕 ATG 全房分析
 // @namespace    xinyao-atg-room-scanner
 // @version      2.1.3
-// @description  一鍵掃描 ATG 全房、整理房號統計，並可將非敏感房號快照同步到芯瑤 ATG AI助手。
+// @description  一鍵掃描 ATG 全房、整理房號統計，並可將非敏感房號快照同步到賽特神諭 ATG AI助手。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
 // @inject-into  page
@@ -1040,13 +1040,13 @@
     const target = window.open(siteUrl, 'xinyao-atg-ai');
 
     if (!target) {
-      state.scanError = '瀏覽器阻擋開啟芯瑤頁面，請允許彈出式視窗後再按一次。';
+      state.scanError = '瀏覽器阻擋開啟賽特神諭頁面，請允許彈出式視窗後再按一次。';
       scheduleRender();
       return;
     }
 
     state.scanError = '';
-    state.scanMessage = `正在同步 ${payload.rooms.length} 房到芯瑤…`;
+    state.scanMessage = `正在同步 ${payload.rooms.length} 房到賽特神諭…`;
     scheduleRender();
 
     let tries = 0;
@@ -1058,7 +1058,7 @@
 
       if (tries >= 16) {
         clearInterval(timer);
-        state.scanMessage = `✅ 已送出 ${payload.rooms.length} 房｜請到芯瑤「全房推薦」查看`;
+        state.scanMessage = `✅ 已送出 ${payload.rooms.length} 房｜請到賽特神諭「全房推薦」查看`;
         scheduleRender();
       }
     }, 500);
@@ -1362,7 +1362,7 @@
 
     state.panel.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px;">
-        <div style="font-weight:800;font-size:14px;">🌸 芯瑤 ATG 全房分析</div>
+        <div style="font-weight:800;font-size:14px;">🌸 賽特神諭 ATG 全房分析</div>
         <button id="xinyao-room-hide" style="${secondaryButtonStyle('padding:4px 8px;')}">縮小</button>
       </div>
 
@@ -1380,7 +1380,7 @@
         <button id="xinyao-scan-all" style="${buttonStyle()}">${state.scanRunning ? '掃描中…' : '一鍵掃描 4100 房'}</button>
         <button id="xinyao-stop" style="${secondaryButtonStyle()}">停止掃描</button>
         <button id="xinyao-expand" style="${secondaryButtonStyle()}">${ui.expanded ? '收合分析' : '完整分析'}</button>
-        <button id="xinyao-sync-site" style="${buttonStyle('grid-column:1 / -1;')}">🌸 同步到芯瑤</button>
+        <button id="xinyao-sync-site" style="${buttonStyle('grid-column:1 / -1;')}">🌸 同步到賽特神諭</button>
         <button id="xinyao-calibrate" style="${secondaryButtonStyle('grid-column:1 / -1;')}">${state.calibrationActive
           ? `校準中 ${state.calibrationSamples.length}/2｜請點 1 → 9`
           : (state.pageCalibration ? '重新校準頁碼' : '校準頁碼位置')}</button>
@@ -1398,7 +1398,7 @@
 
       ${expanded}
 
-      <div style="margin-top:8px;font-size:9px;opacity:.55;line-height:1.45;">僅整理房號、狀態、投注與派彩統計；不輸出帳密、Cookie 或 Token，同步功能只會傳送房號、狀態、投注與派彩統計到芯瑤頁面，不包含帳密、Cookie 或 Token。歷史統計不保證未來結果。</div>
+      <div style="margin-top:8px;font-size:9px;opacity:.55;line-height:1.45;">僅整理房號、狀態、投注與派彩統計；不輸出帳密、Cookie 或 Token，同步功能只會傳送房號、狀態、投注與派彩統計到賽特神諭頁面，不包含帳密、Cookie 或 Token。歷史統計不保證未來結果。</div>
     `;
 
     bindUiEvents();
