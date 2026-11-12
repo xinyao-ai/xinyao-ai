@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.65
+// @version      4.1.66
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -2223,6 +2223,21 @@ try {
       const n = Number(value);
       return Number.isInteger(n) && n >= 1 && n <= 4100 ? n : null;
     };
+    // 掃房「進入此房」：在原生確認完成後，獨立記下房號與 ID。
+    // 這是使用者經系統選房的房號，不能視為伺服器正式回傳的房號。
+    const selectedByOracle = (() => {
+      try {
+        const p = JSON.parse(sessionStorage.getItem('xinyao_oracle_confirmed_room_v1') || 'null');
+        if (!p || !Number.isFinite(Number(p.at)) || Date.now() - Number(p.at) > 30 * 60 * 1000) return null;
+        const room = valid(p.roomNumber);
+        const id = Number(p.roomId);
+        if (room === null || !Number.isFinite(id)) return null;
+        const stateId = currentRoomIdFromState();
+        // 另有目前房的伺服器 ID 且與選房不同，不得沿用上次所選房號。
+        if (stateId !== null && Number(stateId) !== id) return null;
+        return { room, id };
+      } catch (_) { return null; }
+    })();
     const engineIdentity = engine ? resolveRoomIdentityFromEngine(engine) : null;
     const engineRoom = valid(engineIdentity?.roomNumber);
     if (engineRoom !== null) return engineRoom;
@@ -2246,7 +2261,15 @@ try {
     const sceneIdentity = resolveRoomIdentityFromCocos();
     const sceneRoom = valid(sceneIdentity?.roomNumber);
     const currentId = currentRoomIdFromState();
-    if (sceneRoom !== null && currentId === null) return sceneRoom;
+    if (sceneRoom !== null && currentId === null) {
+      if (selectedByOracle && sceneRoom !== selectedByOracle.room) return null;
+      return sceneRoom;
+    }
+    // 若畫面辨識不出目前房，但最近由賽特神諭成功確認過進房，
+    // 可用已確認的使用者選房資訊；換房時事件會即刻清除舊選房。
+    if (selectedByOracle && (sceneRoom === null || sceneRoom === selectedByOracle.room)) {
+      return selectedByOracle.room;
+    }
 
     if (currentId !== null) {
       const mapped = valid(fullScanRoomNumberByRoomId(currentId)) ?? lookup(currentId);
@@ -5400,10 +5423,27 @@ try {
     };
   } catch (_) {}
 
+  // 只記錄原生進房確認成功的目標，不修改任何進房操作。
+  function oracleRecordConfirmedEntry(roomNumber, roomId) {
+    const n = finiteNumber(roomNumber), id = finiteNumber(roomId);
+    if (n === null || id === null || n < 1 || n > 4100) return;
+    try {
+      sessionStorage.setItem('xinyao_oracle_confirmed_room_v1',
+        JSON.stringify({ roomNumber: Math.trunc(n), roomId: Math.trunc(id), at: Date.now() }));
+    } catch (_) {}
+  }
+
   function publishCurrentRoomSelection(roomId, source = 'scanner') {
     const id = finiteNumber(roomId);
     if (id === null) return false;
     state.currentSelectedRoomId = id;
+    // 會員手動改選其他房間時，先使舊版後台歸屬失效。
+    try {
+      const old = JSON.parse(sessionStorage.getItem('xinyao_oracle_confirmed_room_v1') || 'null');
+      if (old && Number(old.roomId) !== id) {
+        sessionStorage.removeItem('xinyao_oracle_confirmed_room_v1');
+      }
+    } catch (_) {}
     const roomNumber = roomNumberByRoomIdFromScanner(id);
     try {
       window.dispatchEvent(new CustomEvent('xinyao:current-room-selected', {
@@ -9732,6 +9772,7 @@ try {
     const wantedId = Math.trunc(id);
     const roomText = String(roomNo).padStart(4,'0');
 
+    try { sessionStorage.removeItem('xinyao_oracle_confirmed_room_v1'); } catch (_) {}
     state.enterRoomBusy = true;
     state.enterRoomStatus = `⚡ 直達 ${roomText}｜準備原生頁面資料…`;
     scheduleRender();
@@ -9893,6 +9934,7 @@ try {
         throw new Error(`已選到 ${roomText}，但自動按確定失敗｜${dialogConfirm?.reason || 'unknown'}`);
       }
 
+      oracleRecordConfirmedEntry(roomNo, wantedId);
       state.enterRoomStatus = `✅ 已自動確認並進入 ${roomText} 房｜roomId=${wantedId}`;
       scheduleRender();
 
@@ -10505,6 +10547,7 @@ try {
     const wantedId = Math.trunc(id);
     const roomText = String(roomNo).padStart(4,'0');
 
+    try { sessionStorage.removeItem('xinyao_oracle_confirmed_room_v1'); } catch (_) {}
     state.enterRoomBusy = true;
     state.enterRoomStatus = `🐯 直達 ${roomText}｜準備原生頁面資料…`;
     scheduleRender();
@@ -10702,6 +10745,7 @@ try {
         );
       }
 
+      oracleRecordConfirmedEntry(roomNo, wantedId);
       state.enterRoomStatus =
         `✅ 🐯 已自動確認並進入 ${roomText} 房｜roomId=${wantedId}`;
       scheduleRender();
