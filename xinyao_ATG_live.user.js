@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.63
+// @version      4.1.64
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -2215,19 +2215,45 @@ try {
     return '未識別遊戲';
   }
 
-  function oracleRecordedRoomNumber() {
-    const n = Number(state.currentRoomNumber);
-    if (Number.isInteger(n) && n >= 1 && n <= 4100) return n;
-    // 房號與 roomId 可能不同步；只接受原有掃房表裡實際對應的號碼。
-    const id = currentRoomIdFromState();
-    if (id !== null) {
-      const mapped = fullScanRoomNumberByRoomId(id);
-      if (Number.isInteger(mapped) && mapped >= 1 && mapped <= 4100) return mapped;
+  // 每一局單獨確認房號。換房後若尚未拿到新號碼，寧可保持未確認，
+  // 也不會拿上一個房號充當本局房號；此函式只用於上傳紀錄。
+  function oracleRecordedRoomNumber(engine = null) {
+    const valid = value => {
+      if (value === null || value === undefined || value === '') return null;
+      const n = Number(value);
+      return Number.isInteger(n) && n >= 1 && n <= 4100 ? n : null;
+    };
+    const engineIdentity = engine ? resolveRoomIdentityFromEngine(engine) : null;
+    const engineRoom = valid(engineIdentity?.roomNumber);
+    if (engineRoom !== null) return engineRoom;
+
+    const engineId = engine ? findNamedNumber(engine, new Set(['roomid','tableid'])) : null;
+    if (engineId !== null) {
+      const mapped = valid(fullScanRoomNumberByRoomId(engineId));
+      // 結算封包帶有其他房間 ID 時，不沿用上一房號。
+      if (mapped !== null) return mapped;
+      const currentId = currentRoomIdFromState();
+      if (currentId === null || String(currentId) !== String(engineId)) return null;
     }
-    // 畫面上能確認目前機台時再附上房號，禁止將 runtime/roomId 當房號。
-    const current = resolveRoomIdentityFromCocos();
-    const candidate = Number(current?.roomNumber);
-    return Number.isInteger(candidate) && candidate >= 1 && candidate <= 4100 ? candidate : null;
+
+    // 優先比對當下 Cocos 的「正在遊玩」機台資訊，而非掃房推薦榜。
+    const sceneIdentity = resolveRoomIdentityFromCocos();
+    const sceneRoom = valid(sceneIdentity?.roomNumber);
+    const currentId = currentRoomIdFromState();
+    if (sceneRoom !== null && currentId === null) return sceneRoom;
+
+    if (currentId !== null) {
+      const mapped = valid(fullScanRoomNumberByRoomId(currentId));
+      if (mapped !== null) return mapped;
+    }
+
+    // 只使用本房已確認狀態；runtime key 無法證明房號。
+    const stateRoom = valid(state.currentRoomNumber);
+    if (stateRoom !== null && !String(state.currentRoomKey || '').startsWith('runtime:')) {
+      if (sceneRoom !== null && sceneRoom !== stateRoom) return null;
+      return stateRoom;
+    }
+    return sceneRoom;
   }
 
   // 免遊只有「明確購買動作且遊戲端確認成功」才列為付費購買。
@@ -2340,7 +2366,7 @@ try {
       const eventBet = toNumber(finalState.totalStake);
       if (deviceToken && eventBet !== null && payout !== null && eventBet >= 0 && payout >= 0) {
         const eventGame = oracleRecordedGameName(gameProfileHint);
-        const eventRoom = oracleRecordedRoomNumber();
+        const eventRoom = oracleRecordedRoomNumber(engine);
         const buyConfirmed = oracleConfirmedPaidFreeBuy(engine, finalState);
         const body = {
           spinId, stake: eventBet, payout,
