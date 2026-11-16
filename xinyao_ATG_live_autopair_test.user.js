@@ -2790,7 +2790,7 @@ try {
     const pairBox = !deviceToken ? `
       <div class="xinyaoGroup xinyaoPairGroup">
       <div style="font-size:10px;line-height:1.45;opacity:.84;margin-bottom:6px;">
-        \${autoPairTransportStatus}｜手動配對仍可使用
+        ${autoPairTransportStatus}｜手動配對仍可使用
       </div>
       <div style="display:flex;gap:5px;">
         <input id="xinyaoPairInput" maxlength="12" placeholder="配對碼"
