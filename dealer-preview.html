@@ -3165,9 +3165,20 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
        if(v===DEFAULT.register)a.setAttribute('href',d.register);
        if(v===DEFAULT.line)a.setAttribute('href',d.line);
      }
+     // 登入後右下角固定 LINE 浮動按鈕，明確鎖定經銷商的客服網址。
+     const floating=document.getElementById('appLineFloat');
+     if(floating&&floating.getAttribute('href')!==d.line)floating.setAttribute('href',d.line);
    };
    fix();
    new MutationObserver(fix).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['href']});
+   // 在點擊前再確認一次，避免其他登入流程重設連結。
+   document.addEventListener('click',event=>{
+     const a=event.target.closest?.('a');
+     if(!a)return;
+     if(a.id==='appLineFloat'||a.classList.contains('oracle-guide-line')){
+       a.setAttribute('href',d.line);
+     }
+   },true);
    lock.remove();
  }
  async function start(){
