@@ -34,5 +34,13 @@
       "mobile": "https://xinyao-ai.github.io/xinyao-ai/assets/carousel/1793542025701-1-mobile.png",
       "enabled": true
     }
-  ]
+  ],
+  "dealerRegistry": {
+    "A001": {
+      "name": "經銷商 A001",
+      "register": "https://hd5957.com/?aff=sx59vt",
+      "line": "https://lin.ee/piiNk2M",
+      "enabled": true
+    }
+  }
 }
