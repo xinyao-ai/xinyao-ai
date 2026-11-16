@@ -406,6 +406,7 @@
           clearInterval(timer);
           clearTimeout(expireTimer);
           window.removeEventListener('message',onReply);
+          window.removeEventListener('message',onRequest);
         };
         // ATG 遊戲可能是遊戲大廳裡的跨網域 iframe，因此巡查視窗及其子框架。
         const send = (win,depth=0) => {
@@ -416,12 +417,27 @@
             for(let i=0;i<count;i++)send(win.frames[i],depth+1);
           }catch(_){}
         };
+        // 遊戲端主動握手：即使跨網域遊戲 iframe 無法被主頁逐層找到，也能向開啟它的會員頁要求一次性配對。
+        const onRequest = event => {
+          if (done || Date.now()>=until) return;
+          if (event.origin !== 'https://play.godeebxp.com') return;
+          if (event.data?.type !== 'seth-oracle:auto-pair-request:v1') return;
+          if (!event.source || typeof event.source.postMessage !== 'function') return;
+          try {
+            event.source.postMessage({type:'seth-oracle:auto-pair:v1',pairCode:code},event.origin);
+            betaStatus('已收到遊戲端請求，正在自動綁定…');
+          } catch (err) {
+            betaStatus('遊戲端連線受限，請手動配對');
+          }
+        };
+        window.addEventListener('message',onRequest);
         window.addEventListener('message',onReply);
         const timer=setInterval(()=>{
           if(done)return;
           if(Date.now()>=until||!gameWindow||gameWindow.closed){
             clearInterval(timer);
             window.removeEventListener('message',onReply);
+          window.removeEventListener('message',onRequest);
             if(!done)betaStatus('未接到遊戲端回覆，請手動配對');
             return;
           }
