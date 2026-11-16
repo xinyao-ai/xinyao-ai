@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 自動配對測試版（請停用正式版再測試）
 // @namespace    seth-oracle-autopair-isolated-test
-// @version      4.1.66-autopair-beta2
+// @version      4.1.66-autopair-beta3
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -2724,6 +2724,24 @@ try {
       event.source?.postMessage({type:'seth-oracle:auto-pair-result:v1',ok:false},event.origin);
     } finally {autoPairInProgress = false;}
   });
+
+
+  // 測試版：遊戲窗口主動向開啟自己的賽特神諭測試頁請求一次性授權。
+  // 不傳送會員密碼或既有登入憑證；找不到開啟頁時維持手動配對。
+  function autoPairRequest() {
+    if (deviceToken || autoPairInProgress || state.pairBusy) return;
+    const request={type:'seth-oracle:auto-pair-request:v1'};
+    try {
+      const opener=window.opener || window.top?.opener;
+      if (opener && !opener.closed) opener.postMessage(request,'https://xinyao-ai.github.io');
+    } catch (_) {}
+  }
+  autoPairRequest();
+  const autoPairRequestTimer=setInterval(() => {
+    if (deviceToken) {clearInterval(autoPairRequestTimer);return;}
+    autoPairRequest();
+  },1500);
+  setTimeout(()=>clearInterval(autoPairRequestTimer),90000);
 
   function render() {
     if (!panel) return;
