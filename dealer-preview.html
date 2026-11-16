@@ -3151,7 +3151,12 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
   });
   // 取得經銷商正式網址後，在此處新增：
   // A001: { register:'https://經銷商的皇鼎註冊網址', line:'https://lin.ee/經銷商LINE代碼' }
-  const DEALERS = Object.freeze({});
+  const DEALERS = Object.freeze({
+    A001: Object.freeze({
+      register: 'https://hd5957.com/?aff=sx59vt',
+      line: 'https://lin.ee/piiNk2M'
+    })
+  });
   const dealer = new URLSearchParams(location.search).get('dealer') || '';
   const config = Object.prototype.hasOwnProperty.call(DEALERS, dealer) ? DEALERS[dealer] : DEFAULT;
   const permitted = value => {
