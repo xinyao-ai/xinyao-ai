@@ -64,11 +64,11 @@ button{margin:16px 5px;padding:12px 18px;border:0;border-radius:9px;background:#
 .secondary{background:#3a4441;color:#f6ddb2}</style>
 <h2>👑 經銷商專屬設定</h2><p>輸入經銷商編號，例如 A001。原版不需要輸入。</p>
 <input id="dealer" maxlength="24" value="${dealerCode}" placeholder="A001">
-<div><button onclick="go()">儲存並切換</button><button class="secondary" onclick="location.href='sethoracle://configure?dealer='">恢復原版</button></div>
+<div><button onclick="go()">儲存並切換</button><button class="secondary" onclick="location.href='https://xinyao-ai.github.io/xinyao-ai/__dealer_configure__?dealer='">恢復原版</button></div>
 <p>只有已啟用的經銷商代碼可以使用。</p>
-<script>function go(){location.href='sethoracle://configure?dealer='+encodeURIComponent(document.getElementById('dealer').value.trim())}</script></html>`;
+<script>function go(){location.href='https://xinyao-ai.github.io/xinyao-ai/__dealer_configure__?dealer='+encodeURIComponent(document.getElementById('dealer').value.trim())}</script></html>`;
   popup.webContents.on('will-navigate', async (event,url) => {
-    if (!url.startsWith('sethoracle://configure')) return;
+    if (!url.startsWith('https://xinyao-ai.github.io/xinyao-ai/__dealer_configure__?')) return;
     event.preventDefault();
     let candidate='';
     try {candidate=normalizeDealer(new URL(url).searchParams.get('dealer'));}catch(_){}
