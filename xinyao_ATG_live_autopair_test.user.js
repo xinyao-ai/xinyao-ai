@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 自動配對測試版（請停用正式版再測試）
 // @namespace    seth-oracle-autopair-isolated-test
-// @version      4.1.66-autopair-beta1
+// @version      4.1.66-autopair-beta2
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -2763,7 +2763,7 @@ try {
     const pairBox = !deviceToken ? `
       <div class="xinyaoGroup xinyaoPairGroup">
       <div style="font-size:10px;line-height:1.45;opacity:.84;margin-bottom:6px;">
-        第一次使用請輸入賽特神諭顯示的配對碼
+        🧪 自動配對測試版已載入｜自動配對失敗時仍可手動輸入配對碼
       </div>
       <div style="display:flex;gap:5px;">
         <input id="xinyaoPairInput" maxlength="12" placeholder="配對碼"
