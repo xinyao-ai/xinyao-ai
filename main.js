@@ -1,11 +1,103 @@
 'use strict';
-const { app, BrowserWindow, net, dialog } = require('electron');
+const { app, BrowserWindow, net, dialog, Menu } = require('electron');
+const fs = require('fs');
 const path = require('path');
 const APP_ICON = path.join(__dirname, 'icon-512.png');
 
 const SITE = 'https://xinyao-ai.github.io/xinyao-ai/';
 const SCRIPT_URL = 'https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/main/xinyao_ATG_live.user.js';
 const GAME_ORIGIN = 'https://play.godeebxp.com';
+const DEALER_PREVIEW = SITE + 'dealer-preview.html?dealer=';
+const DEALER_CONFIG = SITE + 'carousel-config.json';
+const DEALER_CODE_FILE = () => path.join(app.getPath('userData'), 'dealer-code.json');
+let dealerCode = '';
+
+function normalizeDealer(value) {
+  const result = String(value || '').trim().toUpperCase();
+  return /^[A-Z0-9_-]{2,24}$/.test(result) ? result : '';
+}
+
+async function verifyDealer(code) {
+  if (!code) return false;
+  try {
+    const res = await net.fetch(DEALER_CONFIG + '?t=' + Date.now(), {cache: 'no-store'});
+    if (!res.ok) return false;
+    const config = await res.json();
+    const d = config.dealerRegistry?.[code];
+    if (!d || d.enabled === false) return false;
+    const reg = new URL(d.register), line = new URL(d.line);
+    return reg.protocol === 'https:' &&
+      (reg.hostname === 'hd5957.com' || reg.hostname.endsWith('.hd5957.com')) &&
+      line.protocol === 'https:' && line.hostname === 'lin.ee';
+  } catch (err) {
+    console.warn('[SethOracle] Unable to verify dealer:', err.message);
+    return false;
+  }
+}
+
+function readSavedDealer() {
+  try {
+    return normalizeDealer(JSON.parse(fs.readFileSync(DEALER_CODE_FILE(), 'utf8')).dealer);
+  } catch (_) { return ''; }
+}
+
+function persistDealer(code) {
+  fs.writeFileSync(DEALER_CODE_FILE(), JSON.stringify({dealer:code}), {mode:0o600});
+  dealerCode = code;
+}
+
+function siteForDealer() {
+  return dealerCode ? DEALER_PREVIEW + encodeURIComponent(dealerCode) : SITE;
+}
+
+async function openDealerSettings(window) {
+  const popup = new BrowserWindow({
+    parent: window, modal: true, width: 460, height: 330, resizable: false,
+    title: '賽特神諭｜經銷商設定', icon: APP_ICON,
+    autoHideMenuBar: true,
+    webPreferences: {nodeIntegration:false,contextIsolation:true,sandbox:true}
+  });
+  const html = `<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><title>經銷商設定</title>
+<style>body{margin:0;background:#101e20;color:#f6d98a;font-family:"Microsoft JhengHei",sans-serif;padding:24px;text-align:center}
+h2{margin:0 0 12px}p{font-size:13px;color:#ddd0af}input{width:95%;box-sizing:border-box;padding:12px;border-radius:9px;background:#1e2c2d;color:white;border:1px solid #c7a669;text-align:center;font-size:18px}
+button{margin:16px 5px;padding:12px 18px;border:0;border-radius:9px;background:#edc66f;font-weight:bold;cursor:pointer}
+.secondary{background:#3a4441;color:#f6ddb2}</style>
+<h2>👑 經銷商專屬設定</h2><p>輸入經銷商編號，例如 A001。原版不需要輸入。</p>
+<input id="dealer" maxlength="24" value="${dealerCode}" placeholder="A001">
+<div><button onclick="go()">儲存並切換</button><button class="secondary" onclick="location.href='sethoracle://configure?dealer='">恢復原版</button></div>
+<p>只有已啟用的經銷商代碼可以使用。</p>
+<script>function go(){location.href='sethoracle://configure?dealer='+encodeURIComponent(document.getElementById('dealer').value.trim())}</script></html>`;
+  popup.webContents.on('will-navigate', async (event,url) => {
+    if (!url.startsWith('sethoracle://configure')) return;
+    event.preventDefault();
+    let candidate='';
+    try {candidate=normalizeDealer(new URL(url).searchParams.get('dealer'));}catch(_){}
+    if (candidate && !(await verifyDealer(candidate))) {
+      dialog.showMessageBoxSync(popup,{type:'warning',title:'經銷商代碼無效',message:'找不到已啟用的經銷商代碼，請確認後再試。'});
+      return;
+    }
+    try {
+      persistDealer(candidate);
+      if (!popup.isDestroyed()) popup.close();
+      if (!window.isDestroyed()) await window.loadURL(siteForDealer());
+    } catch(e) {
+      dialog.showErrorBox('切換失敗', String(e));
+    }
+  });
+  await popup.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+}
+
+function setupDealerMenu(window) {
+  const menu = Menu.buildFromTemplate([
+    {label:'賽特神諭',submenu:[
+      {label:'經銷商代碼設定',accelerator:'CommandOrControl+Shift+D',click:()=>openDealerSettings(window)},
+      {type:'separator'},
+      {label:'回到首頁',click:()=>window.loadURL(siteForDealer())}
+    ]}
+  ]);
+  window.setMenu(menu);
+}
+
 let scriptText = '';
 const configured = new WeakSet();
 const injectionPromises = new WeakMap();
@@ -118,7 +210,14 @@ app.whenReady().then(async () => {
     webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true }
   });
   setupInjection(mainWindow.webContents);
-  await mainWindow.loadURL(SITE);
+  dealerCode = readSavedDealer();
+  // 驗證失敗時不更動原版設定；經銷商代碼仍保存在本機供稍後重試。
+  if (dealerCode && !(await verifyDealer(dealerCode))) {
+    console.warn('[SethOracle] Saved dealer unavailable, opening original site');
+    dealerCode = '';
+  }
+  setupDealerMenu(mainWindow);
+  await mainWindow.loadURL(siteForDealer());
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -127,7 +226,8 @@ app.whenReady().then(async () => {
         webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true }
       });
       setupInjection(win.webContents);
-      win.loadURL(SITE);
+      setupDealerMenu(win);
+      win.loadURL(siteForDealer());
     }
   });
 });
