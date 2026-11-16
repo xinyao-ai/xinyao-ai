@@ -377,31 +377,64 @@
 
     try { gameWindow.focus(); } catch (_) {}
 
-    // 自動配對測試：會員頁使用已驗證的 session 向後端取得一次性配對碼，
-    // 只送到 ATG 遊戲來源。無法送達時保留原本的手動配對流程。
+    // 獨立測試模式診斷資訊；不更動正式版流程。
+    const betaStatus = message => {
+      const badge = document.getElementById('autopairTestBanner');
+      if (badge) badge.textContent = '🧪 自動配對測試｜' + message;
+      console.info('[SethOracle AutoPair Beta]',message);
+    };
+    // 只有會員在這張測試頁點選遊戲才啟動。身份驗證依舊由雲端 /session 檢查。
     (async () => {
+      betaStatus('正在取得一次性配對授權…');
       try {
         const result = await api('/pair/start', {
           method:'POST',headers:{'Content-Type':'application/json'}
         });
         const code = String(result.pairCode || '');
-        if (!/^[A-Z0-9]{4,12}$/.test(code)) return;
+        if (!/^[A-Z0-9]{4,12}$/.test(code)) {
+          betaStatus('後端未提供有效配對碼，請改用手動配對');
+          return;
+        }
+        let done=false;
         const until = Math.min(Date.now()+90000,Number(result.expiresAt)||Date.now()+90000);
+        const onReply = event => {
+          if(event.origin!=='https://play.godeebxp.com')return;
+          if(event.data?.type!=='seth-oracle:auto-pair-result:v1')return;
+          if(done)return;
+          done=true;
+          betaStatus(event.data.ok?'已收到遊戲端配對成功回覆 ✅':'遊戲端回覆配對失敗，請手動配對');
+          clearInterval(timer);
+          clearTimeout(expireTimer);
+          window.removeEventListener('message',onReply);
+        };
+        // ATG 遊戲可能是遊戲大廳裡的跨網域 iframe，因此巡查視窗及其子框架。
         const send = (win,depth=0) => {
-          if (!win || depth > 3) return;
+          if (!win || depth > 5) return;
           try {win.postMessage({type:'seth-oracle:auto-pair:v1',pairCode:code},'https://play.godeebxp.com')}catch(_){}
           try {
-            const count=Math.min(win.frames.length,16);
-            for(let i=0;i<count;i++) send(win.frames[i],depth+1);
+            const count=Math.min(win.frames.length,24);
+            for(let i=0;i<count;i++)send(win.frames[i],depth+1);
           }catch(_){}
         };
+        window.addEventListener('message',onReply);
         const timer=setInterval(()=>{
-          if(Date.now()>=until || !gameWindow || gameWindow.closed){clearInterval(timer);return}
+          if(done)return;
+          if(Date.now()>=until||!gameWindow||gameWindow.closed){
+            clearInterval(timer);
+            window.removeEventListener('message',onReply);
+            if(!done)betaStatus('未接到遊戲端回覆，請手動配對');
+            return;
+          }
           send(gameWindow);
         },1000);
+        const expireTimer=setTimeout(()=>{
+          if(!done)betaStatus('未收到遊戲端配對回覆；請檢查測試腳本是否啟用');
+        },20000);
+        betaStatus('已取得授權，正在等待遊戲端接收…');
         send(gameWindow);
-        setTimeout(()=>clearInterval(timer),95000);
-      }catch(err){console.warn('[賽特神諭自動配對測試] 未連線，請使用原本的手動配對',err)}
+      }catch(err){
+        betaStatus('授權失敗：'+String(err?.message||'請用手動配對').slice(0,100));
+      }
     })();
 
 
