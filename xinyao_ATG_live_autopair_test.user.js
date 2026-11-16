@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 自動配對測試版（請停用正式版再測試）
 // @namespace    seth-oracle-autopair-isolated-test
-// @version      4.1.66-autopair-beta3
+// @version      4.1.66-autopair-beta4
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -2728,15 +2728,24 @@ try {
 
   // 測試版：遊戲窗口主動向開啟自己的賽特神諭測試頁請求一次性授權。
   // 不傳送會員密碼或既有登入憑證；找不到開啟頁時維持手動配對。
+  let autoPairTransportStatus = '正在檢查遊戲與會員頁的連線…';
   function autoPairRequest() {
     if (deviceToken || autoPairInProgress || state.pairBusy) return;
     const request={type:'seth-oracle:auto-pair-request:v1'};
     try {
       const opener=window.opener || window.top?.opener;
-      if (opener && !opener.closed) opener.postMessage(request,'https://xinyao-ai.github.io');
-    } catch (_) {}
+      if (!opener || opener.closed) {
+        autoPairTransportStatus='未找到會員頁連線（可能被皇鼎跳轉或瀏覽器隔離），需要後端綁定接口';
+        return;
+      }
+      opener.postMessage(request,'https://xinyao-ai.github.io');
+      autoPairTransportStatus='已向會員頁發送配對請求，等待授權回覆…';
+    } catch (err) {
+      autoPairTransportStatus='跨網站傳訊受限：'+String(err?.message||'請使用手動配對').slice(0,40);
+    }
   }
   autoPairRequest();
+  setTimeout(()=>{if(!deviceToken)render()},2000);
   const autoPairRequestTimer=setInterval(() => {
     if (deviceToken) {clearInterval(autoPairRequestTimer);return;}
     autoPairRequest();
@@ -2781,7 +2790,7 @@ try {
     const pairBox = !deviceToken ? `
       <div class="xinyaoGroup xinyaoPairGroup">
       <div style="font-size:10px;line-height:1.45;opacity:.84;margin-bottom:6px;">
-        🧪 自動配對測試版已載入｜自動配對失敗時仍可手動輸入配對碼
+        \${autoPairTransportStatus}｜手動配對仍可使用
       </div>
       <div style="display:flex;gap:5px;">
         <input id="xinyaoPairInput" maxlength="12" placeholder="配對碼"
