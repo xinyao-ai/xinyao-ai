@@ -3179,6 +3179,15 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
        a.setAttribute('href',d.line);
      }
    },true);
+   // 僅經銷商頁面顯示安裝版設定提示，不修改原版首頁。
+   const downloads=document.querySelector('.oracle-downloads-actions');
+   if(downloads&&!document.getElementById('dealerInstallHelp')){
+     const hint=document.createElement('p');
+     hint.id='dealerInstallHelp';
+     hint.style.cssText='margin:10px 0;padding:12px;border:1px solid #a88d55;border-radius:12px;background:#172525;color:#f3d594;font-size:13px;line-height:1.7;';
+     hint.textContent='👑 Windows 安裝版：開啟後按 Ctrl + Shift + D，輸入專屬經銷商編號 '+id+'，儲存後會自動記住。Android APK 尚未加入經銷商切換，請先使用此專屬網頁。';
+     downloads.insertAdjacentElement('afterend',hint);
+   }
    lock.remove();
  }
  async function start(){
