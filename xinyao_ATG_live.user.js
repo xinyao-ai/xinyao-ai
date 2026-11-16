@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.66
+// @version      4.1.67
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -2703,6 +2703,54 @@ try {
     return true;
   }
 
+  // 自動配對：僅接受賽特神諭官方網站傳來的一次性配對碼。
+  // 不修改既有掃描、進房、手動配對；失敗時仍可手動輸入。
+  let autoPairInProgress = false;
+  window.addEventListener('message', async event => {
+    if (event.origin !== 'https://xinyao-ai.github.io') return;
+    const data = event.data;
+    if (!data || data.type !== 'seth-oracle:auto-pair:v1') return;
+    if (!/^[A-Z0-9]{4,12}$/.test(String(data.pairCode || ''))) return;
+    if (deviceToken || state.pairBusy || autoPairInProgress) return;
+    autoPairInProgress = true;
+    try {
+      await claimPairCode(data.pairCode);
+      event.source?.postMessage({type:'seth-oracle:auto-pair-result:v1',ok:true},event.origin);
+    } catch (error) {
+      state.pairBusy = false;
+      state.pairMessage = '自動綁定失敗，可改用配對碼';
+      render();
+      event.source?.postMessage({type:'seth-oracle:auto-pair-result:v1',ok:false},event.origin);
+    } finally {autoPairInProgress = false;}
+  });
+
+
+  // 遊戲窗口主動向開啟自己的賽特神諭會員頁請求一次性授權。
+  // 不傳送會員密碼或既有登入憑證；找不到開啟頁時維持手動配對。
+  let autoPairTransportStatus = '正在檢查遊戲與會員頁的連線…';
+  function autoPairRequest() {
+    if (deviceToken || autoPairInProgress || state.pairBusy) return;
+    const request={type:'seth-oracle:auto-pair-request:v1'};
+    try {
+      const opener=window.opener || window.top?.opener;
+      if (!opener || opener.closed) {
+        autoPairTransportStatus='未找到會員頁連線（可能被皇鼎跳轉或瀏覽器隔離），需要後端綁定接口';
+        return;
+      }
+      opener.postMessage(request,'https://xinyao-ai.github.io');
+      autoPairTransportStatus='已向會員頁發送配對請求，等待授權回覆…';
+    } catch (err) {
+      autoPairTransportStatus='跨網站傳訊受限：'+String(err?.message||'請使用手動配對').slice(0,40);
+    }
+  }
+  autoPairRequest();
+  setTimeout(()=>{if(!deviceToken)render()},2000);
+  const autoPairRequestTimer=setInterval(() => {
+    if (deviceToken) {clearInterval(autoPairRequestTimer);return;}
+    autoPairRequest();
+  },1500);
+  setTimeout(()=>clearInterval(autoPairRequestTimer),90000);
+
   function render() {
     if (!panel) return;
 
@@ -2741,7 +2789,7 @@ try {
     const pairBox = !deviceToken ? `
       <div class="xinyaoGroup xinyaoPairGroup">
       <div style="font-size:10px;line-height:1.45;opacity:.84;margin-bottom:6px;">
-        第一次使用請輸入賽特神諭顯示的配對碼
+        ${autoPairTransportStatus}｜如未自動配對，仍可手動輸入配對碼
       </div>
       <div style="display:flex;gap:5px;">
         <input id="xinyaoPairInput" maxlength="12" placeholder="配對碼"
