@@ -4602,8 +4602,33 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
         openAnalyzer(loggedInMember);
       }
     }
-    oracleSsoLoginButton.addEventListener('click', () => {
-      window.location.assign(ORACLE_HD_SSO + '/start');
+    oracleSsoLoginButton.addEventListener('click', async () => {
+      if (oracleSsoLoginButton.disabled) return;
+      oracleSsoLoginButton.disabled = true;
+      oracleSsoLoginButton.textContent = '正在確認皇鼎登入狀態…';
+      try {
+        // 若本站已有經皇鼎 SSO 驗證的憑證，先驗證，成功就直接進入。
+        const saved = sessionStorage.getItem(ORACLE_SSO_ACCESS_KEY);
+        if (saved) {
+          try {
+            const me = await oracleSsoFetch('/me', {
+              headers: { Authorization: 'Bearer ' + saved }
+            });
+            if (me.username) {
+              memberAccountInput.value = me.username;
+              openAnalyzer(me.username);
+              return;
+            }
+          } catch (_) {
+            sessionStorage.removeItem(ORACLE_SSO_ACCESS_KEY);
+          }
+        }
+        // 沒有有效憑證，仍由皇鼎官方驗證，不繞過帳密。
+        window.location.assign(ORACLE_HD_SSO + '/start');
+      } finally {
+        oracleSsoLoginButton.disabled = false;
+        oracleSsoLoginButton.textContent = '🔐 皇鼎會員一鍵登入';
+      }
     });
 
     oracleHandleSsoReturn();
