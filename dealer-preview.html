@@ -3141,51 +3141,49 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
 #loginPage .login-form-card-539 #oracleHdSsoLogin:disabled{opacity:.7;cursor:wait!important}
 </style>
 <script id="seth-dealer-preview-only">
-/* 經銷商專屬入口測試版：此檔案獨立於正式首頁，正式版不受影響。
-   未設定的經銷商一律退回原版網址；不可用網址參數覆蓋註冊／LINE 目標。 */
 (() => {
-  'use strict';
-  const DEFAULT = Object.freeze({
-    register: 'https://gs42oj.hd5957.com/register',
-    line: 'https://lin.ee/TOLUjbR'
-  });
-  // 取得經銷商正式網址後，在此處新增：
-  // A001: { register:'https://經銷商的皇鼎註冊網址', line:'https://lin.ee/經銷商LINE代碼' }
-  const DEALERS = Object.freeze({
-    A001: Object.freeze({
-      register: 'https://hd5957.com/?aff=sx59vt',
-      line: 'https://lin.ee/piiNk2M'
-    })
-  });
-  const dealer = new URLSearchParams(location.search).get('dealer') || '';
-  const config = Object.prototype.hasOwnProperty.call(DEALERS, dealer) ? DEALERS[dealer] : DEFAULT;
-  const permitted = value => {
-    try { const u = new URL(value); return u.protocol === 'https:'; }
-    catch (_) { return false; }
-  };
-  const registration = permitted(config.register) ? config.register : DEFAULT.register;
-  const contact = permitted(config.line) ? config.line : DEFAULT.line;
-  function replaceLinks() {
-    for (const a of document.querySelectorAll('a[href]')) {
-      const original = a.getAttribute('href');
-      if (original === DEFAULT.register && original !== registration) a.setAttribute('href', registration);
-      if (original === DEFAULT.line && original !== contact) a.setAttribute('href', contact);
-    }
-  }
-  function init() {
-    replaceLinks();
-    new MutationObserver(replaceLinks).observe(document.body, {subtree:true, childList:true, attributes:true, attributeFilter:['href']});
-    if (dealer) {
-      const badge = document.createElement('div');
-      badge.textContent = Object.prototype.hasOwnProperty.call(DEALERS, dealer)
-        ? '經銷商測試模式：' + dealer
-        : '測試模式：尚未設定 ' + dealer + '，使用原版連結';
-      badge.style.cssText = 'position:fixed;left:12px;bottom:10px;z-index:2147483646;padding:7px 11px;border:1px solid #d6b46c;border-radius:12px;background:#102326;color:#f1d38b;font:700 12px sans-serif;pointer-events:none;max-width:75vw';
-      document.body.appendChild(badge);
-    }
-  }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, {once:true});
-  else init();
+ 'use strict';
+ const DEFAULT={register:'https://gs42oj.hd5957.com/register',line:'https://lin.ee/TOLUjbR'};
+ const id=(new URLSearchParams(location.search).get('dealer')||'').trim().toUpperCase();
+ if(!id)return;
+ const lock=document.createElement('style');lock.textContent='body{visibility:hidden!important}';document.head.appendChild(lock);
+ const acceptable=(u,kind)=>{
+  try{const x=new URL(u);return x.protocol==='https:'&&(kind==='register'?(x.hostname==='hd5957.com'||x.hostname.endsWith('.hd5957.com')):x.hostname==='lin.ee')}catch{return false}
+ };
+ function unavailable(msg){
+   document.body.replaceChildren();
+   const box=document.createElement('main');
+   box.style.cssText='min-height:100vh;background:#0d1718;color:#e9c77e;font:700 17px sans-serif;display:grid;place-content:center;text-align:center;padding:30px';
+   const h=document.createElement('h2');h.textContent='賽特神諭｜專屬入口暫不可用';box.appendChild(h);
+   const p=document.createElement('p');p.textContent=msg;box.appendChild(p);
+   document.body.appendChild(box);lock.remove();
+ }
+ function activate(d){
+   const fix=()=>{
+     for(const a of document.querySelectorAll('a[href]')){
+       const v=a.getAttribute('href');
+       if(v===DEFAULT.register)a.setAttribute('href',d.register);
+       if(v===DEFAULT.line)a.setAttribute('href',d.line);
+     }
+   };
+   fix();
+   new MutationObserver(fix).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['href']});
+   lock.remove();
+ }
+ async function start(){
+  try{
+   const res=await fetch('./carousel-config.json?t='+Date.now(),{cache:'no-store'});
+   if(!res.ok)throw Error('設定讀取失敗');
+   const config=await res.json();
+   const dealer=config.dealerRegistry&&config.dealerRegistry[id];
+   if(!dealer||dealer.enabled===false||!acceptable(dealer.register,'register')||!acceptable(dealer.line,'line')){
+     unavailable('此經銷商入口尚未啟用或已停用。');return;
+   }
+   activate(dealer);
+  }catch(err){unavailable('暫時無法載入經銷商設定，請稍後重試。')}
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
+ else start();
 })();
 </script>
 </head>
