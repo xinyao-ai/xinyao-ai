@@ -3,6 +3,11 @@ name: SethOracle iOS Build
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-build.yml'
 
 permissions:
   contents: read
@@ -19,6 +24,9 @@ jobs:
       - name: Find iOS Project
         run: |
           find . -name "*.xcodeproj" -print
+
+      - name: Show available Xcode schemes
+        run: xcodebuild -list -project ios/SethOracle.xcodeproj
 
       - name: Build iOS Device (unsigned)
         run: |
