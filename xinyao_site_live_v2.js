@@ -23,18 +23,18 @@
       overlay.id = 'xinyaoSiteMaintenanceOverlay';
       overlay.setAttribute('role','status');
       overlay.setAttribute('aria-live','polite');
-      overlay.style.cssText = `position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:22px;box-sizing:border-box;background:linear-gradient(135deg,#fff7fb,#ffeaf3);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;`;
+      overlay.style.cssText = `position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:22px;box-sizing:border-box;background:linear-gradient(145deg,#071316 0%,#10272a 54%,#080e12 100%);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;`;
       overlay.innerHTML = `
-        <div style="width:min(520px,100%);background:#fff;border:1px solid #f2dbe6;border-radius:24px;padding:30px 24px;box-shadow:0 24px 80px rgba(118,45,78,.18);text-align:center;">
+        <div style="width:min(520px,100%);background:linear-gradient(160deg,#132224 0%,#0a1517 100%);border:1px solid #d6b15f;border-radius:24px;padding:30px 24px;box-shadow:0 24px 80px rgba(0,0,0,.5);text-align:center;">
           <div style="font-size:42px;margin-bottom:8px;">🛠️</div>
-          <div style="font-size:22px;font-weight:900;color:#513d47;">賽特神諭 ATG 系統維護中</div>
-          <div id="xinyaoSiteMaintenanceMessage" style="margin-top:12px;color:#806773;font-size:14px;line-height:1.8;"></div>
-          <div style="margin-top:18px;font-size:12px;color:#b08d9d;">維護完成後將自動恢復，不需要重新安裝程式。</div>
+          <div style="font-size:22px;font-weight:900;color:#f4d585;">賽特神諭 ATG 系統維護中</div>
+          <div id="xinyaoSiteMaintenanceMessage" style="margin-top:12px;color:#ead9b2;font-size:14px;line-height:1.8;"></div>
+          
         </div>`;
       document.body.appendChild(overlay);
     }
     const msg = overlay.querySelector('#xinyaoSiteMaintenanceMessage');
-    if (msg) msg.textContent = maintenanceState.message || '為提供更穩定的使用體驗，目前正在進行系統升級維護。';
+    if (msg) msg.textContent = String(maintenanceState.message || '為提供更穩定的使用體驗，目前正在進行系統升級維護。').replace(/\[\[XIANYAO_HD_ONLY=(?:0|1)\]\]/gi, '').trim();
     document.documentElement.style.overflow = 'hidden';
   }
 
