@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.68
+// @version      4.1.69
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -18113,11 +18113,12 @@ const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const mobile=()=>/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints>1&&!/Electron/i.test(navigator.userAgent));
 const mode=()=>!mobile()?'pc':innerWidth>innerHeight?'land':'port';
 const initial={pc:100,land:75,port:85};
+const maxScale=()=>mode()==='pc'?300:180;
 const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'{}')}catch(_){return {}}};
 const data=()=>read()[mode()]||{};
 const save=d=>{try{const o=read();o[mode()]=d;localStorage.setItem(KEY,JSON.stringify(o))}catch(_){}};
 let hud=null,lastMode='',lastSize='',drag=null,pinch=null;
-const percent=()=>clamp(Number(data().scale)||initial[mode()],60,120);
+const percent=()=>clamp(Number(data().scale)||initial[mode()],60,maxScale());
 function place(x,y){
  if(!hud)return;
  const r=hud.getBoundingClientRect();
@@ -18132,11 +18133,10 @@ function remember(){
 }
 function resize(n){
  if(!hud)return;
- const r=hud.getBoundingClientRect(),p=clamp(Math.round(n),60,120);
+ const r=hud.getBoundingClientRect(),p=clamp(Math.round(n),60,maxScale());
  save({...data(),scale:p});
  hud.style.zoom=String(p/100);
- const next=hud.getBoundingClientRect();
- place(r.left+(r.width-next.width)/2,r.top+(r.height-next.height)/2);
+ place(drag && drag.type==='resize' ? drag.x : r.left, drag && drag.type==='resize' ? drag.y : r.top);
  remember();
  const label=hud.querySelector('.seth-scale-label');
  if(label)label.textContent=p+'%';
@@ -18170,14 +18170,14 @@ function attach(el){
   e.preventDefault();e.stopPropagation();
   const r=el.getBoundingClientRect();
   drag={id:e.pointerId,type:handle?'resize':'move',sx:e.clientX,sy:e.clientY,x:r.left,y:r.top,p:percent()};
-  try{e.target.setPointerCapture(e.pointerId)}catch(_){}
+  try{el.setPointerCapture(e.pointerId)}catch(_){}
  });
  el.addEventListener('pointermove',e=>{
   if(!drag||drag.id!==e.pointerId||pinch)return;
   e.preventDefault();
   const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;
   if(drag.type==='move')place(drag.x+dx,drag.y+dy);
-  else resize(drag.p+(dx+dy)*.4);
+  else resize(drag.p+Math.max(dx,dy)*.65);
  });
  const finish=e=>{if(drag&&e.pointerId===drag.id){remember();drag=null}};
  el.addEventListener('pointerup',finish);el.addEventListener('pointercancel',finish);
