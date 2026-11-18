@@ -118,7 +118,7 @@ struct OracleWebView: UIViewRepresentable {
         (() => {
           'use strict';
           if (location.protocol !== 'https:' || location.hostname !== 'play.godeebxp.com') return;
-          if (window.__SETH_IOS_ADAPTIVE_HUD__) return;
+          if (window.__SETH_IOS_ADAPTIVE_HUD__ || window.__SETH_SIX_HUD_RESIZE__) return;
           window.__SETH_IOS_ADAPTIVE_HUD__ = true;
 
           const ID = 'xinyao-atg-mobile-quick-hud';
