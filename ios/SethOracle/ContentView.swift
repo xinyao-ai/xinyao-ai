@@ -2,7 +2,7 @@ import SwiftUI
 import WebKit
 
 // iOS app owns the ATG assistant: users do not need Userscripts or a browser extension.
-private let oracleHome = "https://xinyao-ai.github.io/xinyao-ai/"
+private let oracleHome = "https://xinyao-ai.github.io/xinyao-ai/?appview=5112"
 private let oracleScript = "https://raw.githubusercontent.com/xinyao-ai/xinyao-ai/main/xinyao_ATG_live.user.js"
 
 struct ContentView: View {
@@ -299,7 +299,9 @@ struct OracleWebView: UIViewRepresentable {
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
         if let url = URL(string: oracleHome) {
-            webView.load(URLRequest(url: url))
+            var homeRequest = URLRequest(url: url)
+            homeRequest.cachePolicy = .reloadIgnoringLocalCacheData
+            webView.load(homeRequest)
         }
         return webView
     }
