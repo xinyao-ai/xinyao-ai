@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.69
+// @version      4.1.70
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -18207,4 +18207,112 @@ const boot=()=>{sync();setInterval(sync,1000)};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 window.addEventListener('resize',sync,{passive:true});
 window.addEventListener('orientationchange',()=>setTimeout(sync,250),{passive:true});
+})();
+
+
+/* 賽特神諭｜資料詳細面板自由縮放控制：不修改資料、掃描、進房或渲染流程 */
+(() => {
+ 'use strict';
+ if(window.__SETH_DETAIL_SCALE_V1__)return;
+ window.__SETH_DETAIL_SCALE_V1__=true;
+ const ID='xinyaoATGLiveV200', UI='seth-detail-resizer-v1', KEY='seth_detail_layout_v1';
+ const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+ const mobile=()=>/iPhone|Android|iPad|iPod/i.test(navigator.userAgent)&&!/Electron/i.test(navigator.userAgent);
+ const mode=()=>mobile()?(innerWidth>innerHeight?'mobile-land':'mobile-port'):'windows';
+ const initial={'windows':100,'mobile-land':75,'mobile-port':85};
+ const max=()=>mobile()?180:300;
+ const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(_){return {}}};
+ const get=()=>read()[mode()]||{};
+ const save=v=>{try{const a=read();a[mode()]=v;localStorage.setItem(KEY,JSON.stringify(a))}catch(_){}};
+ const pct=()=>clamp(Number(get().pct)||initial[mode()],60,max());
+ let panel=null,bar=null,gesture=null,orientation='',dims='';
+ function rect(){return panel?.getBoundingClientRect()}
+ function setPos(x,y){
+  if(!panel)return;
+  const r=rect();
+  panel.style.setProperty('right','auto','important');
+  panel.style.setProperty('bottom','auto','important');
+  panel.style.setProperty('left',clamp(x,0,Math.max(0,innerWidth-r.width-2))+'px','important');
+  panel.style.setProperty('top',clamp(y,0,Math.max(0,innerHeight-Math.min(r.height,innerHeight-10)-2))+'px','important');
+ }
+ function persist(){
+  if(!panel)return;
+  const r=rect();save({pct:pct(),x:r.left,y:r.top});
+ }
+ function setScale(v){
+  if(!panel)return;
+  const next=clamp(Math.round(v),60,max());
+  save({...get(),pct:next});
+  const r=rect();
+  panel.style.setProperty('zoom',String(next/100),'important');
+  setPos(gesture?.x??r.left,gesture?.y??r.top);
+  persist();
+  positionBar();
+ }
+ function apply(){
+  if(!panel)return;
+  const setting=get();
+  panel.style.setProperty('zoom',String(pct()/100),'important');
+  setPos(Number.isFinite(setting.x)?setting.x:8,Number.isFinite(setting.y)?setting.y:8);
+  positionBar();
+ }
+ function positionBar(){
+  if(!bar||!panel)return;
+  const r=rect();
+  if(!r)return;
+  const visible=panel.isConnected&&getComputedStyle(panel).display!=='none'&&r.width>0&&r.height>0;
+  bar.style.display=visible?'flex':'none';
+  if(!visible)return;
+  const w=bar.offsetWidth||126,h=bar.offsetHeight||25;
+  bar.style.left=clamp(r.right-w,0,Math.max(0,innerWidth-w))+'px';
+  bar.style.top=clamp(r.bottom-h,0,Math.max(0,innerHeight-h))+'px';
+  const label=bar.querySelector('[data-value]');
+  if(label)label.textContent=pct()+'%';
+ }
+ function setup(el){
+  panel=el;
+  if(!bar){
+   const css=document.createElement('style');css.id=UI+'-style';
+   css.textContent='#'+UI+'{position:fixed;z-index:2147483647;align-items:center;gap:3px;padding:3px 5px;border:1px solid #cba45e;border-radius:7px;background:rgba(16,13,18,.93);color:#ffe6a1;font:800 11px system-ui;box-shadow:0 3px 9px #0008;user-select:none;touch-action:none}#'+UI+' button{background:#2c241a;color:#ffe6a1;border:1px solid #b68b43;border-radius:4px;padding:2px 5px;font:900 12px system-ui;cursor:pointer}#'+UI+' [data-grip]{cursor:nwse-resize;touch-action:none;font-size:14px;line-height:1.3;padding:0 2px}';
+   (document.head||document.documentElement).appendChild(css);
+   bar=document.createElement('div');bar.id=UI;
+   bar.innerHTML='<button type="button" data-step="-10" title="縮小資料面板">−</button><span data-value>100%</span><button type="button" data-step="10" title="放大資料面板">＋</button><span data-grip title="拖曳調整資料面板大小">◢</span>';
+   (document.body||document.documentElement).appendChild(bar);
+   bar.addEventListener('click',e=>{
+    const btn=e.target.closest('[data-step]');if(!btn)return;
+    e.stopPropagation();e.preventDefault();
+    setScale(pct()+Number(btn.dataset.step));
+   });
+   bar.addEventListener('pointerdown',e=>{
+    if(!e.target.closest('[data-grip]'))return;
+    e.preventDefault();e.stopPropagation();
+    const r=rect();
+    gesture={id:e.pointerId,sx:e.clientX,sy:e.clientY,x:r.left,y:r.top,start:pct()};
+    try{bar.setPointerCapture(e.pointerId)}catch(_){}
+   });
+   bar.addEventListener('pointermove',e=>{
+    if(!gesture||e.pointerId!==gesture.id)return;
+    e.preventDefault();
+    const dx=e.clientX-gesture.sx,dy=e.clientY-gesture.sy;
+    setScale(gesture.start+Math.max(dx,dy)*.65);
+   });
+   const done=e=>{if(!gesture||e.pointerId!==gesture.id)return;persist();gesture=null;positionBar()};
+   bar.addEventListener('pointerup',done);
+   bar.addEventListener('pointercancel',done);
+  }
+  apply();
+ }
+ function sync(){
+  const el=document.getElementById(ID);
+  if(!el){if(bar)bar.style.display='none';panel=null;return}
+  if(el!==panel)setup(el);
+  const m=mode(),v=innerWidth+'x'+innerHeight;
+  if(m!==orientation){orientation=m;dims=v;apply()}
+  else if(v!==dims){dims=v;const r=rect();setPos(r.left,r.top)}
+  positionBar();
+ }
+ const boot=()=>{sync();setInterval(sync,400)};
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+ window.addEventListener('resize',sync,{passive:true});
+ window.addEventListener('orientationchange',()=>setTimeout(sync,150),{passive:true});
 })();
