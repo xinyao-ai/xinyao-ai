@@ -1377,8 +1377,8 @@
       <div style="margin-top:7px;background:rgba(255,255,255,.06);padding:7px 8px;border-radius:9px;font-size:10.5px;">${escapeHtml(bestText)}</div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;">
-        <button id="xinyao-scan-all" style="${buttonStyle()}">${state.scanRunning ? '掃描中…' : '一鍵掃描 4100 房'}</button>
-        <button id="xinyao-expand" style="${secondaryButtonStyle()}">${ui.expanded ? '收合分析' : '完整分析'}</button>
+        <button id="xinyao-scan-all" style="${(!state.scanRunning && !state.scanError && /^✅ 全房掃描完成/.test(state.scanMessage || '')) ? secondaryButtonStyle() : buttonStyle()}">${state.scanRunning ? '掃描中…' : '一鍵掃描 4100 房'}</button>
+        <button id="xinyao-expand" style="${(!state.scanRunning && !state.scanError && /^✅ 全房掃描完成/.test(state.scanMessage || '')) ? buttonStyle() : secondaryButtonStyle()}">${ui.expanded ? '收合分析' : '完整分析'}</button>
         <button id="xinyao-calibrate" style="${secondaryButtonStyle('grid-column:1 / -1;')}">${state.calibrationActive
           ? `校準中 ${state.calibrationSamples.length}/2｜請點 1 → 9`
           : (state.pageCalibration ? '重新校準頁碼' : '校準頁碼位置')}</button>
