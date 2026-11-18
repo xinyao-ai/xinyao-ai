@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.70
+// @version      4.1.71
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -18103,112 +18103,138 @@ if (document.readyState === 'loading') {
 
 
 
-/* 賽特神諭：六格助手縮放、拖曳、跨方向記憶。僅增加 UI 行為。 */
+
+/* 賽特神諭：六格拖曳 v2。以視窗座標定位，避免 zoom 後跳位。 */
 (() => {
 'use strict';
 if(window.__SETH_SIX_HUD_RESIZE__)return;
 window.__SETH_SIX_HUD_RESIZE__=true;
-const ID='xinyao-atg-mobile-quick-hud',KEY='seth_six_hud_layout_2026';
-const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
-const mobile=()=>/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints>1&&!/Electron/i.test(navigator.userAgent));
+const ID='xinyao-atg-mobile-quick-hud', KEY='seth_six_hud_layout_2026';
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const mobile=()=>/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&!/Electron/i.test(navigator.userAgent));
 const mode=()=>!mobile()?'pc':innerWidth>innerHeight?'land':'port';
-const initial={pc:100,land:75,port:85};
+const defaultScale={pc:100,land:75,port:85};
 const maxScale=()=>mode()==='pc'?300:180;
-const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'{}')}catch(_){return {}}};
+const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(_){return {}}};
 const data=()=>read()[mode()]||{};
-const save=d=>{try{const o=read();o[mode()]=d;localStorage.setItem(KEY,JSON.stringify(o))}catch(_){}};
-let hud=null,lastMode='',lastSize='',drag=null,pinch=null;
-const percent=()=>clamp(Number(data().scale)||initial[mode()],60,maxScale());
-function place(x,y){
+const save=item=>{try{const d=read();d[mode()]=item;localStorage.setItem(KEY,JSON.stringify(d))}catch(_){}};
+const pct=()=>clamp(Number(data().scale)||defaultScale[mode()],60,maxScale());
+let hud=null, drag=null, pinch=null, previousMode='',previousSize='';
+function position(x,y){
  if(!hud)return;
  const r=hud.getBoundingClientRect();
- hud.style.right='auto';hud.style.bottom='auto';
- hud.style.left=clamp(x,0,Math.max(0,innerWidth-r.width))+'px';
- hud.style.top=clamp(y,0,Math.max(0,innerHeight-r.height))+'px';
+ const maxX=Math.max(0,innerWidth-r.width-2),maxY=Math.max(0,innerHeight-r.height-2);
+ hud.style.setProperty('right','auto','important');
+ hud.style.setProperty('bottom','auto','important');
+ hud.style.setProperty('left',clamp(x,0,maxX)+'px','important');
+ hud.style.setProperty('top',clamp(y,0,maxY)+'px','important');
 }
 function remember(){
  if(!hud)return;
  const r=hud.getBoundingClientRect();
- save({scale:percent(),x:r.left,y:r.top});
+ save({scale:pct(),x:r.left,y:r.top});
 }
-function resize(n){
+function resize(value,anchor){
  if(!hud)return;
- const r=hud.getBoundingClientRect(),p=clamp(Math.round(n),60,maxScale());
- save({...data(),scale:p});
- hud.style.zoom=String(p/100);
- place(drag && drag.type==='resize' ? drag.x : r.left, drag && drag.type==='resize' ? drag.y : r.top);
- remember();
+ const n=clamp(Math.round(value),60,maxScale());
+ const old=hud.getBoundingClientRect();
+ save({...data(),scale:n});
+ hud.style.setProperty('zoom',String(n/100),'important');
+ position(anchor?.x??old.left,anchor?.y??old.top);
  const label=hud.querySelector('.seth-scale-label');
- if(label)label.textContent=p+'%';
+ if(label)label.textContent=n+'%';
 }
 function apply(){
  if(!hud)return;
  const d=data();
- hud.style.zoom=String(percent()/100);
+ hud.style.setProperty('zoom',String(pct()/100),'important');
  const r=hud.getBoundingClientRect();
- place(Number.isFinite(d.x)?d.x:r.left,Number.isFinite(d.y)?d.y:r.top);
+ position(Number.isFinite(d.x)?d.x:r.left,Number.isFinite(d.y)?d.y:r.top);
  const label=hud.querySelector('.seth-scale-label');
- if(label)label.textContent=percent()+'%';
+ if(label)label.textContent=pct()+'%';
+}
+function stop(e){
+ if(!drag||e.pointerId!==drag.id)return;
+ remember();drag=null;
+ window.removeEventListener('pointermove',move,true);
+ window.removeEventListener('pointerup',stop,true);
+ window.removeEventListener('pointercancel',stop,true);
+}
+function move(e){
+ if(!drag||e.pointerId!==drag.id||!hud)return;
+ e.preventDefault();e.stopPropagation();
+ const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;
+ if(drag.type==='move'){
+  position(drag.x+dx,drag.y+dy);
+ }else{
+  // Fixed top-left anchor, no center adjustment and no accumulated delta.
+  resize(drag.start+Math.max(dx,dy)*.6,{x:drag.x,y:drag.y});
+ }
+}
+function start(e){
+ if(e.button!==0&&e.pointerType!=='touch')return;
+ if(e.pointerType==='touch'&&!e.isPrimary)return;
+ const handle=e.target.closest('.seth-scale-handle');
+ const header=e.target.closest('.qh-top,.qh-signal');
+ if(!handle&&!header)return;
+ e.preventDefault();e.stopPropagation();
+ const r=hud.getBoundingClientRect();
+ drag={id:e.pointerId,type:handle?'resize':'move',sx:e.clientX,sy:e.clientY,x:r.left,y:r.top,start:pct()};
+ // Capture events on window instead of the zoomed element.
+ window.addEventListener('pointermove',move,{capture:true,passive:false});
+ window.addEventListener('pointerup',stop,true);
+ window.addEventListener('pointercancel',stop,true);
 }
 function attach(el){
  hud=el;
- if(el.dataset.sethScaleAttached)return;
- el.dataset.sethScaleAttached='1';
- if(!document.getElementById('seth-scale-css')){
-  const s=document.createElement('style');s.id='seth-scale-css';
-  s.textContent='#'+ID+' .qh-top,#'+ID+' .qh-signal{cursor:move;touch-action:none}#'+ID+' .seth-scale-handle{cursor:nwse-resize;touch-action:none;font-size:13px}#'+ID+' .seth-scale-bar{display:flex;justify-content:space-between;align-items:center;gap:2px;margin-top:5px;font:700 9px system-ui;color:#ffe18b}#'+ID+' .seth-scale-bar button{cursor:pointer;border:1px solid #cba45e;border-radius:4px;padding:2px 4px;background:#17130e;color:#ffe18b;font-size:11px}';
-  (document.head||document.documentElement).appendChild(s);
+ if(el.dataset.sethScaleAttached==='2')return;
+ // Upgrade old UI only if needed; this also handles pre-existing DOM.
+ el.dataset.sethScaleAttached='2';
+ const cssID='seth-scale-css';
+ let css=document.getElementById(cssID);
+ if(!css){css=document.createElement('style');css.id=cssID;(document.head||document.documentElement).appendChild(css)}
+ css.textContent='#'+ID+' .qh-top,#'+ID+' .qh-signal{cursor:move;touch-action:none}#'+ID+' .seth-scale-handle{cursor:nwse-resize;touch-action:none;font-size:13px}#'+ID+' .seth-scale-bar{display:flex;justify-content:space-between;align-items:center;gap:2px;margin-top:5px;font:700 9px system-ui;color:#ffe18b}#'+ID+' .seth-scale-bar button{cursor:pointer;border:1px solid #cba45e;border-radius:4px;padding:2px 4px;background:#17130e;color:#ffe18b;font-size:11px}';
+ let bar=el.querySelector('.seth-scale-bar');
+ if(!bar){
+  bar=document.createElement('div');bar.className='seth-scale-bar';
+  bar.innerHTML='<button type="button" data-adjust="-5" title="縮小">−</button><span class="seth-scale-label">100%</span><button type="button" data-adjust="5" title="放大">＋</button><span class="seth-scale-handle" title="拖曳縮放">◢</span>';
+  el.appendChild(bar);
  }
- const bar=document.createElement('div');bar.className='seth-scale-bar';
- bar.innerHTML='<button type="button" data-adjust="-5" title="縮小">−</button><span class="seth-scale-label">100%</span><button type="button" data-adjust="5" title="放大">＋</button><span class="seth-scale-handle" title="拖曳縮放">◢</span>';
- el.appendChild(bar);
- bar.addEventListener('click',e=>{const b=e.target.closest('[data-adjust]');if(!b)return;e.preventDefault();e.stopPropagation();resize(percent()+Number(b.dataset.adjust))});
- el.addEventListener('pointerdown',e=>{
-  if(e.pointerType==='touch'&&!e.isPrimary)return;
-  const handle=e.target.closest('.seth-scale-handle'),head=e.target.closest('.qh-top,.qh-signal');
-  if(!handle&&!head)return;
+ bar.addEventListener('click',e=>{
+  const btn=e.target.closest('[data-adjust]');if(!btn)return;
   e.preventDefault();e.stopPropagation();
-  const r=el.getBoundingClientRect();
-  drag={id:e.pointerId,type:handle?'resize':'move',sx:e.clientX,sy:e.clientY,x:r.left,y:r.top,p:percent()};
-  try{el.setPointerCapture(e.pointerId)}catch(_){}
+  resize(pct()+Number(btn.dataset.adjust));
+  remember();
  });
- el.addEventListener('pointermove',e=>{
-  if(!drag||drag.id!==e.pointerId||pinch)return;
-  e.preventDefault();
-  const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;
-  if(drag.type==='move')place(drag.x+dx,drag.y+dy);
-  else resize(drag.p+Math.max(dx,dy)*.65);
- });
- const finish=e=>{if(drag&&e.pointerId===drag.id){remember();drag=null}};
- el.addEventListener('pointerup',finish);el.addEventListener('pointercancel',finish);
+ el.addEventListener('pointerdown',start,true);
  el.addEventListener('touchstart',e=>{
   if(e.touches.length!==2)return;
-  const a=e.touches[0],b=e.touches[1];
-  pinch={d:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY),p:percent()};
-  drag=null;
+  const x=e.touches[0],y=e.touches[1];
+  const r=el.getBoundingClientRect();
+  pinch={distance:Math.hypot(x.clientX-y.clientX,x.clientY-y.clientY),scale:pct(),x:r.left,y:r.top};
+  if(drag){window.removeEventListener('pointermove',move,true);window.removeEventListener('pointerup',stop,true);window.removeEventListener('pointercancel',stop,true);drag=null}
  },{passive:true});
  el.addEventListener('touchmove',e=>{
-  if(!pinch||e.touches.length<2)return;
+  if(!pinch||e.touches.length!==2)return;
   e.preventDefault();
-  const a=e.touches[0],b=e.touches[1];
-  resize(pinch.p*Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)/Math.max(1,pinch.d));
+  const x=e.touches[0],y=e.touches[1];
+  resize(pinch.scale*Math.hypot(x.clientX-y.clientX,x.clientY-y.clientY)/Math.max(1,pinch.distance),pinch);
  },{passive:false});
- el.addEventListener('touchend',e=>{if(e.touches.length<2){if(pinch)remember();pinch=null}},{passive:true});
+ el.addEventListener('touchend',e=>{if(pinch&&e.touches.length<2){pinch=null;remember()}},{passive:true});
  apply();
 }
 function sync(){
  const el=document.getElementById(ID);if(!el)return;
  if(el!==hud)attach(el);
- const m=mode(),sz=innerWidth+'x'+innerHeight;
- if(lastMode!==m){lastMode=m;lastSize=sz;apply()}
- else if(lastSize!==sz){lastSize=sz;const r=el.getBoundingClientRect();place(r.left,r.top)}
+ const m=mode(),v=innerWidth+'x'+innerHeight;
+ if(m!==previousMode){previousMode=m;previousSize=v;apply()}
+ else if(v!==previousSize&&!drag){previousSize=v;const r=el.getBoundingClientRect();position(r.left,r.top)}
 }
 const boot=()=>{sync();setInterval(sync,1000)};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 window.addEventListener('resize',sync,{passive:true});
 window.addEventListener('orientationchange',()=>setTimeout(sync,250),{passive:true});
 })();
-
 
 /* 賽特神諭｜資料詳細面板自由縮放控制：不修改資料、掃描、進房或渲染流程 */
 (() => {
