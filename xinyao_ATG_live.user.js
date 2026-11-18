@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.73
+// @version      4.1.74
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -2703,6 +2703,41 @@ try {
     return true;
   }
 
+
+  // 唯一有效配對碼由已登入的賽特神諭會員頁從後端領取，遊戲端僅顯示。
+  let displayPairCode = '';
+  let displayPairExpiry = 0;
+  function visiblePairCode() {
+    return !deviceToken && displayPairExpiry > Date.now() ? displayPairCode : '';
+  }
+  function askMemberPagePairCode() {
+    const opener = window.opener || window.top?.opener;
+    if (!opener || opener.closed) {
+      state.pairMessage = '請保持賽特神諭會員頁開啟，或在會員頁產生配對碼';
+      render();
+      return;
+    }
+    try {
+      opener.postMessage({type:'seth-oracle:pair-code-request:v1'},'https://xinyao-ai.github.io');
+      state.pairMessage = '已向會員頁申請配對碼…';
+    } catch (_) {
+      state.pairMessage = '無法連線會員頁，請在會員頁產生配對碼';
+    }
+    render();
+  }
+  window.addEventListener('message', event => {
+    if (event.origin !== 'https://xinyao-ai.github.io') return;
+    const data = event.data;
+    if (data?.type !== 'seth-oracle:pair-code-display:v1' || deviceToken) return;
+    const code = String(data.pairCode || '').trim().toUpperCase();
+    const expiry = Number(data.expiresAt || 0);
+    if (!/^[A-Z0-9]{4,12}$/.test(code) || expiry <= Date.now() || expiry > Date.now()+180000) return;
+    displayPairCode = code;
+    displayPairExpiry = expiry;
+    state.pairMessage = '已取得配對碼，可點綁定';
+    render();
+  });
+
   // 自動配對：僅接受賽特神諭官方網站傳來的一次性配對碼。
   // 不修改既有掃描、進房、手動配對；失敗時仍可手動輸入。
   let autoPairInProgress = false;
@@ -2789,9 +2824,11 @@ try {
     const pairBox = !deviceToken ? `
       <div class="xinyaoGroup xinyaoPairGroup">
       <div style="font-size:10px;line-height:1.45;opacity:.84;margin-bottom:6px;">
-        ${autoPairTransportStatus}｜如未自動配對，仍可手動輸入配對碼
+        ${autoPairTransportStatus}｜自動配對失敗時可手動綁定
       </div>
+      ${visiblePairCode() ? `<div style="margin:5px 0;padding:6px;border:1px solid #cba45e;border-radius:7px;color:#f4d789;font-size:14px;text-align:center;font-weight:900;letter-spacing:1px;">配對碼：${visiblePairCode()}</div>` : ''}
       <div style="display:flex;gap:5px;">
+        <button id="xinyaoPairGetCode" type="button" style="border:1px solid #cba45e;border-radius:7px;padding:5px;background:#18282a;color:#ffe2a3;font-weight:800;font-size:10px;cursor:pointer;">取得配對碼</button>
         <input id="xinyaoPairInput" maxlength="12" placeholder="配對碼"
           style="width:100px;min-width:0;border:1px solid rgba(255,255,255,.22);border-radius:8px;background:rgba(255,255,255,.09);color:#fff;padding:6px 7px;font-size:11px;outline:none;text-transform:uppercase;">
         <button id="xinyaoPairButton" type="button" ${state.pairBusy ? 'disabled' : ''}
@@ -2862,7 +2899,10 @@ try {
     }
 
     const button = panel?.querySelector('#xinyaoPairButton');
+    const getCode = panel?.querySelector('#xinyaoPairGetCode');
+    if (getCode) getCode.onclick = event => { event.stopPropagation(); askMemberPagePairCode(); };
     const input = panel?.querySelector('#xinyaoPairInput');
+    if (input && visiblePairCode()) input.value = visiblePairCode();
     const message = panel?.querySelector('#xinyaoPairMessage');
 
     if (input) {
