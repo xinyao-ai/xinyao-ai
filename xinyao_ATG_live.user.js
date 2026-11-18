@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.67
+// @version      4.1.68
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -18101,3 +18101,110 @@ if (document.readyState === 'loading') {
   publish();
 })();
 
+
+
+/* 賽特神諭：六格助手縮放、拖曳、跨方向記憶。僅增加 UI 行為。 */
+(() => {
+'use strict';
+if(window.__SETH_SIX_HUD_RESIZE__)return;
+window.__SETH_SIX_HUD_RESIZE__=true;
+const ID='xinyao-atg-mobile-quick-hud',KEY='seth_six_hud_layout_2026';
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const mobile=()=>/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints>1&&!/Electron/i.test(navigator.userAgent));
+const mode=()=>!mobile()?'pc':innerWidth>innerHeight?'land':'port';
+const initial={pc:100,land:75,port:85};
+const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'{}')}catch(_){return {}}};
+const data=()=>read()[mode()]||{};
+const save=d=>{try{const o=read();o[mode()]=d;localStorage.setItem(KEY,JSON.stringify(o))}catch(_){}};
+let hud=null,lastMode='',lastSize='',drag=null,pinch=null;
+const percent=()=>clamp(Number(data().scale)||initial[mode()],60,120);
+function place(x,y){
+ if(!hud)return;
+ const r=hud.getBoundingClientRect();
+ hud.style.right='auto';hud.style.bottom='auto';
+ hud.style.left=clamp(x,0,Math.max(0,innerWidth-r.width))+'px';
+ hud.style.top=clamp(y,0,Math.max(0,innerHeight-r.height))+'px';
+}
+function remember(){
+ if(!hud)return;
+ const r=hud.getBoundingClientRect();
+ save({scale:percent(),x:r.left,y:r.top});
+}
+function resize(n){
+ if(!hud)return;
+ const r=hud.getBoundingClientRect(),p=clamp(Math.round(n),60,120);
+ save({...data(),scale:p});
+ hud.style.zoom=String(p/100);
+ const next=hud.getBoundingClientRect();
+ place(r.left+(r.width-next.width)/2,r.top+(r.height-next.height)/2);
+ remember();
+ const label=hud.querySelector('.seth-scale-label');
+ if(label)label.textContent=p+'%';
+}
+function apply(){
+ if(!hud)return;
+ const d=data();
+ hud.style.zoom=String(percent()/100);
+ const r=hud.getBoundingClientRect();
+ place(Number.isFinite(d.x)?d.x:r.left,Number.isFinite(d.y)?d.y:r.top);
+ const label=hud.querySelector('.seth-scale-label');
+ if(label)label.textContent=percent()+'%';
+}
+function attach(el){
+ hud=el;
+ if(el.dataset.sethScaleAttached)return;
+ el.dataset.sethScaleAttached='1';
+ if(!document.getElementById('seth-scale-css')){
+  const s=document.createElement('style');s.id='seth-scale-css';
+  s.textContent='#'+ID+' .qh-top,#'+ID+' .qh-signal{cursor:move;touch-action:none}#'+ID+' .seth-scale-handle{cursor:nwse-resize;touch-action:none;font-size:13px}#'+ID+' .seth-scale-bar{display:flex;justify-content:space-between;align-items:center;gap:2px;margin-top:5px;font:700 9px system-ui;color:#ffe18b}#'+ID+' .seth-scale-bar button{cursor:pointer;border:1px solid #cba45e;border-radius:4px;padding:2px 4px;background:#17130e;color:#ffe18b;font-size:11px}';
+  (document.head||document.documentElement).appendChild(s);
+ }
+ const bar=document.createElement('div');bar.className='seth-scale-bar';
+ bar.innerHTML='<button type="button" data-adjust="-5" title="縮小">−</button><span class="seth-scale-label">100%</span><button type="button" data-adjust="5" title="放大">＋</button><span class="seth-scale-handle" title="拖曳縮放">◢</span>';
+ el.appendChild(bar);
+ bar.addEventListener('click',e=>{const b=e.target.closest('[data-adjust]');if(!b)return;e.preventDefault();e.stopPropagation();resize(percent()+Number(b.dataset.adjust))});
+ el.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='touch'&&!e.isPrimary)return;
+  const handle=e.target.closest('.seth-scale-handle'),head=e.target.closest('.qh-top,.qh-signal');
+  if(!handle&&!head)return;
+  e.preventDefault();e.stopPropagation();
+  const r=el.getBoundingClientRect();
+  drag={id:e.pointerId,type:handle?'resize':'move',sx:e.clientX,sy:e.clientY,x:r.left,y:r.top,p:percent()};
+  try{e.target.setPointerCapture(e.pointerId)}catch(_){}
+ });
+ el.addEventListener('pointermove',e=>{
+  if(!drag||drag.id!==e.pointerId||pinch)return;
+  e.preventDefault();
+  const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;
+  if(drag.type==='move')place(drag.x+dx,drag.y+dy);
+  else resize(drag.p+(dx+dy)*.4);
+ });
+ const finish=e=>{if(drag&&e.pointerId===drag.id){remember();drag=null}};
+ el.addEventListener('pointerup',finish);el.addEventListener('pointercancel',finish);
+ el.addEventListener('touchstart',e=>{
+  if(e.touches.length!==2)return;
+  const a=e.touches[0],b=e.touches[1];
+  pinch={d:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY),p:percent()};
+  drag=null;
+ },{passive:true});
+ el.addEventListener('touchmove',e=>{
+  if(!pinch||e.touches.length<2)return;
+  e.preventDefault();
+  const a=e.touches[0],b=e.touches[1];
+  resize(pinch.p*Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)/Math.max(1,pinch.d));
+ },{passive:false});
+ el.addEventListener('touchend',e=>{if(e.touches.length<2){if(pinch)remember();pinch=null}},{passive:true});
+ apply();
+}
+function sync(){
+ const el=document.getElementById(ID);if(!el)return;
+ if(el!==hud)attach(el);
+ const m=mode(),sz=innerWidth+'x'+innerHeight;
+ if(lastMode!==m){lastMode=m;lastSize=sz;apply()}
+ else if(lastSize!==sz){lastSize=sz;const r=el.getBoundingClientRect();place(r.left,r.top)}
+}
+const boot=()=>{sync();setInterval(sync,1000)};
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+window.addEventListener('resize',sync,{passive:true});
+window.addEventListener('orientationchange',()=>setTimeout(sync,250),{passive:true});
+})();
