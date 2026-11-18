@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.71
+// @version      4.1.72
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -18104,7 +18104,7 @@ if (document.readyState === 'loading') {
 
 
 
-/* 賽特神諭：六格拖曳 v2。以視窗座標定位，避免 zoom 後跳位。 */
+/* 賽特神諭：六格拖曳 v3。用 transform 視覺縮放，固定元素定位座標。 */
 (() => {
 'use strict';
 if(window.__SETH_SIX_HUD_RESIZE__)return;
@@ -18139,7 +18139,9 @@ function resize(value,anchor){
  const n=clamp(Math.round(value),60,maxScale());
  const old=hud.getBoundingClientRect();
  save({...data(),scale:n});
- hud.style.setProperty('zoom',String(n/100),'important');
+ hud.style.setProperty('zoom','1','important');
+ hud.style.setProperty('transform-origin','top left','important');
+ hud.style.setProperty('transform','scale('+n/100+')','important');
  position(anchor?.x??old.left,anchor?.y??old.top);
  const label=hud.querySelector('.seth-scale-label');
  if(label)label.textContent=n+'%';
@@ -18147,7 +18149,9 @@ function resize(value,anchor){
 function apply(){
  if(!hud)return;
  const d=data();
- hud.style.setProperty('zoom',String(pct()/100),'important');
+ hud.style.setProperty('zoom','1','important');
+ hud.style.setProperty('transform-origin','top left','important');
+ hud.style.setProperty('transform','scale('+pct()/100+')','important');
  const r=hud.getBoundingClientRect();
  position(Number.isFinite(d.x)?d.x:r.left,Number.isFinite(d.y)?d.y:r.top);
  const label=hud.querySelector('.seth-scale-label');
