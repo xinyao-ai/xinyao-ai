@@ -3388,6 +3388,59 @@ html body #loginPage #oracleHdSsoLogin:active:not(:disabled){
 }
 html body #loginPage #oracleHdSsoLogin:focus-visible{outline:2px solid #fff4bc!important;outline-offset:5px!important;}
 </style>
+<style id="oracle-supported-compact-grid-5121">
+/* 登入前只展示支援清單，不取代登入後第二頁的選房進房流程。 */
+html body #loginPage #oraclePreloginGameLobby {
+  padding:14px 13px 13px!important;
+  margin:10px 0 14px!important;
+  border-radius:19px!important;
+}
+html body #loginPage #oraclePreloginGameLobby .oracle-prelogin-head {padding:0 2px 12px!important;}
+html body #loginPage #oraclePreloginGameLobby .oracle-prelogin-head h3 {font-size:18px!important;}
+html body #loginPage #oraclePreloginGameLobby .oracle-prelogin-carousel,
+html body #loginPage #oraclePreloginGameLobby .oracle-prelogin-nav,
+html body #loginPage #oraclePreloginGameLobby .oracle-prelogin-status {
+  display:none!important;
+}
+html body #loginPage #oraclePreloginGameLobby .oracle-supported-games-5121 {display:block!important;}
+html body #loginPage #oraclePreloginGameLobby .oracle-supported-game-grid {
+  display:grid!important;
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:9px!important;
+  width:100%!important;
+}
+html body #loginPage #oraclePreloginGameLobby .oracle-supported-game-item {
+  display:flex!important;flex-direction:column!important;overflow:hidden!important;
+  min-width:0!important;border:1px solid #cba35b!important;border-radius:11px!important;
+  background:linear-gradient(160deg,#172526,#070f10)!important;
+  box-shadow:inset 0 0 0 1px #f0ca7942,0 2px 5px #0007!important;
+}
+html body #loginPage #oraclePreloginGameLobby .oracle-supported-game-item img {
+  display:block!important;aspect-ratio:1/1!important;width:100%!important;
+  object-fit:cover!important;background:#201721!important;
+}
+html body #loginPage #oraclePreloginGameLobby .oracle-supported-game-item span {
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  text-align:center!important;min-height:28px!important;padding:3px 2px!important;
+  font-size:clamp(9px,1.9vw,13px)!important;line-height:1.2!important;
+  font-weight:850!important;color:#f6dc96!important;
+  background:linear-gradient(#34281b,#121a19)!important;
+  border-top:1px solid #b98a3f!important;white-space:normal!important;
+}
+html body #loginPage #oraclePreloginGameLobby .oracle-supported-game-footer {
+  display:flex!important;justify-content:space-between!important;align-items:center!important;
+  flex-wrap:wrap!important;gap:5px 10px!important;
+  padding:12px 2px 0!important;color:#d2bc84!important;font-size:11px!important;font-weight:700!important;
+}
+html body #loginPage #oraclePreloginGameLobby .oracle-supported-game-footer span:last-child {color:#f4d58c!important;}
+@media(max-width:480px){
+ html body #loginPage #oraclePreloginGameLobby {padding:11px 10px!important;}
+ html body #loginPage #oraclePreloginGameLobby .oracle-supported-game-grid {gap:6px!important;}
+ html body #loginPage #oraclePreloginGameLobby .oracle-supported-game-item {border-radius:8px!important;}
+ html body #loginPage #oraclePreloginGameLobby .oracle-supported-game-item span {font-size:10px!important;min-height:31px!important;}
+ html body #loginPage #oraclePreloginGameLobby .oracle-supported-game-footer {font-size:10px!important;}
+}
+</style>
 </head>
 
 <body>
@@ -3451,9 +3504,22 @@ html body #loginPage #oracleHdSsoLogin:focus-visible{outline:2px solid #fff4bc!i
       
       <section class="oracle-prelogin-lobby" id="oraclePreloginGameLobby" aria-label="登入前瀏覽 ATG 遊戲">
         <div class="oracle-prelogin-head">
-          <h3>🎮 選擇遊戲</h3>
+          <h3>🎮 支援遊戲</h3>
           <span class="game-launcher-badge oracle-atg-brand oracle-prelogin-provider" aria-label="ATG"><svg class="oracle-atg-mark" viewBox="0 0 46 42" aria-hidden="true"><path d="M4 12 22 2 41 12 34 17 22 10 11 17v10l11 7 10-6v-7l9 5v8L22 44 3 34V12Z" fill="#f1432d"/><path d="m14 22 8-5 8 5Z" fill="#f1432d"/></svg><span>ATG</span></span>
         </div>
+        <div class="oracle-supported-games-5121" aria-label="賽特神諭支援的八款 ATG 遊戲">
+  <div class="oracle-supported-game-grid">
+    <div class="oracle-supported-game-item"><img src="./assets/seth1-cover.png?v=5047" alt="戰神賽特（一代）" loading="lazy" decoding="async"><span>戰神賽特（一代）</span></div>
+    <div class="oracle-supported-game-item"><img src="./assets/seth2-cover.png?v=5045" alt="戰神賽特2" loading="lazy" decoding="async"><span>戰神賽特2</span></div>
+    <div class="oracle-supported-game-item"><img src="./assets/tiger-girl.jpg" alt="虎小妹" loading="lazy" decoding="async"><span>虎小妹</span></div>
+    <div class="oracle-supported-game-item"><img src="https://www.atg-games.com/elder-god-baphomet/en/game_icon.png" alt="古神巴風特" loading="lazy" decoding="async"><span>古神巴風特</span></div>
+    <div class="oracle-supported-game-item"><img src="https://www.atg-games.com/vampire/en/game_icon.png" alt="惡魔血域" loading="lazy" decoding="async"><span>惡魔血域</span></div>
+    <div class="oracle-supported-game-item"><img src="./songo_cover.png" alt="孫行者" loading="lazy" decoding="async"><span>孫行者</span></div>
+    <div class="oracle-supported-game-item"><img src="https://www.atg-games.com/scarlet-three-kingdoms/en/game_icon.png" alt="赤三國" loading="lazy" decoding="async"><span>赤三國</span></div>
+    <div class="oracle-supported-game-item"><img src="https://www.atg-games.com/wuxia-caishen/en/game_icon.png" alt="武俠" loading="lazy" decoding="async"><span>武俠</span></div>
+  </div>
+  <div class="oracle-supported-game-footer"><span>以上遊戲皆可使用賽特神諭</span><span>登入後於第二頁選擇遊戲 ›</span></div>
+</div>
         <div class="oracle-prelogin-carousel">
           <button class="oracle-prelogin-arrow oracle-prelogin-prev" type="button" aria-label="上一款遊戲">‹</button>
           <div class="oracle-prelogin-track" id="oraclePreloginTrack" role="group" aria-label="遊戲封面">
