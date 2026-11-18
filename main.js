@@ -48,7 +48,7 @@ function persistDealer(code) {
 
 function siteForDealer() {
   const url = dealerCode ? DEALER_PREVIEW + encodeURIComponent(dealerCode) : SITE;
-  return url + (url.includes('?') ? '&' : '?') + 'appview=5133';
+  return url + (url.includes('?') ? '&' : '?') + 'appview=5134';
 }
 
 async function refreshSiteCache(win) {
@@ -186,7 +186,7 @@ function setupInjection(contents) {
     const target = (() => { try { return new URL(url); } catch (_) { return null; } })();
     if (target && target.protocol === 'https:' &&
         (target.origin === new URL(SITE).origin || target.origin === GAME_ORIGIN ||
-         target.hostname.endsWith('.hd5957.com'))) {
+         (target.hostname === 'hd5957.com' || target.hostname.endsWith('.hd5957.com')))) {
       return {
         action: 'allow',
         overrideBrowserWindowOptions: {
