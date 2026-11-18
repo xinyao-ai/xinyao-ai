@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.75
+// @version      4.1.76
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -10968,8 +10968,24 @@ try {
     };
   }
 
+  let lastRoomPanelPaintAt = 0;
   function render() {
     if (!state.panel) return;
+
+    // 畫面繪製限速：掃描/遊戲資料仍照常接收，僅避免 4100 房資料
+    // 被高頻事件反覆排序並重建整塊 DOM，造成點擊、捲動卡頓。
+    const paintNow = Date.now();
+    const minPaintGap = state.scanRunning ? 450 : 280;
+    const gapRemaining = minPaintGap - (paintNow - lastRoomPanelPaintAt);
+    if (gapRemaining > 0) {
+      if (!state.renderTimer) {
+        state.renderTimer = setTimeout(() => {
+          state.renderTimer = null;
+          render();
+        }, gapRemaining + 5);
+      }
+      return;
+    }
 
     // 全裝置上 ATG 資料更新很頻繁。使用者正在按按鈕或上下滑動面板時，
     // 暫停重建 DOM，避免 pointer / touch 手勢被即時刷新打斷。
@@ -10986,6 +11002,7 @@ try {
     }
 
     // 重新整理內容後保留使用者目前的捲動位置。
+    lastRoomPanelPaintAt = Date.now();
     const previousPanelScrollTop = state.panel.scrollTop || 0;
 
     const count = numberedCount();
@@ -11224,6 +11241,11 @@ try {
     panel.addEventListener('touchcancel', finishTouchScroll, { passive: true, capture: true });
     panel.addEventListener('scroll', () => holdPanelInteraction(700), { passive: true });
     panel.addEventListener('wheel', () => holdPanelInteraction(700), { passive: true, capture: true });
+    // 讓滑鼠點擊期間 DOM 保持穩定；避免按下與放開之間按鈕被即時刷新替換。
+    panel.addEventListener('pointerdown', event => {
+      if (event.target?.closest?.('button,select,input,a')) holdPanelInteraction(350);
+    }, {capture:true,passive:true});
+    panel.addEventListener('focusin', () => holdPanelInteraction(500), true);
 
     // 使用固定在 panel 本體上的 pointerdown 事件代理。
     // ATG 即時資料很頻繁，render() 會重建 panel 內容；若把 click 綁在每顆
