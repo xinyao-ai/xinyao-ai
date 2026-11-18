@@ -3344,20 +3344,49 @@ html body #loginPage .login-form-card-539::before,
 html body #loginPage .login-form-card-539::after {content:none!important;display:none!important;}
 html body #loginPage .login-form-card-539 #oracleHdSsoLogin {display:block!important;width:100%!important;margin:0!important;}
 </style>
-<style id="oracle-sso-3d-gold-5119">
-/* 立體金屬登入按鈕：僅變更按鈕外觀，保留現有尺寸與 SSO 事件 */
+<style id="oracle-sso-3d-gold-5120">
+/* 皇鼎一鍵登入：明顯厚度的立體金磚按鈕，僅變更外觀 */
 html body #loginPage #oracleHdSsoLogin {
- border:1px solid #fff0ac!important;
- background:linear-gradient(180deg,#fff5bb 0%,#ffe18a 17%,#f3c45c 48%,#d69b2b 86%,#ad7118 100%)!important;
- color:#362109!important;
- box-shadow:inset 0 2px 1px #fff9d4,inset 0 -3px 0 #966116,0 5px 0 #795014,0 9px 16px rgba(0,0,0,.56)!important;
- text-shadow:0 1px 0 #fff2b1!important;
- transition:transform .14s ease,box-shadow .14s ease,filter .14s ease!important;
- position:relative!important;
+  appearance:none!important;
+  display:block!important;
+  width:100%!important;
+  position:relative!important;
+  isolation:isolate!important;
+  overflow:visible!important;
+  border:2px solid #ffe8a0!important;
+  border-bottom:7px solid #75420c!important;
+  border-radius:17px!important;
+  background:linear-gradient(180deg,#fff9d3 0%,#fff2aa 11%,#ffd979 25%,#f9c34b 47%,#e0a32b 68%,#b97913 90%,#965509 100%)!important;
+  color:#352008!important;
+  font-weight:950!important;
+  letter-spacing:.5px!important;
+  text-shadow:0 1px 0 #fff4bc,0 -1px 0 #b9812e!important;
+  box-shadow:inset 0 3px 0 #fffef0,inset 0 7px 9px #fff5b7bb,inset 3px 0 5px #fff1a49c,inset -3px 0 6px #8c4e2055,inset 0 -5px 8px #7a431c88,0 5px 0 #542d08,0 10px 0 #301b08,0 15px 18px #000b!important;
+  transform:translateY(0)!important;
+  transition:transform .13s ease,box-shadow .13s ease,filter .13s ease!important;
 }
-html body #loginPage #oracleHdSsoLogin:hover:not(:disabled){filter:brightness(1.07)!important;transform:translateY(-1px)!important;}
-html body #loginPage #oracleHdSsoLogin:active:not(:disabled){transform:translateY(4px)!important;box-shadow:inset 0 2px 5px #865812,0 1px 0 #795014,0 3px 8px #0008!important;filter:brightness(.98)!important;}
-html body #loginPage #oracleHdSsoLogin:focus-visible {outline:2px solid #fff5bf!important;outline-offset:4px!important;}
+html body #loginPage #oracleHdSsoLogin::before {
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  left:10px!important;right:10px!important;top:3px!important;
+  height:35%!important;
+  border-radius:13px 13px 48% 48%!important;
+  pointer-events:none!important;
+  background:linear-gradient(180deg,#fffef0a8,#ffffff08)!important;
+  z-index:-1!important;
+}
+html body #loginPage #oracleHdSsoLogin:hover:not(:disabled){
+  filter:brightness(1.09)!important;
+  transform:translateY(-2px)!important;
+}
+html body #loginPage #oracleHdSsoLogin:active:not(:disabled){
+  transform:translateY(9px)!important;
+  border-bottom-width:3px!important;
+  box-shadow:inset 0 4px 10px #86500e88,inset 0 -2px 5px #5e350a88,0 2px 0 #542d08,0 4px 7px #0009!important;
+  filter:brightness(.97)!important;
+}
+html body #loginPage #oracleHdSsoLogin:focus-visible{outline:2px solid #fff4bc!important;outline-offset:5px!important;}
 </style>
 </head>
 
@@ -3446,7 +3475,7 @@ html body #loginPage #oracleHdSsoLogin:focus-visible {outline:2px solid #fff5bf!
       <section class="login-form-card-539">
         
         <div hidden style="display:none!important" aria-hidden="true"><label for="memberAccount">會員帳號</label><input id="memberAccount" type="text" autocomplete="username" tabindex="-1"><button id="loginButton" type="button" tabindex="-1">登入分析系統</button></div>
-        <button id="oracleHdSsoLogin" type="button" aria-label="使用皇鼎會員帳號登入" style="display:block!important;width:100%!important;margin:0!important;padding:18px 14px!important;border:1px solid #fff0ac!important;border-radius:14px!important;background:linear-gradient(180deg,#fff5bb 0%,#ffe18a 17%,#f3c45c 48%,#d69b2b 86%,#ad7118 100%)!important;color:#362109!important;font-size:18px!important;font-weight:900!important;text-align:center!important;cursor:pointer!important;box-shadow:inset 0 2px 1px #fff9d4,inset 0 -3px 0 #966116,0 5px 0 #795014,0 9px 16px #0009!important;text-shadow:0 1px 0 #fff2b1!important;transition:transform .14s ease,box-shadow .14s ease,filter .14s ease!important;position:relative!important">🔐 皇鼎會員一鍵登入</button>
+        <button id="oracleHdSsoLogin" type="button" aria-label="使用皇鼎會員帳號登入" style="display:block!important;width:100%!important;margin:0!important;padding:18px 14px!important;border-radius:17px!important;font-size:18px!important;text-align:center!important;cursor:pointer!important">🔐 皇鼎會員一鍵登入</button>
         <div id="loginMessage" class="login-message-539"></div>
       </section>
 
