@@ -3349,8 +3349,8 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
         <div class="oracle-prelogin-carousel">
           <button class="oracle-prelogin-arrow oracle-prelogin-prev" type="button" aria-label="上一款遊戲">‹</button>
           <div class="oracle-prelogin-track" id="oraclePreloginTrack" role="group" aria-label="遊戲封面">
-            <button type="button" class="oracle-prelogin-card is-selected" data-launch="xinyaoLaunchSeth" aria-pressed="true"><img class="oracle-prelogin-image" src="./assets/seth2-cover.png?v=5045" alt="戰神賽特2 覺醒之力"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">戰神賽特2・覺醒之力</span><span class="oracle-prelogin-enter">登入後進入遊戲</span></button>
-            <button type="button" class="oracle-prelogin-card" data-launch="xinyaoLaunchSeth1" aria-pressed="false"><img class="oracle-prelogin-image" src="./assets/seth1-cover.png?v=5047" alt="戰神賽特一代"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">戰神賽特（一代）</span><span class="oracle-prelogin-enter">登入後進入遊戲</span></button>
+            <button type="button" class="oracle-prelogin-card" data-launch="xinyaoLaunchSeth" aria-pressed="false"><img class="oracle-prelogin-image" src="./assets/seth2-cover.png?v=5045" alt="戰神賽特2 覺醒之力"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">戰神賽特2・覺醒之力</span><span class="oracle-prelogin-enter">登入後進入遊戲</span></button>
+            <button type="button" class="oracle-prelogin-card is-selected" data-launch="xinyaoLaunchSeth1" aria-pressed="true"><img class="oracle-prelogin-image" src="./assets/seth1-cover.png?v=5047" alt="戰神賽特一代"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">戰神賽特（一代）</span><span class="oracle-prelogin-enter">登入後進入遊戲</span></button>
             <button type="button" class="oracle-prelogin-card" data-launch="xinyaoLaunchTiger" aria-pressed="false"><img class="oracle-prelogin-image" src="./assets/download.png?v=5018" alt="虎小妹"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">虎小妹</span><span class="oracle-prelogin-enter">登入後進入遊戲</span></button>
             <button type="button" class="oracle-prelogin-card" data-launch="xinyaoLaunchBaphomet" aria-pressed="false"><img class="oracle-prelogin-image" src="https://www.atg-games.com/elder-god-baphomet/en/game_icon.png" alt="古神巴風特"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">古神巴風特</span><span class="oracle-prelogin-enter">登入後進入遊戲</span></button>
             <button type="button" class="oracle-prelogin-card" data-launch="xinyaoLaunchVampire" aria-pressed="false"><img class="oracle-prelogin-image" src="https://www.atg-games.com/vampire/en/game_icon.png" alt="惡魔血域"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">惡魔血域</span><span class="oracle-prelogin-enter">登入後進入遊戲</span></button>
@@ -3361,7 +3361,7 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
           <button class="oracle-prelogin-arrow oracle-prelogin-next" type="button" aria-label="下一款遊戲">›</button>
         </div>
         <div class="oracle-prelogin-nav" aria-hidden="true"></div>
-        <div class="oracle-prelogin-status" id="oraclePreloginStatus">已選擇 <strong>戰神賽特2・覺醒之力</strong> · 登入後可進入</div>
+        <div class="oracle-prelogin-status" id="oraclePreloginStatus">已選擇 <strong>戰神賽特（一代）</strong> · 登入後可進入</div>
       </section>
 
       <section class="login-form-card-539">
@@ -5078,10 +5078,15 @@ setInterval(()=>{if(active&&!document.hidden)show(index+1)},6500);
     if(Math.abs(dx)>38&&Math.abs(dx)>Math.abs(dy)*1.35)select(activeIndex+(dx<0?1:-1));
   },{passive:true});
   track.addEventListener('touchcancel',()=>{startX=null;startY=null},{passive:true});
+  // 每次重新開啟登入首頁都先選賽特一代；只有 SSO 返回時
+  // 才保留會員登入前親自選好的遊戲，確保驗證後進入正確目標。
+  const returningFromSso=/(?:^#|&)sso_code=[a-f0-9]{64}(?:&|$)/.test(location.hash);
   let saved='';
-  try{saved=sessionStorage.getItem('oracle_prelogin_game_selection')||''}catch(_){}
-  const found=cards.findIndex(card=>card.dataset.launch===saved);
-  select(found>=0?found:0);
+  if(returningFromSso){
+    try{saved=sessionStorage.getItem('oracle_prelogin_game_selection')||''}catch(_){}
+  }
+  const found=cards.findIndex(card=>card.dataset.launch===(saved||'xinyaoLaunchSeth1'));
+  select(found>=0?found:1);
 })();
 </script>
 </body>
