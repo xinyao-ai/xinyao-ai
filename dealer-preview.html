@@ -3240,7 +3240,19 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
 @media(max-width:480px){
  #loginPage .login-shell-539 > .login-form-card-539 {padding:5px 6px!important;border-radius:11px!important}
 }
-</style></head>
+</style><style id="oracle-hide-second-page-analysis-5129">
+/* 登入後第二頁：只隱藏分析選單卡片與其資料面板，不移除資料或變更遊戲入口 */
+#appPage section.card:has(> .mode-grid),
+#appPage #analyzePanel,
+#appPage #continuePanel,
+#appPage #historyPanel,
+#appPage #xinyaoRoomRecommendPanel,
+#appPage #xinyaoCurrentRoomPanel,
+#appPage #xinyaoPlayHistoryPanel {
+  display:none!important;
+}
+</style>
+</head>
 
 <body>
 
