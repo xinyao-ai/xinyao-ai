@@ -3874,13 +3874,23 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
         window.scrollTo({ top: 0, behavior: "smooth" });
       };
       if (!isSelectedGame) {
-        showMemberLobby();
+        // Safari 回到會員頁或重新整理時，也保持原本的選遊戲畫面，
+        // 不自動切回第二個會員大廳。手動進入會員大廳的既有入口不受影響。
+        if (sessionStorage.getItem('oracle_direct_game_mode_v1') === '1') {
+          loginPage.style.display = "flex";
+          appPage.style.display = "none";
+          appPage.style.visibility = "";
+          appLineFloat.classList.remove("show");
+        } else {
+          showMemberLobby();
+        }
         return;
       }
-      // 遊戲入口由既有站點腳本負責；大廳暫不顯示，以免跳出第二畫面。
-      loginPage.style.display = "none";
-      appPage.style.display = "block";
-      appPage.style.visibility = "hidden";
+      // Safari 遊戲通常另開分頁；原會員頁保留選擇遊戲的畫面，
+      // 使會員返回原分頁時不會看到第二個登入後大廳。
+      loginPage.style.display = "flex";
+      appPage.style.display = "none";
+      appPage.style.visibility = "";
       appLineFloat.classList.remove("show");
 
       let attempts = 0;
@@ -3890,12 +3900,9 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
           const launch = window.__SETH_LAUNCH_PRESELECTED_GAME__;
           if (typeof launch === 'function' && launch(selectedGame)) {
             sessionStorage.removeItem('oracle_prelogin_game_selection');
-            // 只有遊戲另外開在新分頁時，原會員頁才還會留著；避免留空白頁。
-            setTimeout(() => {
-              if (document.visibilityState === 'visible' && location.hostname === 'xinyao-ai.github.io') {
-                appPage.style.visibility = "";
-              }
-            }, 1800);
+            sessionStorage.setItem('oracle_direct_game_mode_v1','1');
+            // 已開啟所選遊戲，原會員分頁維持登入前選遊戲畫面。
+            // 不切換登入後大廳，也不動現有的遊戲入口或授權流程。
             return;
           }
         } catch (error) {
