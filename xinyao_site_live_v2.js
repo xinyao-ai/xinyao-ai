@@ -484,25 +484,6 @@
     }, 1200);
   }
 
-  // 登入前已選好遊戲時，直接沿用現有皇鼎入口／配對邏輯，不再要求會員點第二次。
-  // 若 Safari 擋住新視窗，原 launchHuangDingGame 已有同頁切換備援。
-  window.__SETH_LAUNCH_PRESELECTED_GAME__ = function(launcherId) {
-    const launchMap = Object.freeze({
-      xinyaoLaunchSeth: 'seth',
-      xinyaoLaunchSeth1: 'seth1',
-      xinyaoLaunchTiger: 'tiger',
-      xinyaoLaunchBaphomet: 'baphomet',
-      xinyaoLaunchVampire: 'vampire',
-      xinyaoLaunchSongo: 'songo',
-      xinyaoLaunchScarlet: 'scarlet',
-      xinyaoLaunchWuxia: 'wuxia'
-    });
-    const gameId = launchMap[String(launcherId || '')];
-    if (!gameId) return false;
-    launchHuangDingGame(gameId);
-    return true;
-  };
-
   function bindGameLauncher() {
     const sethButton = $('xinyaoLaunchSeth');
     if (sethButton && sethButton.dataset.bound !== '1') {
