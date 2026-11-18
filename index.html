@@ -3961,64 +3961,19 @@ html body #loginPage #oraclePreloginGameLobby .oracle-prelogin-next{right:6px!im
       sessionStorage.setItem("memberAccount", memberAccount);
       loginMessage.style.display = "none";
 
-      // 會員登入完成後直接進入登入前所選遊戲，不再先顯示第二個大廳。
-      // 未選遊戲、無法開啟入口時，仍保留原來的會員大廳作為備援。
-      let selectedGame = '';
+      // 登入成功後恢復原本的第二頁會員大廳；
+      // 遊戲由會員在第二頁自行選擇進入，不自動開新視窗。
       try {
-        selectedGame = sessionStorage.getItem('oracle_prelogin_game_selection') || '';
+        sessionStorage.removeItem('oracle_direct_game_mode_v1');
+        sessionStorage.removeItem('oracle_prelogin_game_selection');
       } catch (_) {}
-      const isSelectedGame = /^xinyaoLaunch(?:Seth1?|Tiger|Baphomet|Vampire|Songo|Scarlet|Wuxia)$/.test(selectedGame);
-      const showMemberLobby = () => {
-        loginPage.style.display = "none";
-        appPage.style.display = "block";
-        appPage.style.visibility = "";
-        appLineFloat.classList.add("show");
-        playLoginTransition();
-        renderHistory();
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      };
-      if (!isSelectedGame) {
-        // Safari 回到會員頁或重新整理時，也保持原本的選遊戲畫面，
-        // 不自動切回第二個會員大廳。手動進入會員大廳的既有入口不受影響。
-        if (sessionStorage.getItem('oracle_direct_game_mode_v1') === '1') {
-          loginPage.style.display = "flex";
-          appPage.style.display = "none";
-          appPage.style.visibility = "";
-          appLineFloat.classList.remove("show");
-        } else {
-          showMemberLobby();
-        }
-        return;
-      }
-      // Safari 遊戲通常另開分頁；原會員頁保留選擇遊戲的畫面，
-      // 使會員返回原分頁時不會看到第二個登入後大廳。
-      loginPage.style.display = "flex";
-      appPage.style.display = "none";
+      loginPage.style.display = "none";
+      appPage.style.display = "block";
       appPage.style.visibility = "";
-      appLineFloat.classList.remove("show");
-
-      let attempts = 0;
-      const enterSelectedGame = () => {
-        attempts++;
-        try {
-          const launch = window.__SETH_LAUNCH_PRESELECTED_GAME__;
-          if (typeof launch === 'function' && launch(selectedGame)) {
-            sessionStorage.removeItem('oracle_prelogin_game_selection');
-            sessionStorage.setItem('oracle_direct_game_mode_v1','1');
-            // 已開啟所選遊戲，原會員分頁維持登入前選遊戲畫面。
-            // 不切換登入後大廳，也不動現有的遊戲入口或授權流程。
-            return;
-          }
-        } catch (error) {
-          console.warn('[SethOracle] Selected game launch failed',error);
-        }
-        if (attempts < 12) {
-          setTimeout(enterSelectedGame,100);
-        } else {
-          showMemberLobby();
-        }
-      };
-      enterSelectedGame();
+      appLineFloat.classList.add("show");
+      playLoginTransition();
+      renderHistory();
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
 
@@ -4848,14 +4803,6 @@ html body #loginPage #oraclePreloginGameLobby .oracle-prelogin-next{right:6px!im
     }
     oracleSsoLoginButton.addEventListener('click', async () => {
       if (oracleSsoLoginButton.disabled) return;
-      try {
-        if (!sessionStorage.getItem('oracle_prelogin_game_selection')) {
-          const defaultSelected = document.querySelector('#oraclePreloginTrack .oracle-prelogin-card.is-selected');
-          if (defaultSelected?.dataset.launch) {
-            sessionStorage.setItem('oracle_prelogin_game_selection',defaultSelected.dataset.launch);
-          }
-        }
-      } catch (_) {}
       oracleSsoLoginButton.disabled = true;
       oracleSsoLoginButton.textContent = '正在確認皇鼎登入狀態…';
       try {
