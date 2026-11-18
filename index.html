@@ -3203,12 +3203,12 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
 }
 #loginPage .oracle-prelogin-head .oracle-prelogin-provider .oracle-atg-mark{display:block!important;width:20px!important;height:19px!important;flex:none!important}
 </style>
-<style id="oracle-prelogin-three-card-carousel-5100">
-/* 2026-11-18: 三張遊戲卡等寬等大，中央清楚、左右只調整顏色淡化。
+<style id="oracle-prelogin-equal-size-slide-5104">
+/* 2026-11-18: 三張同尺寸實體卡片。中間完整，兩邊等比例放在畫布外、只變淡。
    不用 scroll/transform 推拉版面，避免 Safari 上下或左右漂移。 */
 #loginPage .oracle-prelogin-carousel{position:relative!important;width:100%!important;overflow:hidden!important}
 #loginPage .oracle-prelogin-track{
-  display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  display:grid!important;grid-template-columns:repeat(3,minmax(0,44%))!important;justify-content:center!important;
   align-items:stretch!important;gap:8px!important;
   padding:5px 2px 12px!important;margin:0!important;
   box-sizing:border-box!important;width:100%!important;
@@ -3223,7 +3223,7 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
   border:1px solid rgba(221,172,79,.72)!important;border-radius:14px!important;
   background:linear-gradient(160deg,#102c2c,#0b1b1d)!important;
   flex-direction:column!important;align-self:stretch!important;
-  opacity:.52!important;filter:brightness(.72) saturate(.82)!important;
+  opacity:.55!important;filter:brightness(.68) saturate(.78)!important;
   transform:none!important;translate:none!important;animation:none!important;
   transition:opacity .2s ease,filter .2s ease,border-color .2s ease!important;
 }
@@ -3269,7 +3269,7 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
 #loginPage .oracle-prelogin-nav{height:5px!important;margin:3px 5% 0!important}
 @media(max-width:420px){
   #loginPage .oracle-prelogin-track{gap:5px!important;padding:4px 1px 9px!important;
-    grid-template-columns:repeat(3,minmax(0,1fr))!important}
+    grid-template-columns:repeat(3,minmax(0,44%))!important;justify-content:center!important}
   #loginPage .oracle-prelogin-card{padding:4px!important;border-radius:10px!important}
   #loginPage .oracle-prelogin-image{border-radius:6px!important}
   #loginPage .oracle-prelogin-name{min-height:30px!important;font-size:10px!important}
