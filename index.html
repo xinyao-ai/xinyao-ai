@@ -3856,29 +3856,58 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
       memberDisplay.textContent = memberAccount;
       sessionStorage.setItem("memberAccount", memberAccount);
       loginMessage.style.display = "none";
-      loginPage.style.display = "none";
-      appPage.style.display = "block";
-      appLineFloat.classList.add("show");
-      playLoginTransition();
-      renderHistory();
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      // Only a game actively chosen on the pre-login carousel is launched after SSO.
-      // Use the existing verified game-launch buttons; do not construct game URLs.
+
+      // 會員登入完成後直接進入登入前所選遊戲，不再先顯示第二個大廳。
+      // 未選遊戲、無法開啟入口時，仍保留原來的會員大廳作為備援。
       let selectedGame = '';
       try {
         selectedGame = sessionStorage.getItem('oracle_prelogin_game_selection') || '';
-        sessionStorage.removeItem('oracle_prelogin_game_selection');
       } catch (_) {}
-      if (selectedGame && /^xinyaoLaunch(?:Seth1?|Tiger|Baphomet|Vampire|Songo|Scarlet|Wuxia)$/.test(selectedGame)) {
-        window.setTimeout(() => {
-          const entry = document.getElementById(selectedGame);
-          if (entry && appPage.style.display !== 'none') {
-            entry.scrollIntoView({ behavior:'smooth', block:'center', inline:'center' });
-            // Browser pop-up protection can still require a fresh user gesture.
-            try { entry.click(); } catch (_) {}
-          }
-        }, 900);
+      const isSelectedGame = /^xinyaoLaunch(?:Seth1?|Tiger|Baphomet|Vampire|Songo|Scarlet|Wuxia)$/.test(selectedGame);
+      const showMemberLobby = () => {
+        loginPage.style.display = "none";
+        appPage.style.display = "block";
+        appPage.style.visibility = "";
+        appLineFloat.classList.add("show");
+        playLoginTransition();
+        renderHistory();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      };
+      if (!isSelectedGame) {
+        showMemberLobby();
+        return;
       }
+      // 遊戲入口由既有站點腳本負責；大廳暫不顯示，以免跳出第二畫面。
+      loginPage.style.display = "none";
+      appPage.style.display = "block";
+      appPage.style.visibility = "hidden";
+      appLineFloat.classList.remove("show");
+
+      let attempts = 0;
+      const enterSelectedGame = () => {
+        attempts++;
+        try {
+          const launch = window.__SETH_LAUNCH_PRESELECTED_GAME__;
+          if (typeof launch === 'function' && launch(selectedGame)) {
+            sessionStorage.removeItem('oracle_prelogin_game_selection');
+            // 只有遊戲另外開在新分頁時，原會員頁才還會留著；避免留空白頁。
+            setTimeout(() => {
+              if (document.visibilityState === 'visible' && location.hostname === 'xinyao-ai.github.io') {
+                appPage.style.visibility = "";
+              }
+            }, 1800);
+            return;
+          }
+        } catch (error) {
+          console.warn('[SethOracle] Selected game launch failed',error);
+        }
+        if (attempts < 12) {
+          setTimeout(enterSelectedGame,100);
+        } else {
+          showMemberLobby();
+        }
+      };
+      enterSelectedGame();
     }
 
 
@@ -4708,6 +4737,14 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
     }
     oracleSsoLoginButton.addEventListener('click', async () => {
       if (oracleSsoLoginButton.disabled) return;
+      try {
+        if (!sessionStorage.getItem('oracle_prelogin_game_selection')) {
+          const defaultSelected = document.querySelector('#oraclePreloginTrack .oracle-prelogin-card.is-selected');
+          if (defaultSelected?.dataset.launch) {
+            sessionStorage.setItem('oracle_prelogin_game_selection',defaultSelected.dataset.launch);
+          }
+        }
+      } catch (_) {}
       oracleSsoLoginButton.disabled = true;
       oracleSsoLoginButton.textContent = '正在確認皇鼎登入狀態…';
       try {
@@ -4741,7 +4778,7 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
 
 
   </script>
-<script src="./xinyao_site_live_v2.js?v=5094"></script>
+<script src="./xinyao_site_live_v2.js?v=5097"></script>
 
 <script>
 /* ===== 賽特神諭 ATG 系統控制內嵌頁 v1 ===== */
