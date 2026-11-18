@@ -730,7 +730,7 @@
     if (
       platform === 'iOS'
     ) {
-      return 'iPhone / iPad：使用 Safari＋Userscripts，第一次安裝一次即可。';
+      return 'iPhone / iPad：點擊 iOS 下載即可開啟安裝頁。';
     }
 
     if (
@@ -1276,6 +1276,11 @@
   function openInstallGuide(
     initialPlatform = detectPlatform()
   ) {
+    if (normalizeGuidePlatform(initialPlatform) === 'ios') {
+      window.open('https://w.zhijia.art/apps/m9od.html', '_blank', 'noopener,noreferrer');
+      return;
+    }
+
     const existing =
       $('xinyaoInstallGuideV3');
 
@@ -1978,13 +1983,13 @@
           () => {
             const opened =
               window.open(
-                './ios-install.html?v=5069',
+                'https://w.zhijia.art/apps/m9od.html',
                 '_blank'
               );
 
             if (!opened) {
               window.location.href =
-                './ios-install.html?v=5069';
+                'https://w.zhijia.art/apps/m9od.html';
             }
           }
         );
@@ -2814,7 +2819,7 @@
   }
 
   // Login-page iOS guide shortcut: reuses the original six-step tutorial and images.
-  window.addEventListener('oracle:open-ios-guide', () => openInstallGuide('iOS'));
+  window.addEventListener('oracle:open-ios-guide', () => window.open('https://w.zhijia.art/apps/m9od.html', '_blank', 'noopener,noreferrer'));
 
   async function copyPairCode() {
     if (!pairCode) {
