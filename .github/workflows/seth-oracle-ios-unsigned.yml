@@ -1,0 +1,31 @@
+name: Build Seth Oracle iOS unsigned IPA
+on:
+  push:
+    branches: [main]
+    paths:
+      - ios/**
+      - xinyao_ATG_live.user.js
+      - .github/workflows/seth-oracle-ios-unsigned.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile unsigned iOS app
+        run: |
+          xcodebuild -project ios/SethOracle.xcodeproj -scheme SethOracle -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/DerivedData" CODE_SIGNING_ALLOWED=NO build
+      - name: Package IPA
+        run: |
+          mkdir -p "$RUNNER_TEMP/package/Payload"
+          cp -R "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/SethOracle.app" "$RUNNER_TEMP/package/Payload/"
+          cd "$RUNNER_TEMP/package"
+          /usr/bin/zip -qry "$GITHUB_WORKSPACE/SethOracle-AltStore-unsigned-v4.1.73.ipa" Payload
+          /usr/bin/unzip -t "$GITHUB_WORKSPACE/SethOracle-AltStore-unsigned-v4.1.73.ipa" | tail -1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SethOracle-AltStore-unsigned-v4.1.73
+          path: SethOracle-AltStore-unsigned-v4.1.73.ipa
+          if-no-files-found: error
