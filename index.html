@@ -3503,6 +3503,48 @@ html body #loginPage #oraclePreloginGameLobby .oracle-supported-page-arrow:disab
  html body #loginPage #oraclePreloginGameLobby .oracle-supported-page-arrow{width:23px!important;height:31px!important;font-size:19px!important}
 }
 </style>
+<style id="oracle-hd-double-login-5127">
+/* 註冊 / 登入橫向雙金色按鈕；保留既有 SSO 按鈕 ID 與登入流程 */
+html body #loginPage .oracle-hd-entry-actions-5127{
+  display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:10px!important;width:100%!important;align-items:stretch!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister,
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin{
+  box-sizing:border-box!important;
+  display:flex!important;justify-content:center!important;align-items:center!important;
+  min-width:0!important;width:100%!important;height:58px!important;
+  padding:12px 5px!important;margin:0!important;
+  white-space:nowrap!important;text-decoration:none!important;
+  font-family:inherit!important;font-size:clamp(13px,3.5vw,17px)!important;
+  font-weight:900!important;line-height:1.15!important;
+  letter-spacing:0!important;text-align:center!important;
+  border:2px solid #ffe6a0!important;border-bottom:6px solid #875212!important;
+  border-radius:15px!important;
+  background:linear-gradient(180deg,#fff5c0 0%,#f6d47d 32%,#eabc58 73%,#b77d21 100%)!important;
+  color:#342108!important;text-shadow:0 1px 0 #fff3b8!important;
+  box-shadow:inset 0 2px 1px #fff9dd,inset 0 -2px 3px #85541688,0 3px 0 #58310a,0 7px 10px #0007!important;
+  transition:filter .15s,transform .15s!important;
+  cursor:pointer!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister:hover,
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:hover:not(:disabled){
+ filter:brightness(1.07)!important;transform:translateY(-1px)!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister:active,
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:active:not(:disabled){
+ transform:translateY(3px)!important;box-shadow:inset 0 2px 6px #86500e88,0 1px 0 #58310a,0 3px 6px #0006!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister:focus-visible,
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:focus-visible{
+ outline:2px solid #fff7ce!important;outline-offset:3px!important;
+}
+@media(max-width:380px){
+ html body #loginPage .oracle-hd-entry-actions-5127{gap:7px!important}
+ html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister,
+ html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin{font-size:13px!important}
+}
+</style>
 </head>
 
 <body>
@@ -3611,7 +3653,10 @@ html body #loginPage #oraclePreloginGameLobby .oracle-supported-page-arrow:disab
       <section class="login-form-card-539">
         
         <div hidden style="display:none!important" aria-hidden="true"><label for="memberAccount">會員帳號</label><input id="memberAccount" type="text" autocomplete="username" tabindex="-1"><button id="loginButton" type="button" tabindex="-1">登入分析系統</button></div>
-        <button id="oracleHdSsoLogin" type="button" aria-label="使用皇鼎會員帳號登入" style="display:block!important;width:100%!important;margin:0!important;padding:18px 14px!important;border-radius:17px!important;font-size:18px!important;text-align:center!important;cursor:pointer!important">🔐 皇鼎會員一鍵登入</button>
+        <div class="oracle-hd-entry-actions-5127" role="group" aria-label="皇鼎會員註冊及登入">
+          <a id="oracleHdRegister" href="https://gs42oj.hd5957.com/register" target="_blank" rel="noopener noreferrer" aria-label="註冊皇鼎帳號">📝 註冊帳號</a>
+          <button id="oracleHdSsoLogin" type="button" aria-label="登入皇鼎" style="margin:0!important;padding:16px 6px!important;font-size:16px!important;cursor:pointer!important">🔐 登入皇鼎</button>
+        </div>
         <div id="loginMessage" class="login-message-539"></div>
       </section>
 
@@ -4989,7 +5034,7 @@ html body #loginPage #oraclePreloginGameLobby .oracle-supported-page-arrow:disab
           showLoginMessage(err.message || '登入失敗，請重新使用皇鼎會員登入');
         } finally {
           oracleSsoLoginButton.disabled = false;
-          oracleSsoLoginButton.textContent = '🔐 皇鼎會員一鍵登入';
+          oracleSsoLoginButton.textContent = '🔐 登入皇鼎';
         }
         return;
       }
@@ -5043,7 +5088,7 @@ html body #loginPage #oraclePreloginGameLobby .oracle-supported-page-arrow:disab
         window.location.assign(ORACLE_HD_SSO + '/start');
       } finally {
         oracleSsoLoginButton.disabled = false;
-        oracleSsoLoginButton.textContent = '🔐 皇鼎會員一鍵登入';
+        oracleSsoLoginButton.textContent = '🔐 登入皇鼎';
       }
     });
 
