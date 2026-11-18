@@ -2853,6 +2853,45 @@
     }
   }
 
+  // 由已登入會員頁代替 ATG 遊戲視窗取得一次性配對碼；不傳送登入憑證。
+  let gamePairRequestBusy = false;
+  window.addEventListener('message', async event => {
+    if (event.origin !== 'https://play.godeebxp.com') return;
+    if (event.data?.type !== 'seth-oracle:pair-code-request:v1') return;
+    if (!event.source || typeof event.source.postMessage !== 'function' || gamePairRequestBusy) return;
+    // 僅回覆會員頁實際開啟的遊戲子視窗／子框架，防止其他來源索取配對碼。
+    const trustedGame = (() => {
+      try {
+        if (event.source === window.opener) return false;
+        const registeredWindow = localStorage.getItem(XIANYAO_GAME_WINDOW_KEY);
+        const named = String(event.source.name || '');
+        if (registeredWindow && registeredWindow === named) return true;
+        if (Array.from(window.frames).includes(event.source)) return true;
+        return false;
+      } catch (_) { return false; }
+    })();
+    if (!trustedGame) return;
+    gamePairRequestBusy = true;
+    try {
+      const result = await api('/pair/start', {
+        method:'POST',headers:{'Content-Type':'application/json'}
+      });
+      const code = String(result.pairCode || '').toUpperCase();
+      const expiresAt = Number(result.expiresAt || 0);
+      if (!/^[A-Z0-9]{4,12}$/.test(code) || expiresAt <= Date.now()) return;
+      pairCode = code;
+      pairExpiresAt = expiresAt;
+      try { event.source.postMessage({
+        type:'seth-oracle:pair-code-display:v1',pairCode:code,expiresAt
+      }, event.origin); } catch (_) {}
+      try { renderConnectBox(await api('/device/status',{method:'GET'})); } catch (_) {}
+    } catch (error) {
+      console.warn('[SethOracle] Unable to issue pairing code to game',error?.message || error);
+    } finally {
+      gamePairRequestBusy = false;
+    }
+  });
+
   async function startPairing() {
     const button =
       $('xinyaoStartPairV2');
