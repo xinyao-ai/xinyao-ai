@@ -3142,30 +3142,31 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
 </style>
 
 <style id="oracle-prelogin-lobby-style">
-/* 賽特神諭｜登入前遊戲展示；只新增大廳 UI，不碰既有入口與驗證 */
-#loginPage .oracle-prelogin-lobby{width:100%;order:2;padding:15px 12px 17px;margin:10px 0 14px;background:linear-gradient(155deg,rgba(8,29,31,.98),rgba(6,17,22,.97));border:1px solid rgba(215,171,82,.76);border-radius:21px;box-shadow:0 12px 30px #0005;color:#f2dfaf;overflow:hidden}
-#loginPage .oracle-prelogin-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 4px 10px}
-#loginPage .oracle-prelogin-head h3{font-size:18px;color:#ffe5a2;margin:0;font-weight:900}
-#loginPage .oracle-prelogin-head small{font-size:11px;color:#ceb887}
-#loginPage .oracle-prelogin-tabs{display:flex;gap:8px;margin:0 4px 13px}
-#loginPage .oracle-prelogin-tab{border:1px solid #d7aa53;border-radius:11px;background:linear-gradient(135deg,#b99149,#ebcb79);color:#1d1a13;min-width:80px;padding:9px 14px;font-weight:900;font-size:13px}
+/* 登入前大廳：對齊登入後的雙卡遊戲版型；保留原本 SSO 與遊戲入口 */
+#loginPage .oracle-prelogin-lobby{width:100%;order:2;padding:16px 14px 18px;margin:10px 0 14px;background:linear-gradient(155deg,rgba(7,25,28,.98),rgba(4,16,20,.97));border:1px solid rgba(215,171,82,.76);border-radius:21px;box-shadow:0 12px 30px #0005;color:#f2dfaf;overflow:hidden}
+#loginPage .oracle-prelogin-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 3px 13px}
+#loginPage .oracle-prelogin-head h3{font-size:20px;color:#f6d887;margin:0;font-weight:900;display:flex;align-items:center;gap:7px}
+#loginPage .oracle-prelogin-head small{display:inline-flex;align-items:center;gap:4px;border:1px solid #896d39;border-radius:7px;background:#142a2d;padding:5px 9px;color:#edd6a0;font-size:12px;font-weight:800}
 #loginPage .oracle-prelogin-carousel{position:relative}
-#loginPage .oracle-prelogin-track{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;scroll-padding-inline:calc((100% - min(72%,310px))/2);padding:5px max(12%,calc((100% - 310px)/2)) 13px;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+#loginPage .oracle-prelogin-track{display:flex;gap:10px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;scroll-padding-inline:0;padding:2px 2px 14px;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
 #loginPage .oracle-prelogin-track::-webkit-scrollbar{display:none}
-#loginPage .oracle-prelogin-card{flex:0 0 min(72%,310px);scroll-snap-align:center;position:relative;overflow:hidden;min-width:0;border:1px solid rgba(232,194,110,.47);border-radius:18px;padding:0;background:linear-gradient(140deg,#291d29,#121925);color:#f7e4b3;cursor:pointer;box-shadow:0 6px 19px #0009;transition:border-color .2s,box-shadow .2s,transform .2s}
-#loginPage .oracle-prelogin-card.is-selected{border:2px solid #f4d480;box-shadow:0 0 0 2px #dfba6460,0 8px 27px #0009}
-#loginPage .oracle-prelogin-image{width:100%;aspect-ratio:1/1;display:block;object-fit:cover;background:#201b25}
-#loginPage .oracle-prelogin-name{display:block;font-size:15px;font-weight:900;padding:12px 6px 13px;text-align:center;background:rgba(4,17,19,.92)}
-#loginPage .oracle-prelogin-selected{position:absolute;top:10px;right:10px;border-radius:50px;background:#d4ad61;color:#21190e;padding:4px 9px;font-size:11px;font-weight:900;display:none}
+#loginPage .oracle-prelogin-card{flex:0 0 calc((100% - 10px)/2);scroll-snap-align:start;position:relative;overflow:hidden;min-width:0;border:1px solid rgba(221,172,79,.75);border-radius:14px;padding:8px;background:linear-gradient(160deg,#102c2c,#0b1b1d);color:#f7e4b3;cursor:pointer;box-shadow:none;display:flex;flex-direction:column;gap:0;transition:border-color .2s,box-shadow .2s}
+#loginPage .oracle-prelogin-card.is-selected{border-color:#f4d480;box-shadow:inset 0 0 0 1px #f4d480}
+#loginPage .oracle-prelogin-image{width:100%;aspect-ratio:1/1;display:block;object-fit:contain;background:#251b25;border:2px solid #b9934d;border-radius:9px}
+#loginPage .oracle-prelogin-name{display:flex;align-items:center;justify-content:center;min-height:42px;font-size:13px;font-weight:900;padding:10px 2px 8px;text-align:center;background:transparent;line-height:1.3}
+#loginPage .oracle-prelogin-selected{position:absolute;top:13px;right:13px;border-radius:50px;background:#d4ad61;color:#21190e;padding:4px 7px;font-size:10px;font-weight:900;display:none}
 #loginPage .oracle-prelogin-card.is-selected .oracle-prelogin-selected{display:inline-block}
-#loginPage .oracle-prelogin-arrow{position:absolute;top:40%;transform:translateY(-50%);width:40px;height:40px;border:1px solid #cba65c;border-radius:50%;background:rgba(5,21,24,.95);color:#f8de98;font-size:26px;line-height:1;z-index:2;cursor:pointer}
-#loginPage .oracle-prelogin-prev{left:2px}#loginPage .oracle-prelogin-next{right:2px}
-#loginPage .oracle-prelogin-status{text-align:center;font-size:12px;font-weight:700;color:#d5c195;margin:5px 8px 0}
+#loginPage .oracle-prelogin-enter{display:flex;align-items:center;justify-content:space-between;gap:3px;width:100%;border:1px solid #cda85d;border-radius:8px;padding:8px 7px;margin-top:auto;color:#edcf8e;font-size:11px;font-weight:850;line-height:1.2}
+#loginPage .oracle-prelogin-enter::after{content:"›";font-size:17px;line-height:.8}
+#loginPage .oracle-prelogin-nav{height:7px;border-radius:20px;background:linear-gradient(90deg,rgba(236,189,94,.72),rgba(236,189,94,.12));margin:1px 3px 0}
+#loginPage .oracle-prelogin-arrow{position:absolute;top:42%;transform:translateY(-50%);width:31px;height:42px;border:1px solid #cba65c;border-radius:11px;background:rgba(5,21,24,.92);color:#f8de98;font-size:24px;line-height:1;z-index:2;cursor:pointer}
+#loginPage .oracle-prelogin-prev{left:0}#loginPage .oracle-prelogin-next{right:0}
+#loginPage .oracle-prelogin-status{font-size:11px;line-height:1.3;font-weight:700;color:#d5c195;margin:5px 4px 0;text-align:center}
 #loginPage .oracle-prelogin-status strong{color:#ffe49d}
 #loginPage .login-form-card-539{order:3!important}
 #loginPage .oracle-downloads{order:4!important}
 #loginPage .oracle-guide-card{order:5!important}
-@media(max-width:420px){#loginPage .oracle-prelogin-head h3{font-size:16px}#loginPage .oracle-prelogin-card{flex-basis:72%}#loginPage .oracle-prelogin-track{padding-inline:14%}#loginPage .oracle-prelogin-name{font-size:13px}#loginPage .oracle-prelogin-arrow{width:34px;height:34px}}
+@media(max-width:420px){#loginPage .oracle-prelogin-head h3{font-size:17px}#loginPage .oracle-prelogin-lobby{padding:14px 10px 16px}#loginPage .oracle-prelogin-card{padding:6px}#loginPage .oracle-prelogin-name{font-size:11px;min-height:41px}#loginPage .oracle-prelogin-enter{font-size:10px;padding:7px 5px}#loginPage .oracle-prelogin-arrow{width:27px;height:36px}}
 @media(prefers-reduced-motion:reduce){#loginPage .oracle-prelogin-card{transition:none}}
 </style>
 </head>
@@ -3232,24 +3233,24 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
       <section class="oracle-prelogin-lobby" id="oraclePreloginGameLobby" aria-label="登入前瀏覽 ATG 遊戲">
         <div class="oracle-prelogin-head">
           <h3>🎮 選擇遊戲</h3>
-          <small>共 8 款 · 左右滑動</small>
+          <small>🔶 ATG</small>
         </div>
-        <div class="oracle-prelogin-tabs"><span class="oracle-prelogin-tab">ATG 遊戲</span></div>
         <div class="oracle-prelogin-carousel">
           <button class="oracle-prelogin-arrow oracle-prelogin-prev" type="button" aria-label="上一款遊戲">‹</button>
           <div class="oracle-prelogin-track" id="oraclePreloginTrack" role="group" aria-label="遊戲封面">
-            <button type="button" class="oracle-prelogin-card is-selected" data-launch="xinyaoLaunchSeth" aria-pressed="true"><img class="oracle-prelogin-image" src="./assets/seth2-cover.png?v=5045" alt="戰神賽特2 覺醒之力"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">戰神賽特2・覺醒之力</span></button>
-            <button type="button" class="oracle-prelogin-card" data-launch="xinyaoLaunchSeth1" aria-pressed="false"><img class="oracle-prelogin-image" src="./assets/seth1-cover.png?v=5047" alt="戰神賽特一代"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">戰神賽特（一代）</span></button>
-            <button type="button" class="oracle-prelogin-card" data-launch="xinyaoLaunchTiger" aria-pressed="false"><img class="oracle-prelogin-image" src="./assets/download.png?v=5018" alt="虎小妹"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">虎小妹</span></button>
-            <button type="button" class="oracle-prelogin-card" data-launch="xinyaoLaunchBaphomet" aria-pressed="false"><img class="oracle-prelogin-image" src="https://www.atg-games.com/elder-god-baphomet/en/game_icon.png" alt="古神巴風特"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">古神巴風特</span></button>
-            <button type="button" class="oracle-prelogin-card" data-launch="xinyaoLaunchVampire" aria-pressed="false"><img class="oracle-prelogin-image" src="https://www.atg-games.com/vampire/en/game_icon.png" alt="惡魔血域"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">惡魔血域</span></button>
-            <button type="button" class="oracle-prelogin-card" data-launch="xinyaoLaunchSongo" aria-pressed="false"><img class="oracle-prelogin-image" src="./songo_cover.png" alt="孫行者"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">孫行者</span></button>
-            <button type="button" class="oracle-prelogin-card" data-launch="xinyaoLaunchScarlet" aria-pressed="false"><img class="oracle-prelogin-image" src="https://www.atg-games.com/scarlet-three-kingdoms/en/game_icon.png" alt="赤三國"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">赤三國</span></button>
-            <button type="button" class="oracle-prelogin-card" data-launch="xinyaoLaunchWuxia" aria-pressed="false"><img class="oracle-prelogin-image" src="https://www.atg-games.com/wuxia-caishen/en/game_icon.png" alt="武俠"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">武俠</span></button>
+            <button type="button" class="oracle-prelogin-card is-selected" data-launch="xinyaoLaunchSeth" aria-pressed="true"><img class="oracle-prelogin-image" src="./assets/seth2-cover.png?v=5045" alt="戰神賽特2 覺醒之力"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">戰神賽特2・覺醒之力</span><span class="oracle-prelogin-enter">登入後進入遊戲</span></button>
+            <button type="button" class="oracle-prelogin-card" data-launch="xinyaoLaunchSeth1" aria-pressed="false"><img class="oracle-prelogin-image" src="./assets/seth1-cover.png?v=5047" alt="戰神賽特一代"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">戰神賽特（一代）</span><span class="oracle-prelogin-enter">登入後進入遊戲</span></button>
+            <button type="button" class="oracle-prelogin-card" data-launch="xinyaoLaunchTiger" aria-pressed="false"><img class="oracle-prelogin-image" src="./assets/download.png?v=5018" alt="虎小妹"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">虎小妹</span><span class="oracle-prelogin-enter">登入後進入遊戲</span></button>
+            <button type="button" class="oracle-prelogin-card" data-launch="xinyaoLaunchBaphomet" aria-pressed="false"><img class="oracle-prelogin-image" src="https://www.atg-games.com/elder-god-baphomet/en/game_icon.png" alt="古神巴風特"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">古神巴風特</span><span class="oracle-prelogin-enter">登入後進入遊戲</span></button>
+            <button type="button" class="oracle-prelogin-card" data-launch="xinyaoLaunchVampire" aria-pressed="false"><img class="oracle-prelogin-image" src="https://www.atg-games.com/vampire/en/game_icon.png" alt="惡魔血域"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">惡魔血域</span><span class="oracle-prelogin-enter">登入後進入遊戲</span></button>
+            <button type="button" class="oracle-prelogin-card" data-launch="xinyaoLaunchSongo" aria-pressed="false"><img class="oracle-prelogin-image" src="./songo_cover.png" alt="孫行者"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">孫行者</span><span class="oracle-prelogin-enter">登入後進入遊戲</span></button>
+            <button type="button" class="oracle-prelogin-card" data-launch="xinyaoLaunchScarlet" aria-pressed="false"><img class="oracle-prelogin-image" src="https://www.atg-games.com/scarlet-three-kingdoms/en/game_icon.png" alt="赤三國"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">赤三國</span><span class="oracle-prelogin-enter">登入後進入遊戲</span></button>
+            <button type="button" class="oracle-prelogin-card" data-launch="xinyaoLaunchWuxia" aria-pressed="false"><img class="oracle-prelogin-image" src="https://www.atg-games.com/wuxia-caishen/en/game_icon.png" alt="武俠"><span class="oracle-prelogin-selected">已選擇</span><span class="oracle-prelogin-name">武俠</span><span class="oracle-prelogin-enter">登入後進入遊戲</span></button>
           </div>
           <button class="oracle-prelogin-arrow oracle-prelogin-next" type="button" aria-label="下一款遊戲">›</button>
         </div>
-        <div class="oracle-prelogin-status" id="oraclePreloginStatus">已選擇 <strong>戰神賽特2・覺醒之力</strong> · 登入後可從大廳進入</div>
+        <div class="oracle-prelogin-nav" aria-hidden="true"></div>
+        <div class="oracle-prelogin-status" id="oraclePreloginStatus">已選擇 <strong>戰神賽特2・覺醒之力</strong> · 登入後可進入</div>
       </section>
 
       <section class="login-form-card-539">
@@ -4886,9 +4887,9 @@ setInterval(()=>{if(active&&!document.hidden)show(index+1)},6500);
     cards.forEach(el=>{const selected=el===card;el.classList.toggle('is-selected',selected);el.setAttribute('aria-pressed',String(selected));});
     status.textContent='';
     status.append(document.createTextNode('已選擇 '));
-    const strong=document.createElement('strong');strong.textContent=card.querySelector('.oracle-prelogin-name')?.textContent||'ATG 遊戲';status.append(strong,document.createTextNode(' · 請先登入皇鼎會員'));
+    const strong=document.createElement('strong');strong.textContent=card.querySelector('.oracle-prelogin-name')?.textContent||'ATG 遊戲';status.append(strong,document.createTextNode(' · 登入後可進入'));
     try{sessionStorage.setItem('oracle_prelogin_game_selection',card.dataset.launch)}catch(_){}
-    card.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+    track.scrollTo({left:Math.max(0,card.offsetLeft-track.offsetLeft),behavior:'smooth'});
   }
   cards.forEach(card=>card.addEventListener('click',()=>select(card)));
   root.querySelector('.oracle-prelogin-prev')?.addEventListener('click',()=>track.scrollBy({left:-Math.max(180,track.clientWidth*.72),behavior:'smooth'}));
