@@ -3168,6 +3168,22 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
 #loginPage .oracle-guide-card{order:5!important}
 @media(max-width:420px){#loginPage .oracle-prelogin-head h3{font-size:17px}#loginPage .oracle-prelogin-lobby{padding:14px 10px 16px}#loginPage .oracle-prelogin-card{padding:6px}#loginPage .oracle-prelogin-name{font-size:11px;min-height:41px}#loginPage .oracle-prelogin-enter{font-size:10px;padding:7px 5px}#loginPage .oracle-prelogin-arrow{width:27px;height:36px}}
 @media(prefers-reduced-motion:reduce){#loginPage .oracle-prelogin-card{transition:none}}
+
+/* 2026-11-18：登入頁遊戲封面完全固定，僅允許水平滑動，不做上下浮動 */
+#loginPage .login-shell-539{animation:none!important;transform:none!important}
+#loginPage .oracle-prelogin-lobby,
+#loginPage .oracle-prelogin-carousel,
+#loginPage .oracle-prelogin-track,
+#loginPage .oracle-prelogin-card,
+#loginPage .oracle-prelogin-image{
+  animation:none!important;
+  translate:none!important;
+  transform:none!important;
+  transition-property:border-color,box-shadow!important;
+}
+#loginPage .oracle-prelogin-card{align-self:stretch!important}
+#loginPage .oracle-prelogin-image{height:auto!important;aspect-ratio:1/1!important;object-position:center center!important}
+#loginPage .oracle-prelogin-track{align-items:stretch!important;overscroll-behavior-y:contain!important;touch-action:pan-x!important}
 </style>
 </head>
 
