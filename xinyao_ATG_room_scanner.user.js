@@ -1380,7 +1380,6 @@
         <button id="xinyao-scan-all" style="${buttonStyle()}">${state.scanRunning ? '掃描中…' : '一鍵掃描 4100 房'}</button>
         <button id="xinyao-stop" style="${secondaryButtonStyle()}">停止掃描</button>
         <button id="xinyao-expand" style="${secondaryButtonStyle()}">${ui.expanded ? '收合分析' : '完整分析'}</button>
-        <button id="xinyao-sync-site" style="${buttonStyle('grid-column:1 / -1;')}">🌸 同步到賽特神諭</button>
         <button id="xinyao-calibrate" style="${secondaryButtonStyle('grid-column:1 / -1;')}">${state.calibrationActive
           ? `校準中 ${state.calibrationSamples.length}/2｜請點 1 → 9`
           : (state.pageCalibration ? '重新校準頁碼' : '校準頁碼位置')}</button>
