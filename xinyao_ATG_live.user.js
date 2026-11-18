@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         賽特神諭｜ATG 即時助手（賽特1＋賽特2＋虎小妹）
 // @namespace    xinyao-atg-live-v4-hud-test
-// @version      4.1.74
+// @version      4.1.75
 // @description  單檔三遊戲：賽特一代與賽特二、虎小妹共用自動掃描與進房流程，賽特二及虎小妹原版維持。
 // @match        https://play.godeebxp.com/*
 // @run-at       document-start
@@ -2707,25 +2707,50 @@ try {
   // 唯一有效配對碼由已登入的賽特神諭會員頁從後端領取，遊戲端僅顯示。
   let displayPairCode = '';
   let displayPairExpiry = 0;
+  let directPairPending = false;
+  let directPairRequestAt = 0;
   function visiblePairCode() {
     return !deviceToken && displayPairExpiry > Date.now() ? displayPairCode : '';
   }
-  function askMemberPagePairCode() {
+  async function askMemberPagePairCode() {
+    if (deviceToken || state.pairBusy || directPairPending) return;
+    const code = visiblePairCode();
+    if (code) {
+      try {
+        await claimPairCode(code);
+      } catch (error) {
+        state.pairBusy = false;
+        state.pairMessage = error?.message || '綁定失敗，請重試';
+        render();
+      }
+      return;
+    }
     const opener = window.opener || window.top?.opener;
     if (!opener || opener.closed) {
-      state.pairMessage = '請保持賽特神諭會員頁開啟，或在會員頁產生配對碼';
+      state.pairMessage = '找不到已登入會員頁，無法安全簽發配對碼。請從賽特神諭會員頁開啟遊戲。';
       render();
       return;
     }
+    directPairPending = true;
+    directPairRequestAt = Date.now();
     try {
       opener.postMessage({type:'seth-oracle:pair-code-request:v1'},'https://xinyao-ai.github.io');
-      state.pairMessage = '已向會員頁申請配對碼…';
+      state.pairMessage = '正在取得會員授權並自動綁定…';
     } catch (_) {
-      state.pairMessage = '無法連線會員頁，請在會員頁產生配對碼';
+      directPairPending = false;
+      state.pairMessage = '會員頁授權連線失敗，請從賽特神諭重新開啟遊戲';
     }
     render();
+    setTimeout(() => {
+      if (!directPairPending || Date.now() - directPairRequestAt < 11000) return;
+      directPairPending = false;
+      if (!deviceToken) {
+        state.pairMessage = '會員頁未回覆。請保持會員頁登入狀態，再點一次重試。';
+        render();
+      }
+    }, 12000);
   }
-  window.addEventListener('message', event => {
+  window.addEventListener('message', async event => {
     if (event.origin !== 'https://xinyao-ai.github.io') return;
     const data = event.data;
     if (data?.type !== 'seth-oracle:pair-code-display:v1' || deviceToken) return;
@@ -2734,8 +2759,19 @@ try {
     if (!/^[A-Z0-9]{4,12}$/.test(code) || expiry <= Date.now() || expiry > Date.now()+180000) return;
     displayPairCode = code;
     displayPairExpiry = expiry;
-    state.pairMessage = '已取得配對碼，可點綁定';
-    render();
+    if (directPairPending && !state.pairBusy) {
+      directPairPending = false;
+      try {
+        await claimPairCode(code);
+      } catch (error) {
+        state.pairBusy = false;
+        state.pairMessage = error?.message || '自動綁定失敗，可輸入配對碼重試';
+        render();
+      }
+    } else {
+      state.pairMessage = '已收到有效配對碼，可手動綁定';
+      render();
+    }
   });
 
   // 自動配對：僅接受賽特神諭官方網站傳來的一次性配對碼。
@@ -2828,7 +2864,7 @@ try {
       </div>
       ${visiblePairCode() ? `<div style="margin:5px 0;padding:6px;border:1px solid #cba45e;border-radius:7px;color:#f4d789;font-size:14px;text-align:center;font-weight:900;letter-spacing:1px;">配對碼：${visiblePairCode()}</div>` : ''}
       <div style="display:flex;gap:5px;">
-        <button id="xinyaoPairGetCode" type="button" style="border:1px solid #cba45e;border-radius:7px;padding:5px;background:#18282a;color:#ffe2a3;font-weight:800;font-size:10px;cursor:pointer;">取得配對碼</button>
+        <button id="xinyaoPairGetCode" type="button" style="border:1px solid #cba45e;border-radius:7px;padding:5px;background:#18282a;color:#ffe2a3;font-weight:800;font-size:10px;cursor:pointer;">一鍵取得並綁定</button>
         <input id="xinyaoPairInput" maxlength="12" placeholder="配對碼"
           style="width:100px;min-width:0;border:1px solid rgba(255,255,255,.22);border-radius:8px;background:rgba(255,255,255,.09);color:#fff;padding:6px 7px;font-size:11px;outline:none;text-transform:uppercase;">
         <button id="xinyaoPairButton" type="button" ${state.pairBusy ? 'disabled' : ''}
