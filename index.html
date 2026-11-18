@@ -5337,43 +5337,83 @@ setInterval(()=>{if(active&&!document.hidden)show(index+1)},6500);
   });
 })();
 </script>
-<script id="oracle-supported-swipe-js-5124">
+<script id="oracle-supported-swipe-js-5126">
 (() => {
+ 'use strict';
  const viewport=document.getElementById('oracleSupportedSwipeViewport');
  if(!viewport)return;
+ const shell=viewport.closest('.oracle-supported-games-5121');
+ if(!shell)return;
  const pages=[...viewport.querySelectorAll('.oracle-supported-swipe-page')];
  const prev=shell.querySelector('.oracle-supported-page-prev');
  const next=shell.querySelector('.oracle-supported-page-next');
- let current=0;
- function setPage(n, scroll=true){
-   current=Math.max(0,Math.min(pages.length-1,n));
-   prev.disabled=current===0;next.disabled=current===pages.length-1;
-   if(scroll)viewport.scrollTo({left:current*viewport.clientWidth,behavior:'smooth'});
+ if(pages.length!==2||!prev||!next)return;
+ let current=0,dragging=false,startX=0,startLeft=0,moved=false;
+ const maxPage=pages.length-1;
+ function setPage(n,smooth=true){
+   current=Math.max(0,Math.min(maxPage,n));
+   prev.disabled=(current===0);
+   next.disabled=(current===maxPage);
+   const target=current*viewport.clientWidth;
+   if(smooth&&typeof viewport.scrollTo==='function')viewport.scrollTo({left:target,behavior:'smooth'});
+   else viewport.scrollLeft=target;
  }
- prev.addEventListener('click',()=>setPage(current-1));
- next.addEventListener('click',()=>setPage(current+1));
- let timer;
- viewport.addEventListener('scroll',()=>{clearTimeout(timer);timer=setTimeout(()=>setPage(Math.round(viewport.scrollLeft/Math.max(1,viewport.clientWidth)),false),90)},{passive:true});
- let started=false,dragging=false,moved=false,startX=0,startScroll=0;
+ // Native click always switches pages, independent of touch/drag support.
+ prev.addEventListener('click',e=>{e.preventDefault();setPage(current-1);});
+ next.addEventListener('click',e=>{e.preventDefault();setPage(current+1);});
+ let scrollTimer;
+ viewport.addEventListener('scroll',()=>{
+   clearTimeout(scrollTimer);
+   scrollTimer=setTimeout(()=>{
+     current=Math.max(0,Math.min(maxPage,Math.round(viewport.scrollLeft/Math.max(viewport.clientWidth,1))));
+     prev.disabled=(current===0);next.disabled=(current===maxPage);
+   },110);
+ },{passive:true});
+ // Mouse drag for Windows desktop / Electron.
  viewport.addEventListener('pointerdown',e=>{
    if(e.pointerType!=='mouse'||e.button!==0)return;
-   started=true;dragging=false;moved=false;startX=e.clientX;startScroll=viewport.scrollLeft;
+   dragging=true;moved=false;startX=e.clientX;startLeft=viewport.scrollLeft;
  });
  viewport.addEventListener('pointermove',e=>{
-   if(!started)return;
-   const distance=e.clientX-startX;
-   if(!dragging&&Math.abs(distance)>5){dragging=true;moved=true;viewport.classList.add('is-dragging');viewport.setPointerCapture?.(e.pointerId);}
-   if(dragging)viewport.scrollLeft=startScroll-distance;
+   if(!dragging)return;
+   const delta=e.clientX-startX;
+   if(Math.abs(delta)>5){
+     moved=true;viewport.classList.add('is-dragging');
+     viewport.scrollLeft=startLeft-delta;
+   }
  });
- const release=e=>{
-   if(!started)return;
-   started=false;viewport.classList.remove('is-dragging');
-   if(dragging){dragging=false;try{viewport.releasePointerCapture?.(e.pointerId);}catch(_){} setPage(Math.round(viewport.scrollLeft/Math.max(1,viewport.clientWidth)));}
- };
- viewport.addEventListener('pointerup',release);viewport.addEventListener('pointercancel',release);
- viewport.addEventListener('click',e=>{if(moved){e.preventDefault();e.stopPropagation();moved=false;}},true);
- viewport.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();setPage(current+(e.key==='ArrowRight'?1:-1));}});
- window.addEventListener('resize',()=>viewport.scrollTo({left:current*viewport.clientWidth,behavior:'instant'}));
+ function finishMouse(e){
+   if(!dragging)return;
+   dragging=false;viewport.classList.remove('is-dragging');
+   const delta=e.clientX-startX;
+   if(Math.abs(delta)>40)setPage(current+(delta<0?1:-1));
+   else setPage(Math.round(viewport.scrollLeft/Math.max(1,viewport.clientWidth)));
+ }
+ viewport.addEventListener('pointerup',finishMouse);
+ viewport.addEventListener('pointercancel',finishMouse);
+ window.addEventListener('pointerup',e=>{if(dragging)finishMouse(e)});
+ // Touch swipe fallback; native horizontal scrolling still works.
+ let touchX=0,touchY=0,touchActive=false;
+ viewport.addEventListener('touchstart',e=>{
+   if(e.touches.length!==1)return;
+   touchActive=true;touchX=e.touches[0].clientX;touchY=e.touches[0].clientY;
+ },{passive:true});
+ viewport.addEventListener('touchend',e=>{
+   if(!touchActive||!e.changedTouches.length)return;
+   touchActive=false;
+   const dx=e.changedTouches[0].clientX-touchX;
+   const dy=e.changedTouches[0].clientY-touchY;
+   if(Math.abs(dx)>35&&Math.abs(dx)>Math.abs(dy)*1.3)setPage(current+(dx<0?1:-1));
+ },{passive:true});
+ viewport.addEventListener('click',e=>{
+   if(moved){e.preventDefault();e.stopPropagation();moved=false;}
+ },true);
+ viewport.addEventListener('keydown',e=>{
+   if(e.key==='ArrowRight'||e.key==='ArrowLeft'){
+     e.preventDefault();setPage(current+(e.key==='ArrowRight'?1:-1));
+   }
+ });
+ window.addEventListener('resize',()=>setPage(current,false));
  setPage(0,false);
 })();
 </script>
