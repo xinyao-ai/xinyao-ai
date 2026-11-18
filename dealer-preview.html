@@ -3869,8 +3869,16 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
       memberDisplay.textContent = memberAccount;
       sessionStorage.setItem("memberAccount", memberAccount);
       loginMessage.style.display = "none";
+
+      // 登入成功後恢復原本的第二頁會員大廳；
+      // 遊戲由會員在第二頁自行選擇進入，不自動開新視窗。
+      try {
+        sessionStorage.removeItem('oracle_direct_game_mode_v1');
+        sessionStorage.removeItem('oracle_prelogin_game_selection');
+      } catch (_) {}
       loginPage.style.display = "none";
       appPage.style.display = "block";
+      appPage.style.visibility = "";
       appLineFloat.classList.add("show");
       playLoginTransition();
       renderHistory();
