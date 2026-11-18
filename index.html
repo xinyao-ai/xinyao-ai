@@ -3189,6 +3189,20 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
 /* 只隱藏會員網站的配對卡片，不移除其 DOM、後端同步或遊戲端配對。 */
 #appPage #xinyaoLiveDataPanel { display:none!important; }
 </style>
+<style id="oracle-prelogin-atg-match-5096">
+/* Match the authenticated game's ATG brand badge exactly. */
+#loginPage .oracle-prelogin-head .oracle-prelogin-provider {
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  gap:4px!important;flex-shrink:0!important;
+  padding:4px 7px!important;min-height:0!important;
+  border:1px solid #5c6156!important;border-radius:8px!important;
+  background:linear-gradient(145deg,#152c32,#071920)!important;
+  box-shadow:inset 0 0 16px #2cbec51b!important;
+  color:#eee1bb!important;font:900 13px/1 Arial,sans-serif!important;
+  letter-spacing:.08em!important;
+}
+#loginPage .oracle-prelogin-head .oracle-prelogin-provider .oracle-atg-mark{display:block!important;width:20px!important;height:19px!important;flex:none!important}
+</style>
 </head>
 
 <body>
@@ -3253,7 +3267,7 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
       <section class="oracle-prelogin-lobby" id="oraclePreloginGameLobby" aria-label="登入前瀏覽 ATG 遊戲">
         <div class="oracle-prelogin-head">
           <h3>🎮 選擇遊戲</h3>
-          <small>🔶 ATG</small>
+          <span class="game-launcher-badge oracle-atg-brand oracle-prelogin-provider" aria-label="ATG"><svg class="oracle-atg-mark" viewBox="0 0 46 42" aria-hidden="true"><path d="M4 12 22 2 41 12 34 17 22 10 11 17v10l11 7 10-6v-7l9 5v8L22 44 3 34V12Z" fill="#f1432d"/><path d="m14 22 8-5 8 5Z" fill="#f1432d"/></svg><span>ATG</span></span>
         </div>
         <div class="oracle-prelogin-carousel">
           <button class="oracle-prelogin-arrow oracle-prelogin-prev" type="button" aria-label="上一款遊戲">‹</button>
