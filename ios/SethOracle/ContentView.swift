@@ -155,21 +155,7 @@ struct OracleWebView: UIViewRepresentable {
             popup.uiDelegate = self
             container.addSubview(popup)
 
-            // Native close control for game/sign-in windows (no browser extension).
-            let backButton = UIButton(type: .system)
-            backButton.setTitle("‹ 返回賽特神諭", for: .normal)
-            backButton.setTitleColor(.black, for: .normal)
-            backButton.backgroundColor = UIColor(red: 0.94, green: 0.77, blue: 0.40, alpha: 0.97)
-            backButton.titleLabel?.font = .boldSystemFont(ofSize: 12)
-            backButton.layer.cornerRadius = 12
-            backButton.frame = CGRect(x: 12, y: 44, width: 122, height: 32)
-            backButton.autoresizingMask = [.flexibleRightMargin, .flexibleBottomMargin]
-            backButton.addAction(UIAction { [weak self, weak popup] _ in
-                guard let self, let popup else { return }
-                self.closePopup(popup)
-            }, for: .touchUpInside)
-            container.addSubview(backButton)
-
+            // ATG provides its own 「首頁」 action; do not overlay an extra native back button.
             webView.addSubview(container)
             popups.append(Popup(webView: popup, container: container))
             return popup
