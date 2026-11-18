@@ -3609,6 +3609,69 @@ html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:focus-vis
  html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin{font-size:13px!important}
 }
 </style>
+<style id="oracle-hd-bright-duo-5131">
+/* 登入前雙亮色金屬按鈕：白金註冊 + 亮金登入。只變更外觀，不碰連結與 SSO 事件。 */
+html body #loginPage .oracle-hd-entry-actions-5127{
+ display:grid!important;
+ grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ gap:10px!important;width:100%!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister,
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin{
+ box-sizing:border-box!important;display:flex!important;align-items:center!important;justify-content:center!important;
+ width:100%!important;min-width:0!important;height:60px!important;
+ padding:11px 5px!important;margin:0!important;
+ position:relative!important;isolation:isolate!important;
+ border-radius:13px!important;
+ border:2px solid #fff0b7!important;border-bottom:5px solid #a87830!important;
+ font-family:inherit!important;font-size:clamp(13px,3.5vw,17px)!important;
+ font-weight:900!important;letter-spacing:.25px!important;line-height:1.15!important;
+ text-align:center!important;text-decoration:none!important;white-space:nowrap!important;
+ color:#422b0a!important;text-shadow:0 1px 0 #fff9df!important;
+ box-shadow:inset 0 2px 1px #fffdf2,inset 0 -2px 3px #9c681b58,0 3px 0 #7a511b,0 6px 10px #0008!important;
+ transform:none!important;filter:none!important;overflow:hidden!important;
+ transition:filter .16s ease,transform .14s ease,box-shadow .14s ease!important;
+ cursor:pointer!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister{
+ background:linear-gradient(180deg,#ffffff 0%,#fffaf0 18%,#ffefd0 55%,#eac78a 100%)!important;
+ border-color:#fff3d4!important;border-bottom-color:#b18a51!important;
+ color:#56330d!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin{
+ background:linear-gradient(180deg,#fff8c3 0%,#ffdf7b 27%,#f7bd38 67%,#db921b 100%)!important;
+ border-color:#ffe9a7!important;border-bottom-color:#996019!important;
+ color:#352006!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister::before,
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin::before{
+ content:""!important;display:block!important;pointer-events:none!important;
+ position:absolute!important;inset:2px 5px auto!important;height:36%!important;
+ border-radius:10px 10px 50% 50%!important;
+ background:linear-gradient(180deg,#ffffffb0,#ffffff00)!important;
+ z-index:-1!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister:hover,
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:hover:not(:disabled){
+ filter:brightness(1.07)!important;transform:translateY(-1px)!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister:active,
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:active:not(:disabled){
+ transform:translateY(3px)!important;
+ box-shadow:inset 0 3px 6px #9c681b33,0 1px 0 #7a511b,0 3px 7px #0007!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister:focus-visible,
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:focus-visible{
+ outline:2px solid #fff5c1!important;outline-offset:4px!important;
+}
+@media(max-width:370px){
+ html body #loginPage .oracle-hd-entry-actions-5127{gap:7px!important}
+ html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister,
+ html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin{
+ height:56px!important;font-size:13px!important;
+ }
+}
+</style>
 </head>
 
 <body>
