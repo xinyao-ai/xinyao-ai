@@ -3265,7 +3265,32 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
 }
 @media(prefers-reduced-motion:reduce){#loginPage .oracle-prelogin-card{transition:none!important}}
 </style>
-</head>
+<style id="oracle-prelogin-hard-override-5107">
+/* Final high-specificity override for reference carousel — main card fills 68%,
+   neighbors share exactly the same physical card width and peek at the sides. */
+html body #loginPage #oraclePreloginGameLobby .oracle-prelogin-carousel{position:relative!important;overflow:hidden!important}
+html body #loginPage #oraclePreloginGameLobby #oraclePreloginTrack{
+ display:grid!important;grid-template-columns:repeat(3,minmax(0,68%))!important;
+ gap:12px!important;justify-content:center!important;align-items:stretch!important;
+ padding:7px 0 12px!important;overflow:hidden!important;scroll-snap-type:none!important;
+}
+html body #loginPage #oraclePreloginGameLobby #oraclePreloginTrack .oracle-prelogin-card{
+ width:100%!important;max-width:100%!important;min-width:0!important;flex:none!important;
+ transform:none!important;animation:none!important;
+}
+html body #loginPage #oraclePreloginGameLobby #oraclePreloginTrack .oracle-prelogin-card.is-left,
+html body #loginPage #oraclePreloginGameLobby #oraclePreloginTrack .oracle-prelogin-card.is-right{
+ filter:brightness(.43) saturate(.75)!important;opacity:1!important;
+}
+html body #loginPage #oraclePreloginGameLobby #oraclePreloginTrack .oracle-prelogin-card.is-center{
+ filter:none!important;opacity:1!important;
+}
+@media(max-width:420px){
+ html body #loginPage #oraclePreloginGameLobby #oraclePreloginTrack{
+ grid-template-columns:repeat(3,minmax(0,68%))!important;gap:10px!important;
+ }
+}
+</style></head>
 
 <body>
 
