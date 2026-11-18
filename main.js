@@ -48,7 +48,7 @@ function persistDealer(code) {
 
 function siteForDealer() {
   const url = dealerCode ? DEALER_PREVIEW + encodeURIComponent(dealerCode) : SITE;
-  return url + (url.includes('?') ? '&' : '?') + 'appview=5130';
+  return url + (url.includes('?') ? '&' : '?') + 'appview=5131';
 }
 
 async function refreshSiteCache(win) {
