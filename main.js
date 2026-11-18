@@ -47,7 +47,14 @@ function persistDealer(code) {
 }
 
 function siteForDealer() {
-  return dealerCode ? DEALER_PREVIEW + encodeURIComponent(dealerCode) : SITE;
+  const url = dealerCode ? DEALER_PREVIEW + encodeURIComponent(dealerCode) : SITE;
+  return url + (url.includes('?') ? '&' : '?') + 'appview=5110';
+}
+
+async function refreshSiteCache(win) {
+  // Drop only cached HTTP resources; preserve logins, cookies, storage and device pairing.
+  try { await win.webContents.session.clearCache(); }
+  catch (error) { console.warn('[SethOracle] Could not clear site cache', error?.message); }
 }
 
 async function openDealerSettings(window) {
@@ -79,7 +86,10 @@ button{margin:16px 5px;padding:12px 18px;border:0;border-radius:9px;background:#
     try {
       persistDealer(candidate);
       if (!popup.isDestroyed()) popup.close();
-      if (!window.isDestroyed()) await window.loadURL(siteForDealer());
+      if (!window.isDestroyed()) {
+        await refreshSiteCache(window);
+        await window.loadURL(siteForDealer());
+      }
     } catch(e) {
       dialog.showErrorBox('切換失敗', String(e));
     }
@@ -92,7 +102,7 @@ function setupDealerMenu(window) {
     {label:'賽特神諭',submenu:[
       {label:'經銷商代碼設定',accelerator:'CommandOrControl+Shift+D',click:()=>openDealerSettings(window)},
       {type:'separator'},
-      {label:'回到首頁',click:()=>window.loadURL(siteForDealer())}
+      {label:'回到首頁',click:async()=>{await refreshSiteCache(window);return window.loadURL(siteForDealer());}}
     ]}
   ]);
   window.setMenu(menu);
@@ -217,6 +227,7 @@ app.whenReady().then(async () => {
     dealerCode = '';
   }
   setupDealerMenu(mainWindow);
+  await refreshSiteCache(mainWindow);
   await mainWindow.loadURL(siteForDealer());
 
   app.on('activate', () => {
@@ -227,7 +238,7 @@ app.whenReady().then(async () => {
       });
       setupInjection(win.webContents);
       setupDealerMenu(win);
-      win.loadURL(siteForDealer());
+      refreshSiteCache(win).then(()=>win.loadURL(siteForDealer()));
     }
   });
 });
