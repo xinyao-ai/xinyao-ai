@@ -3827,6 +3827,23 @@ text-align:center!important;cursor:pointer!important;box-shadow:0 5px 16px rgba(
       playLoginTransition();
       renderHistory();
       window.scrollTo({ top: 0, behavior: "smooth" });
+      // Only a game actively chosen on the pre-login carousel is launched after SSO.
+      // Use the existing verified game-launch buttons; do not construct game URLs.
+      let selectedGame = '';
+      try {
+        selectedGame = sessionStorage.getItem('oracle_prelogin_game_selection') || '';
+        sessionStorage.removeItem('oracle_prelogin_game_selection');
+      } catch (_) {}
+      if (selectedGame && /^xinyaoLaunch(?:Seth1?|Tiger|Baphomet|Vampire|Songo|Scarlet|Wuxia)$/.test(selectedGame)) {
+        window.setTimeout(() => {
+          const entry = document.getElementById(selectedGame);
+          if (entry && appPage.style.display !== 'none') {
+            entry.scrollIntoView({ behavior:'smooth', block:'center', inline:'center' });
+            // Browser pop-up protection can still require a fresh user gesture.
+            try { entry.click(); } catch (_) {}
+          }
+        }, 900);
+      }
     }
 
 
