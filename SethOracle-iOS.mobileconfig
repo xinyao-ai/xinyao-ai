@@ -8,7 +8,7 @@
 <key>IsRemovable</key><true/>
 <key>Label</key><string>賽特神諭</string>
 <key>Precomposed</key><true/>
-<key>URL</key><string>https://xinyao-ai.github.io/xinyao-ai/?appview=5131</string>
+<key>URL</key><string>https://xinyao-ai.github.io/xinyao-ai/?appview=5132</string>
 <key>PayloadDisplayName</key><string>賽特神諭</string>
 <key>PayloadIdentifier</key><string>ai.xinyao.sethoracle.webclip</string>
 <key>PayloadType</key><string>com.apple.webClip.managed</string>
