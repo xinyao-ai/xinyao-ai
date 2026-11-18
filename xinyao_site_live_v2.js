@@ -303,6 +303,7 @@
 
   const XIANYAO_GAME_WINDOW_KEY =
     'xinyao_atg_game_window_name_v1';
+  const trustedPairGameWindows = new Set();
 
   function validSavedGameWindowName(value) {
     return /^xinyao-hd-launch:(seth|tiger|seth1|baphomet|vampire|wuxia|scarlet|songo):\d+:[a-z0-9]+$/i.test(String(value || ''));
@@ -369,6 +370,8 @@
       gameWindow = window.open(handoffUrl, targetName);
     } catch (_) {}
 
+    if (gameWindow) trustedPairGameWindows.add(gameWindow);
+
     if (!gameWindow) {
       // 若瀏覽器完全封鎖彈出視窗，才退回同頁切換。
       location.assign(handoffUrl);
@@ -411,6 +414,7 @@
         // ATG 遊戲可能是遊戲大廳裡的跨網域 iframe，因此巡查視窗及其子框架。
         const send = (win,depth=0) => {
           if (!win || depth > 5) return;
+          try {win.postMessage({type:'seth-oracle:pair-code-display:v1',pairCode:code,expiresAt:until},'https://play.godeebxp.com')}catch(_){}
           try {win.postMessage({type:'seth-oracle:auto-pair:v1',pairCode:code},'https://play.godeebxp.com')}catch(_){}
           try {
             const count=Math.min(win.frames.length,24);
@@ -424,6 +428,7 @@
           if (event.data?.type !== 'seth-oracle:auto-pair-request:v1') return;
           if (!event.source || typeof event.source.postMessage !== 'function') return;
           try {
+            event.source.postMessage({type:'seth-oracle:pair-code-display:v1',pairCode:code,expiresAt:until},event.origin);
             event.source.postMessage({type:'seth-oracle:auto-pair:v1',pairCode:code},event.origin);
             betaStatus('已收到遊戲端請求，正在自動綁定…');
           } catch (err) {
@@ -2861,14 +2866,23 @@
     if (!event.source || typeof event.source.postMessage !== 'function' || gamePairRequestBusy) return;
     // 僅回覆會員頁實際開啟的遊戲子視窗／子框架，防止其他來源索取配對碼。
     const trustedGame = (() => {
-      try {
-        if (event.source === window.opener) return false;
-        const registeredWindow = localStorage.getItem(XIANYAO_GAME_WINDOW_KEY);
-        const named = String(event.source.name || '');
-        if (registeredWindow && registeredWindow === named) return true;
-        if (Array.from(window.frames).includes(event.source)) return true;
-        return false;
-      } catch (_) { return false; }
+      for (const win of trustedPairGameWindows) {
+        try {
+          if (win.closed) { trustedPairGameWindows.delete(win); continue; }
+          if (event.source === win) return true;
+          const stack = [{value:win, depth:0}];
+          while (stack.length) {
+            const {value,depth} = stack.pop();
+            if (value === event.source) return true;
+            if (depth >= 5) continue;
+            try {
+              const count = Math.min(value.frames.length,24);
+              for (let i=0;i<count;i++) stack.push({value:value.frames[i],depth:depth+1});
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+      return false;
     })();
     if (!trustedGame) return;
     gamePairRequestBusy = true;
