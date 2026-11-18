@@ -3545,6 +3545,18 @@ html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:focus-vis
  html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin{font-size:13px!important}
 }
 </style>
+<style id="oracle-hide-second-page-analysis-5129">
+/* 登入後第二頁：只隱藏分析選單卡片與其資料面板，不移除資料或變更遊戲入口 */
+#appPage section.card:has(> .mode-grid),
+#appPage #analyzePanel,
+#appPage #continuePanel,
+#appPage #historyPanel,
+#appPage #xinyaoRoomRecommendPanel,
+#appPage #xinyaoCurrentRoomPanel,
+#appPage #xinyaoPlayHistoryPanel {
+  display:none!important;
+}
+</style>
 </head>
 
 <body>
