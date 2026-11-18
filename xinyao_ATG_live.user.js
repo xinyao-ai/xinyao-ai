@@ -11123,8 +11123,8 @@ try {
       <div style="margin-top:7px;background:rgba(255,255,255,.06);padding:7px 8px;border-radius:9px;font-size:10.5px;">${escapeHtml(bestText)}</div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;">
-        <button id="xinyao-scan-all" style="${buttonStyle()}">${state.scanRunning ? '掃描中…' : '一鍵掃描全部房間'}</button>
-        <button id="xinyao-expand" style="${secondaryButtonStyle()}">${ui.expanded ? '收合分析' : '完整分析'}</button>
+        <button id="xinyao-scan-all" style="${(!state.scanRunning && !!state.rankingSnapshotAt) ? secondaryButtonStyle() : buttonStyle()}">${state.scanRunning ? '掃描中…' : '一鍵掃描全部房間'}</button>
+        <button id="xinyao-expand" style="${(!state.scanRunning && !!state.rankingSnapshotAt) ? buttonStyle() : secondaryButtonStyle()}">${ui.expanded ? '收合分析' : '完整分析'}</button>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 120px;gap:6px;margin-top:6px;align-items:center;">
