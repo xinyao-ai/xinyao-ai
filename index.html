@@ -3672,6 +3672,74 @@ html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:focus-vis
  }
 }
 </style>
+<style id="oracle-custom-gold-image-buttons-5132">
+/* 使用會員提供的透明金色按鈕圖，不疊加原本漸層、文字或外框 */
+html body #loginPage .oracle-hd-entry-actions-5127 {
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:9px!important;
+  width:100%!important;
+  align-items:center!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister,
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin {
+  appearance:none!important;
+  display:block!important;
+  position:relative!important;
+  box-sizing:border-box!important;
+  width:100%!important;
+  min-width:0!important;
+  height:auto!important;
+  min-height:0!important;
+  aspect-ratio:3 / 1!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background-color:transparent!important;
+  background-repeat:no-repeat!important;
+  background-position:center center!important;
+  background-size:contain!important;
+  box-shadow:none!important;
+  outline:0!important;
+  color:transparent!important;
+  font-size:0!important;
+  line-height:0!important;
+  text-shadow:none!important;
+  text-decoration:none!important;
+  overflow:visible!important;
+  white-space:nowrap!important;
+  cursor:pointer!important;
+  transition:filter .15s ease,transform .12s ease!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister {
+  background-image:url("./assets/seth-register-button-v5132.webp")!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin {
+  background-image:url("./assets/seth-login-button-v5132.webp")!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister::before,
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin::before,
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister::after,
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin::after {
+  content:none!important;display:none!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister:hover,
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:hover:not(:disabled){
+  filter:brightness(1.06)!important;transform:translateY(-1px)!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister:active,
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:active:not(:disabled) {
+  filter:brightness(.94)!important;transform:translateY(1px)!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister:focus-visible,
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:focus-visible {
+  outline:2px solid #ffe9a0!important;outline-offset:3px!important;
+}
+@media(max-width:380px){
+  html body #loginPage .oracle-hd-entry-actions-5127{gap:5px!important;}
+}
+</style>
 </head>
 
 <body>
