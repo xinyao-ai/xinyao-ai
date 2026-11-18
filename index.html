@@ -5049,6 +5049,34 @@ setInterval(()=>{if(active&&!document.hidden)show(index+1)},6500);
     requestAnimationFrame(()=>{resizeQueued=false;sizeTrack();});
   }
   const wrap=index=>(index+total)%total;
+  function enforceDesktopCarousel(){
+    // Apply physical geometry directly so older three-column CSS cannot compress the images.
+    const width = track.getBoundingClientRect().width;
+    if(width <= 0)return;
+    track.style.setProperty('display','block','important');
+    track.style.setProperty('position','relative','important');
+    track.style.setProperty('overflow','hidden','important');
+    const cardWidth = Math.round(width * .66);
+    for(const card of cards){
+      card.style.setProperty('position','absolute','important');
+      card.style.setProperty('top','4px','important');
+      card.style.setProperty('left','50%','important');
+      card.style.setProperty('width',cardWidth+'px','important');
+      card.style.setProperty('min-width',cardWidth+'px','important');
+      card.style.setProperty('max-width',cardWidth+'px','important');
+      card.style.setProperty('animation','none','important');
+      const role = card.classList.contains('is-center') ? 'center' :
+        card.classList.contains('is-left') ? 'left' :
+        card.classList.contains('is-right') ? 'right' : '';
+      card.style.setProperty('display',role?'flex':'none','important');
+      card.style.setProperty('transform',
+        role==='center'?'translateX(-50%)':
+        role==='left'?'translateX(-155%)':
+        role==='right'?'translateX(55%)':'none','important');
+      card.style.setProperty('filter',role==='center'?'none':'brightness(.42) saturate(.68)','important');
+    }
+    sizeTrack();
+  }
   function select(index){
     activeIndex=wrap(index);
     const left=wrap(activeIndex-1),right=wrap(activeIndex+1);
@@ -5070,6 +5098,7 @@ setInterval(()=>{if(active&&!document.hidden)show(index+1)},6500);
     status.append(strong,document.createTextNode(' · 登入後可進入'));
     try{sessionStorage.setItem('oracle_prelogin_game_selection',cards[activeIndex].dataset.launch||'')}catch(_){}
     scheduleSize();
+    requestAnimationFrame(enforceDesktopCarousel);
   }
   cards.forEach((card,i)=>card.addEventListener('click',()=>select(i)));
   root.querySelector('.oracle-prelogin-prev')?.addEventListener('click',()=>select(activeIndex-1));
@@ -5096,12 +5125,18 @@ setInterval(()=>{if(active&&!document.hidden)show(index+1)},6500);
   const found=cards.findIndex(card=>card.dataset.launch===(saved||'xinyaoLaunchSeth1'));
   select(found>=0?found:1);
   cards.forEach(card=>card.querySelector('.oracle-prelogin-image')?.addEventListener('load',scheduleSize));
-  window.addEventListener('resize',scheduleSize,{passive:true});
+  window.addEventListener('resize',()=>{
+    enforceDesktopCarousel();
+    scheduleSize();
+  },{passive:true});
   if(typeof ResizeObserver==='function'){
     const ro=new ResizeObserver(scheduleSize);
     cards.forEach(card=>ro.observe(card));
   }
-  requestAnimationFrame(scheduleSize);
+  requestAnimationFrame(()=>{
+    enforceDesktopCarousel();
+    scheduleSize();
+  });
 })();
 </script>
 </body>
