@@ -3498,16 +3498,6 @@ html body #loginPage #oraclePreloginGameLobby .oracle-supported-page-arrow{
 html body #loginPage #oraclePreloginGameLobby .oracle-supported-page-prev{left:-7px!important}
 html body #loginPage #oraclePreloginGameLobby .oracle-supported-page-next{right:-7px!important}
 html body #loginPage #oraclePreloginGameLobby .oracle-supported-page-arrow:disabled{opacity:.25!important;cursor:default!important}
-html body #loginPage #oraclePreloginGameLobby .oracle-supported-page-dots{
- display:flex!important;justify-content:center!important;align-items:center!important;gap:9px!important;margin:11px 0 0!important;
-}
-html body #loginPage #oraclePreloginGameLobby .oracle-supported-page-dots button{
- padding:0!important;width:8px!important;height:8px!important;border:0!important;border-radius:50%!important;
- background:#586263!important;box-shadow:none!important;cursor:pointer!important;
-}
-html body #loginPage #oraclePreloginGameLobby .oracle-supported-page-dots button.is-current{
- width:21px!important;border-radius:9px!important;background:#eac46e!important;
-}
 @media(max-width:480px){
  html body #loginPage #oraclePreloginGameLobby .oracle-supported-swipe-page .oracle-supported-game-grid{gap:6px!important}
  html body #loginPage #oraclePreloginGameLobby .oracle-supported-page-arrow{width:23px!important;height:31px!important;font-size:19px!important}
@@ -3597,10 +3587,6 @@ html body #loginPage #oraclePreloginGameLobby .oracle-supported-page-dots button
     </div></div>
     </div>
     <button class="oracle-supported-page-arrow oracle-supported-page-next" type="button" aria-label="查看後四款遊戲">›</button>
-  </div>
-  <div class="oracle-supported-page-dots" aria-label="支援遊戲分頁">
-    <button type="button" class="is-current" aria-label="顯示第一組四款遊戲" aria-current="page"></button>
-    <button type="button" aria-label="顯示第二組四款遊戲"></button>
   </div>
   <div class="oracle-supported-game-footer"><span>以上遊戲皆可使用賽特神諭</span><span>登入後於第二頁選擇遊戲 ›</span></div>
 </div>
@@ -5355,21 +5341,17 @@ setInterval(()=>{if(active&&!document.hidden)show(index+1)},6500);
 (() => {
  const viewport=document.getElementById('oracleSupportedSwipeViewport');
  if(!viewport)return;
- const shell=viewport.closest('.oracle-supported-games-5121');
  const pages=[...viewport.querySelectorAll('.oracle-supported-swipe-page')];
- const dots=[...shell.querySelectorAll('.oracle-supported-page-dots button')];
  const prev=shell.querySelector('.oracle-supported-page-prev');
  const next=shell.querySelector('.oracle-supported-page-next');
  let current=0;
  function setPage(n, scroll=true){
    current=Math.max(0,Math.min(pages.length-1,n));
-   dots.forEach((dot,i)=>{dot.classList.toggle('is-current',i===current);if(i===current)dot.setAttribute('aria-current','page');else dot.removeAttribute('aria-current');});
    prev.disabled=current===0;next.disabled=current===pages.length-1;
    if(scroll)viewport.scrollTo({left:current*viewport.clientWidth,behavior:'smooth'});
  }
  prev.addEventListener('click',()=>setPage(current-1));
  next.addEventListener('click',()=>setPage(current+1));
- dots.forEach((dot,i)=>dot.addEventListener('click',()=>setPage(i)));
  let timer;
  viewport.addEventListener('scroll',()=>{clearTimeout(timer);timer=setTimeout(()=>setPage(Math.round(viewport.scrollLeft/Math.max(1,viewport.clientWidth)),false),90)},{passive:true});
  let started=false,dragging=false,moved=false,startX=0,startScroll=0;
