@@ -3819,6 +3819,32 @@ html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:active:no
   outline-offset:4px!important;
 }
 </style>
+<style id="oracle-mobile-performance-5137">
+/* 手機節能：關閉裝飾性背景動畫與較昂貴的半透明模糊；
+   不更動 ATG 遊戲畫面、輪播切換、點擊與掃描行為。 */
+@media (max-width: 760px) {
+  html body::before, html body::after,
+  html body .page::before, html body .page::after,
+  html body #loginPage::before, html body #loginPage::after {
+    animation:none!important;
+    transition:none!important;
+  }
+  html body #loginPage .login-shell-539,
+  html body #loginPage .oracle-prelogin-lobby,
+  html body #loginPage .oracle-downloads,
+  html body #appPage .app-topbar,
+  html body #appPage .game-launcher-card {
+    -webkit-backdrop-filter:none!important;
+    backdrop-filter:none!important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html body::before, html body::after,
+  html body .page::before, html body .page::after {
+    animation:none!important;
+  }
+}
+</style>
 </head>
 
 <body>
@@ -5378,7 +5404,7 @@ html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:active:no
 
 
   </script>
-<script src="./xinyao_site_live_v2.js?v=5128"></script>
+<script src="./xinyao_site_live_v2.js?v=5137"></script>
 
 <script>
 /* ===== 賽特神諭 ATG 系統控制內嵌頁 v1 ===== */
