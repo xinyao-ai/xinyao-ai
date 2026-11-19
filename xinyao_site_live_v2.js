@@ -2982,6 +2982,7 @@
   }
 
   async function pollMemberLive() {
+    if (document.hidden) return;
     if (pollBusy) {
       return;
     }
@@ -3122,13 +3123,14 @@
 
     pollMemberLive();
 
+    // 手機省電：登入後狀態每五秒查詢；頁面隱藏時不呼叫 API。
     setInterval(
       pollMemberLive,
-      2000
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? 5000 : 2000
     );
 
     setInterval(
-      tickCountdown,
+      () => { if (!document.hidden) tickCountdown(); },
       1000
     );
 
