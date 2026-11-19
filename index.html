@@ -3873,26 +3873,59 @@ html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:active:no
   outline:2px solid #ffefac!important;
   outline-offset:4px!important;
 }
-/* 皇鼎金龍圖片按鈕：素材載入前仍保有原文字按鈕備援 */
-#appPage .oracle-other-hd-games-5134 { padding:0 2px!important; margin:12px 0 18px!important; }
+/* 金龍去背圖片：完全移除舊金色矩形底板，保留原本超連結 */
+#appPage .oracle-other-hd-games-5134 {
+  padding:0!important;
+  margin:12px 0 18px!important;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+}
 #appPage .oracle-other-hd-games-button-5134 {
+  appearance:none!important;
+  display:block!important;
   position:relative!important;
-  overflow:visible!important;
+  box-sizing:border-box!important;
+  width:100%!important;
+  height:auto!important;
   min-height:0!important;
   aspect-ratio:2048 / 682!important;
-  padding:0 10px!important;
-  isolation:isolate!important;
+  padding:0!important;
+  margin:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:none!important;
+  background-color:transparent!important;
+  background-image:url("./assets/hd-other-games-dragon.png")!important;
+  background-position:center!important;
+  background-size:contain!important;
+  background-repeat:no-repeat!important;
+  box-shadow:none!important;
+  outline-offset:3px!important;
+  color:transparent!important;
+  font-size:0!important;
+  line-height:0!important;
+  text-shadow:none!important;
+  text-decoration:none!important;
+  overflow:visible!important;
+  filter:none!important;
+  opacity:1!important;
+  transform:none!important;
+  cursor:pointer!important;
 }
+#appPage .oracle-other-hd-games-button-5134::before,
 #appPage .oracle-other-hd-games-button-5134::after {
-  content:"";
-  position:absolute;
-  inset:0;
-  pointer-events:none;
-  z-index:1;
-  background:url("./assets/hd-other-games-dragon.png") center/100% 100% no-repeat;
+  content:none!important;
+  display:none!important;
 }
-#appPage .oracle-other-hd-games-button-5134:hover {filter:brightness(1.08)!important;}
-#appPage .oracle-other-hd-games-button-5134:active {transform:scale(.985)!important;}
+#appPage .oracle-other-hd-games-button-5134:hover {
+  filter:brightness(1.05)!important;
+  transform:none!important;
+}
+#appPage .oracle-other-hd-games-button-5134:active {
+  filter:brightness(.97)!important;
+  transform:scale(.99)!important;
+}
 </style>
 <style id="oracle-mobile-performance-5137">
 /* 手機節能：關閉裝飾性背景動畫與較昂貴的半透明模糊；
