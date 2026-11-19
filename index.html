@@ -3771,6 +3771,61 @@ html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:active:no
   transform:translateY(1px)!important;
 }
 </style>
+<style id="oracle-sharp-dual-image-buttons-5138">
+/* 新版雙按鈕：原比例、移除霧化濾鏡；新高清 PNG 尚未上傳時以原有 webp 備援 */
+html body #loginPage .oracle-hd-entry-actions-5127 {
+ display:grid!important;
+ grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ gap:8px!important;
+ padding:0!important;
+ width:100%!important;
+ align-items:center!important;
+ overflow:visible!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister,
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin {
+ display:block!important;
+ position:relative!important;
+ width:100%!important;
+ min-width:0!important;
+ height:auto!important;
+ min-height:0!important;
+ aspect-ratio:3.46 / 1!important;
+ padding:0!important;
+ margin:0!important;
+ border:0!important;
+ border-radius:0!important;
+ background-color:transparent!important;
+ background-repeat:no-repeat!important;
+ background-position:center!important;
+ background-size:contain!important;
+ box-shadow:none!important;
+ text-shadow:none!important;
+ filter:none!important;
+ transform:none!important;
+ opacity:1!important;
+ image-rendering:auto!important;
+ -webkit-font-smoothing:antialiased!important;
+ overflow:visible!important;
+ color:transparent!important;
+ font-size:0!important;
+ line-height:0!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister {
+ background-image:url("./assets/seth-register-crisp.png"),url("./assets/seth-register-button-v5132.webp")!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin {
+ background-image:url("./assets/seth-login-crisp.png"),url("./assets/seth-login-button-v5132.webp")!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister:hover,
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:hover:not(:disabled) {
+ filter:brightness(1.03)!important;transform:none!important;
+}
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdRegister:active,
+html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:active:not(:disabled) {
+ filter:brightness(.97)!important;transform:scale(.99)!important;
+}
+</style>
 <style id="oracle-other-hd-games-style-5134">
 /* 登入後的遊戲選擇區下方加一顆長形金色入口，僅使用皇鼎官方登入狀態，不轉傳本站 SSO token */
 #appPage .oracle-other-hd-games-5134 {
