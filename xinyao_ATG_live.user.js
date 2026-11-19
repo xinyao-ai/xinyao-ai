@@ -4227,6 +4227,7 @@ try {
   patchXHROutboundRoom();
 
   const patchTimer = setInterval(() => {
+    if (document.hidden) return;
     mountPanel();
     patchWebSocket();
     patchJSON();
@@ -4234,7 +4235,7 @@ try {
     patchSocketIO();
     patchFetchOutboundRoom();
     patchXHROutboundRoom();
-  }, 100);
+  }, 350);
   setTimeout(() => clearInterval(patchTimer), 60000);
 
   setInterval(() => {
@@ -11834,8 +11835,9 @@ try {
 
   patchAll();
   ensureSpeedUi();
-  setInterval(patchAll, 500);
-  setInterval(ensureSpeedUi, 250);
+  // UI 修補改成低頻：WebSocket 遊戲資料接收、進房及自動停止不變。
+  setInterval(() => { if (!document.hidden) patchAll(); }, 1000);
+  setInterval(() => { if (!document.hidden) ensureSpeedUi(); }, 800);
 })();
 
 
@@ -16326,7 +16328,7 @@ if (document.readyState === 'loading') {
   const bootHud = () => {
     if (!document.documentElement) return;
     updateHud();
-    setInterval(updateHud, 250);
+    setInterval(() => { if (!document.hidden) updateHud(); }, 650);
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootHud, {once:true});
   else bootHud();
@@ -17082,7 +17084,7 @@ if (document.readyState === 'loading') {
     ensureButtons();
   }
 
-  setInterval(ensureButtons, 1000);
+  setInterval(() => { if (!document.hidden) ensureButtons(); }, 1800);
 
   window.__XIANYAO_ATG_FREE_HELPER__ = {
     version:'1.3.0-test184',
