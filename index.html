@@ -3818,24 +3818,23 @@ html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:active:no
   outline:2px solid #ffefac!important;
   outline-offset:4px!important;
 }
-/* 皇鼎金龍圖片按鈕；素材上傳後自動顯示，載入失敗時保留原始金色文字按鈕 */
+/* 皇鼎金龍圖片按鈕：素材載入前仍保有原文字按鈕備援 */
 #appPage .oracle-other-hd-games-5134 { padding:0 2px!important; margin:12px 0 18px!important; }
 #appPage .oracle-other-hd-games-button-5134 {
-  width:100%!important;
+  position:relative!important;
+  overflow:visible!important;
   min-height:0!important;
   aspect-ratio:2048 / 682!important;
-  padding:0!important;
-  border:0!important;
-  border-radius:0!important;
-  background-image:url("./assets/hd-other-games-dragon.png")!important;
-  background-color:transparent!important;
-  background-repeat:no-repeat!important;
-  background-size:100% 100%!important;
-  background-position:center!important;
-  box-shadow:none!important;
-  font-size:0!important;
-  text-shadow:none!important;
-  color:transparent!important;
+  padding:0 10px!important;
+  isolation:isolate!important;
+}
+#appPage .oracle-other-hd-games-button-5134::after {
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  z-index:1;
+  background:url("./assets/hd-other-games-dragon.png") center/100% 100% no-repeat;
 }
 #appPage .oracle-other-hd-games-button-5134:hover {filter:brightness(1.08)!important;}
 #appPage .oracle-other-hd-games-button-5134:active {transform:scale(.985)!important;}
