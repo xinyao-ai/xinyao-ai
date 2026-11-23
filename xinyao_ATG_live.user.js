@@ -11246,6 +11246,35 @@ try {
     }, {capture:true,passive:true});
     panel.addEventListener('focusin', () => holdPanelInteraction(500), true);
 
+    // 進房統一入口：勿在 pointerdown 內同步重建 DOM，否則 click/touchend 會遺失。
+    // 短時間連點同一房只進一次；上次進房仍在執行時顯示狀態，不默默忽略。
+    let lastRankedEntryKey = '';
+    let lastRankedEntryAt = 0;
+    function requestRankedRoomEntry(button) {
+      const roomNumber = Number(button?.dataset?.roomNumber);
+      const roomId = Number(button?.dataset?.roomId);
+      if (!Number.isInteger(roomNumber) || roomNumber < 1 ||
+          !Number.isInteger(roomId) || roomId < 0) {
+        state.enterRoomStatus = '⚠️ 房號資料無效，請重新掃描';
+        scheduleRender();
+        return;
+      }
+      const now = Date.now();
+      const key = String(roomNumber) + ':' + String(roomId);
+      if (key === lastRankedEntryKey && now - lastRankedEntryAt < 1300) return;
+      lastRankedEntryKey = key;
+      lastRankedEntryAt = now;
+      if (state.enterRoomBusy) {
+        state.enterRoomStatus = '⏳ 上一個進房操作仍在進行，請稍後再試';
+        scheduleRender();
+        return;
+      }
+      state.enterRoomStatus = '⏳ 已收到 ' + String(roomNumber).padStart(4,'0') + ' 房進入指令｜正在核對原生房號…';
+      // 在最短同步路徑立即把 busy 設定交給原本進房流程，杜絕雙擊。
+      routeEnterRoomFromRanking(roomNumber, roomId);
+      scheduleRender();
+    }
+
     // 使用固定在 panel 本體上的 pointerdown 事件代理。
     // ATG 即時資料很頻繁，render() 會重建 panel 內容；若把 click 綁在每顆
     // 臨時按鈕上，按下與放開之間節點可能已被替換，造成看起來「沒反應」。
@@ -11264,12 +11293,8 @@ try {
       if (enterRoomButton && panel.contains(enterRoomButton)) {
         event.preventDefault();
         event.stopPropagation();
-        holdPanelInteraction(120);
-        const roomNumber = Number(enterRoomButton.dataset.roomNumber);
-        const roomId = Number(enterRoomButton.dataset.roomId);
-        state.enterRoomStatus = `🖱️ 已點擊 ${Number.isFinite(roomNumber) ? Math.trunc(roomNumber) : '—'} 房，準備執行…`;
-        render();
-        routeEnterRoomFromRanking(roomNumber, roomId);
+        holdPanelInteraction(1200);
+        requestRankedRoomEntry(enterRoomButton);
         return;
       }
 
@@ -11320,15 +11345,9 @@ try {
       event.preventDefault();
       event.stopPropagation();
 
-      const roomNumber = Number(enterRoomButton.dataset.roomNumber);
-      const roomId = Number(enterRoomButton.dataset.roomId);
-
-      // pointerdown 已經啟動時不要重複執行；只有沒有 busy 才由 click 補上。
-      if (!state.enterRoomBusy) {
-        state.enterRoomStatus = `🖱️ 已點擊 ${Number.isFinite(roomNumber) ? Math.trunc(roomNumber) : '—'} 房，準備執行…`;
-        render();
-        routeEnterRoomFromRanking(roomNumber, roomId);
-      }
+      // click 僅當 pointerdown 沒有執行時補發，避免雙重導航。
+      holdPanelInteraction(1200);
+      requestRankedRoomEntry(enterRoomButton);
     }, true);
 
     mini.id = 'xinyao-room-mini';
