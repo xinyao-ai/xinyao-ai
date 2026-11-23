@@ -22,10 +22,10 @@ jobs:
           mkdir -p "$RUNNER_TEMP/package/Payload"
           cp -R "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/SethOracle.app" "$RUNNER_TEMP/package/Payload/"
           cd "$RUNNER_TEMP/package"
-          /usr/bin/zip -qry "$GITHUB_WORKSPACE/SethOracle-AltStore-unsigned-v5139-dragon-transparent.ipa" Payload
-          /usr/bin/unzip -t "$GITHUB_WORKSPACE/SethOracle-AltStore-unsigned-v5139-dragon-transparent.ipa" | tail -1
+          /usr/bin/zip -qry "$GITHUB_WORKSPACE/SethOracle-AltStore-unsigned-v5140-carousel-room-images.ipa" Payload
+          /usr/bin/unzip -t "$GITHUB_WORKSPACE/SethOracle-AltStore-unsigned-v5140-carousel-room-images.ipa" | tail -1
       - uses: actions/upload-artifact@v4
         with:
-          name: SethOracle-AltStore-unsigned-v5139-dragon-transparent
-          path: SethOracle-AltStore-unsigned-v5139-dragon-transparent.ipa
+          name: SethOracle-AltStore-unsigned-v5140-carousel-room-images
+          path: SethOracle-AltStore-unsigned-v5140-carousel-room-images.ipa
           if-no-files-found: error
