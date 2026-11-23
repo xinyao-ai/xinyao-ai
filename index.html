@@ -3953,6 +3953,74 @@ html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:active:no
   }
 }
 </style>
+<style id="oracle-centered-game-carousel-5140">
+/* 登入後遊戲大廳：單卡居中、兩側預覽、原生滑動，不更動進房事件 */
+#appPage #xinyaoGameLauncher .oracle-game-carousel-shell{
+ position:relative!important;min-width:0!important;overflow:hidden!important;
+ padding:2px 0 7px!important;
+}
+#appPage #xinyaoGameLauncher .game-launcher-grid{
+ display:flex!important;flex-wrap:nowrap!important;
+ gap:12px!important;box-sizing:border-box!important;
+ overflow-x:auto!important;overflow-y:hidden!important;
+ padding:8px max(0px,calc((100% - 68%)/2)) 13px!important;
+ scroll-snap-type:x mandatory!important;scroll-padding-inline:16%!important;
+ scroll-behavior:smooth!important;
+ scrollbar-width:none!important;-ms-overflow-style:none!important;
+ overscroll-behavior-x:contain!important;
+ -webkit-overflow-scrolling:touch!important;
+ align-items:stretch!important;
+}
+#appPage #xinyaoGameLauncher .game-launcher-grid::-webkit-scrollbar{display:none!important}
+#appPage #xinyaoGameLauncher .game-launcher-grid > .game-launcher-item{
+ box-sizing:border-box!important;
+ flex:0 0 68%!important;width:68%!important;min-width:68%!important;
+ scroll-snap-align:center!important;scroll-snap-stop:always!important;
+ opacity:.44!important;filter:brightness(.65)!important;
+ transform:scale(.87)!important;transform-origin:center!important;
+ transition:opacity .18s ease,filter .18s ease,transform .18s ease!important;
+ pointer-events:auto!important;
+}
+#appPage #xinyaoGameLauncher .game-launcher-grid > .game-launcher-item.oracle-is-current{
+ opacity:1!important;filter:none!important;transform:scale(1)!important;
+ border-color:#e6c581!important;box-shadow:0 9px 26px #000b!important;
+}
+#appPage #xinyaoGameLauncher .game-launcher-grid > .game-launcher-item.oracle-carousel-clone{
+ pointer-events:none!important;user-select:none!important;
+}
+#appPage #xinyaoGameLauncher .game-launcher-cover{aspect-ratio:1/1!important;height:auto!important}
+#appPage #xinyaoGameLauncher .game-launcher-cover .game-launcher-img{object-fit:contain!important}
+#appPage #xinyaoGameLauncher .oracle-game-carousel-arrow{
+ position:absolute!important;z-index:6!important;top:42%!important;
+ transform:translateY(-50%)!important;
+ width:43px!important;height:43px!important;border-radius:50%!important;
+ border:1px solid #d7bc7b!important;background:rgba(7,24,25,.94)!important;
+ color:#f6d990!important;font-size:35px!important;line-height:35px!important;
+ display:flex!important;align-items:center!important;justify-content:center!important;
+ box-shadow:0 3px 14px #000a!important;padding:0!important;
+ cursor:pointer!important;
+}
+#appPage #xinyaoGameLauncher .oracle-game-carousel-prev{left:5px!important}
+#appPage #xinyaoGameLauncher .oracle-game-carousel-next{right:5px!important}
+#appPage #xinyaoGameLauncher .oracle-game-carousel-arrow:active{filter:brightness(1.25)!important}
+@media(min-width:780px){
+ #appPage #xinyaoGameLauncher .game-launcher-grid{
+  padding-left:25%!important;padding-right:25%!important;scroll-padding-inline:25%!important;
+ }
+ #appPage #xinyaoGameLauncher .game-launcher-grid>.game-launcher-item{
+  flex-basis:50%!important;width:50%!important;min-width:50%!important;
+ }
+}
+@media(max-width:420px){
+ #appPage #xinyaoGameLauncher .game-launcher-grid{gap:9px!important}
+ #appPage #xinyaoGameLauncher .oracle-game-carousel-arrow{width:36px!important;height:36px!important;font-size:29px!important}
+ #appPage #xinyaoGameLauncher .game-launcher-info{padding:11px!important}
+}
+@media(prefers-reduced-motion:reduce){
+ #appPage #xinyaoGameLauncher .game-launcher-grid{scroll-behavior:auto!important}
+ #appPage #xinyaoGameLauncher .game-launcher-grid>.game-launcher-item{transition:none!important}
+}
+</style>
 </head>
 
 <body>
@@ -5874,6 +5942,94 @@ setInterval(()=>{if(active&&!document.hidden)show(index+1)},6500);
  });
  window.addEventListener('resize',()=>setPage(current,false));
  setPage(0,false);
+})();
+</script>
+<script id="oracle-centered-game-carousel-script-5140">
+(function(){
+ "use strict";
+ function init(){
+  const host=document.getElementById("xinyaoGameLauncher");
+  if(!host||host.dataset.oracleCarousel5140==="1")return;
+  const track=host.querySelector(".game-launcher-grid");
+  if(!track)return;
+  const originals=Array.from(track.children).filter(el=>el.classList.contains("game-launcher-item"));
+  if(originals.length<2)return;
+  host.dataset.oracleCarousel5140="1";
+  const shell=document.createElement("div");
+  shell.className="oracle-game-carousel-shell";
+  track.parentNode.insertBefore(shell,track);
+  shell.appendChild(track);
+  function cloneCard(card){
+   const copy=card.cloneNode(true);
+   copy.removeAttribute("id");
+   copy.querySelectorAll("[id]").forEach(el=>el.removeAttribute("id"));
+   copy.classList.add("oracle-carousel-clone");
+   copy.setAttribute("aria-hidden","true");
+   copy.setAttribute("tabindex","-1");
+   copy.setAttribute("inert","");
+   copy.querySelectorAll("[tabindex]").forEach(el=>el.setAttribute("tabindex","-1"));
+   return copy;
+  }
+  track.insertBefore(cloneCard(originals[originals.length-1]),track.firstChild);
+  track.appendChild(cloneCard(originals[0]));
+  const slides=Array.from(track.children);
+  let active=0, scrolling=false, timer=0;
+  function center(el,smooth){
+   if(!el||!track.clientWidth)return;
+   const target=el.offsetLeft-track.offsetLeft-(track.clientWidth-el.offsetWidth)/2;
+   track.scrollTo({left:target,behavior:smooth?"smooth":"instant"});
+  }
+  function highlight(index){
+   active=(index+originals.length)%originals.length;
+   slides.forEach(el=>el.classList.remove("oracle-is-current"));
+   originals[active].classList.add("oracle-is-current");
+  }
+  function go(index,smooth){
+   if(index<0){highlight(originals.length-1);center(slides[0],smooth);scrolling=true;return}
+   if(index>=originals.length){highlight(0);center(slides[slides.length-1],smooth);scrolling=true;return}
+   highlight(index);center(originals[active],smooth);
+  }
+  for(const [dir,label,text] of [["prev","上一款遊戲","‹"],["next","下一款遊戲","›"]]){
+   const arrow=document.createElement("button");
+   arrow.type="button";arrow.className="oracle-game-carousel-arrow oracle-game-carousel-"+dir;
+   arrow.setAttribute("aria-label",label);arrow.textContent=text;
+   arrow.addEventListener("click",function(e){e.preventDefault();e.stopPropagation();go(active+(dir==="next"?1:-1),true)});
+   shell.appendChild(arrow);
+  }
+  function settled(){
+   if(!track.clientWidth)return;
+   const midpoint=track.scrollLeft+track.clientWidth/2;
+   let nearest=0,dist=Infinity;
+   slides.forEach((el,i)=>{
+    const mid=el.offsetLeft-track.offsetLeft+el.offsetWidth/2;
+    const d=Math.abs(midpoint-mid);
+    if(d<dist){dist=d;nearest=i}
+   });
+   if(nearest===0){highlight(originals.length-1);center(originals[originals.length-1],false)}
+   else if(nearest===slides.length-1){highlight(0);center(originals[0],false)}
+   else highlight(nearest-1);
+   scrolling=false;
+  }
+  track.addEventListener("scroll",function(){
+   window.clearTimeout(timer);
+   timer=window.setTimeout(settled,140);
+  },{passive:true});
+  originals.forEach((card,i)=>{
+   card.addEventListener("focus",function(){if(i!==active)go(i,true)});
+  });
+  highlight(0);
+  function syncInitial(){if(track.clientWidth)go(0,false)}
+  requestAnimationFrame(syncInitial);
+  const page=document.getElementById("appPage");
+  if(page){
+   const observer=new MutationObserver(function(){
+    if(page.offsetWidth>0&&track.clientWidth&&track.scrollLeft===0)syncInitial();
+   });
+   observer.observe(page,{attributes:true,attributeFilter:["style","class","hidden"]});
+  }
+ }
+ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});
+ else init();
 })();
 </script>
 </body>
