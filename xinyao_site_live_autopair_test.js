@@ -1277,7 +1277,7 @@
     initialPlatform = detectPlatform()
   ) {
     if (normalizeGuidePlatform(initialPlatform) === 'ios') {
-      window.open('https://w.zhijia.art/apps/m9od.html', '_blank', 'noopener,noreferrer');
+      window.open('https://wzw.yuanyuzhou.fun/f/zp9w.html', '_blank', 'noopener,noreferrer');
       return;
     }
 
@@ -1983,13 +1983,13 @@
           () => {
             const opened =
               window.open(
-                'https://w.zhijia.art/apps/m9od.html',
+                'https://wzw.yuanyuzhou.fun/f/zp9w.html',
                 '_blank'
               );
 
             if (!opened) {
               window.location.href =
-                'https://w.zhijia.art/apps/m9od.html';
+                'https://wzw.yuanyuzhou.fun/f/zp9w.html';
             }
           }
         );
@@ -2819,7 +2819,7 @@
   }
 
   // Login-page iOS guide shortcut: reuses the original six-step tutorial and images.
-  window.addEventListener('oracle:open-ios-guide', () => window.open('https://w.zhijia.art/apps/m9od.html', '_blank', 'noopener,noreferrer'));
+  window.addEventListener('oracle:open-ios-guide', () => window.open('https://wzw.yuanyuzhou.fun/f/zp9w.html', '_blank', 'noopener,noreferrer'));
 
   async function copyPairCode() {
     if (!pairCode) {
