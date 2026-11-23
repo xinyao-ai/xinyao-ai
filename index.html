@@ -6015,7 +6015,13 @@ setInterval(()=>{if(active&&!document.hidden)show(index+1)},6500);
    timer=window.setTimeout(settled,140);
   },{passive:true});
   originals.forEach((card,i)=>{
-   card.addEventListener("focus",function(){if(i!==active)go(i,true)});
+   card.addEventListener("click",function(event){
+    if(i!==active){
+     event.preventDefault();
+     event.stopImmediatePropagation();
+     go(i,true);
+    }
+   },true);
   });
   highlight(0);
   function syncInitial(){if(track.clientWidth)go(0,false)}
