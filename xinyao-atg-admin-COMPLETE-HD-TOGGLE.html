@@ -346,7 +346,7 @@
   </div>
 </div>
 <div class="app"><aside class="side"><div class="brand">💕 賽特神諭 ATG 後台</div><nav class="nav">
-<button class="active" data-tab="overview">📊 總覽</button><button data-tab="members">👥 會員管理</button><button data-tab="detail">🪪 會員詳細</button><button data-tab="kick">🚪 強制登出</button><button data-tab="batch">➕ 批次新增</button><button data-tab="wins">🎉 恭喜會員</button><button data-tab="system">🟢 系統狀態</button><button data-tab="oracleCarousel">🖼️ 輪播圖管理</button><button data-tab="logs">🧾 操作紀錄</button><button data-tab="activity">👀 上線／操作</button></nav></aside>
+<button class="active" data-tab="overview">📊 總覽</button><button data-tab="members">👥 會員管理</button><button data-tab="detail">🪪 會員詳細</button><button data-tab="kick">🚪 強制登出</button><button data-tab="batch">➕ 批次新增</button><button data-tab="wins">🎉 恭喜會員</button><button data-tab="system">🟢 系統狀態</button><button data-tab="oracleCarousel">🖼️ 輪播圖管理</button><button data-tab="oraclePopup">📢 彈窗管理</button><button data-tab="logs">🧾 操作紀錄</button><button data-tab="activity">👀 上線／操作</button></nav></aside>
 <main class="main"><div class="top"><h2 id="title">總覽儀表板</h2><div class="row"><button class="btn soft" onclick="refreshAll()">↻ 更新</button><button id="logoutBtn" class="btn danger" onclick="adminLogout()">登出</button></div></div>
 <section id="overview" class="panel active"><div class="stats"><div class="card stat"><span class="muted">會員總數</span><b id="total">—</b></div><div class="card stat"><span class="muted">正常會員</span><b id="active">—</b></div><div class="card stat"><span class="muted">停用會員</span><b id="disabled">—</b></div><div class="card stat"><span class="muted">目前上線</span><b id="online">—</b></div><div class="card stat"><span class="muted">今日新增</span><b id="today_new">—</b></div></div><div class="card"><b>最近會員操作</b><div id="recent" class="muted">載入中...</div></div></section>
 <section id="members" class="panel"><div class="card"><div class="row"><input id="search" class="input" placeholder="搜尋會員"><button class="btn soft" onclick="loadMembers()">搜尋</button><input id="newAccount" class="input" placeholder="新增會員帳號"><button class="btn primary" onclick="addMember()">新增會員</button></div><div id="memberMsg"></div><div class="table"><table><thead><tr><th>ID</th><th>帳號</th><th>狀態</th><th>最後登入</th><th>最後活動</th><th>到期日</th><th>操作</th></tr></thead><tbody id="memberRows"></tbody></table></div></div></section>
@@ -390,6 +390,32 @@
   </div>
   <div id="oracleCarouselMessage" class="muted" role="status" aria-live="polite"></div>
   <div id="oracleCarouselRows" class="oracle-slide-editor"></div>
+ </div>
+</section>
+
+<section id="oraclePopup" class="panel">
+ <div class="card">
+  <h3>📢 賽特神諭｜首頁彈窗管理</h3>
+  <p class="muted">會員每次重新開啟程式時顯示。直式活動海報完整呈現、不裁切；直接使用目前後台登入權限發布，無須另外輸入 GitHub Token。</p>
+  <div class="oracle-size-guide"><div><strong>建議尺寸</strong><b>1122 × 1402 px</b><small>支援 PNG、JPG、WebP，會自動壓縮</small></div><div><strong>呈現方式</strong><b>完整直式海報</b><small>手機畫面不夠高時可在彈窗內捲動</small></div></div>
+  <div style="margin:14px 0"><label style="display:flex;align-items:center;gap:9px"><input id="oraclePopupEnabled" type="checkbox" checked> 啟用首頁彈窗（每次開啟顯示）</label></div>
+  <div style="margin:14px 0"><label style="display:flex;align-items:center;gap:9px"><input id="oraclePopupImageOnly" type="checkbox" checked> 海報模式（有圖時隱藏額外標題與說明）</label></div>
+  <div style="margin:14px 0"><label style="display:block;font-weight:800;margin-bottom:7px">上傳活動海報</label><input id="oraclePopupFile" type="file" accept="image/png,image/jpeg,image/webp" class="input" style="width:min(560px,100%);max-width:100%">
+    <p class="muted">選圖後先預覽，不會立即上線；按「發布彈窗」才更新會員畫面。</p>
+  </div>
+  <div id="oraclePopupPreview" style="border:1px solid #a68b54;border-radius:15px;background:rgba(0,0,0,.28);padding:10px;min-height:100px;width:min(560px,100%);display:flex;align-items:center;justify-content:center;overflow:auto;color:#cab68d">尚未載入海報</div>
+  <label style="display:flex;align-items:center;gap:8px;margin-top:10px"><input type="checkbox" id="oraclePopupRemoveImage"> 移除目前海報圖片</label>
+  <div class="oracle-fields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px">
+   <label>活動點擊網址（選填）<input id="oraclePopupLink" class="input" style="width:100%" type="url" placeholder="https://..."></label>
+   <label>活動按鈕文字（選填）<input id="oraclePopupButton" class="input" style="width:100%" value="查看活動詳情"></label>
+   <label>備用標題（未設定海報時顯示）<input id="oraclePopupTitle" class="input" style="width:100%" value="歡迎使用賽特神諭"></label>
+   <label>備用說明（未設定海報時顯示）<input id="oraclePopupDescription" class="input" style="width:100%" value="最新活動與功能資訊，請留意官方公告。"></label>
+  </div>
+  <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:16px">
+   <button type="button" class="btn soft" id="oraclePopupRefresh">↻ 重新讀取</button>
+   <button type="button" class="btn primary" id="oraclePopupPublish">💾 發布彈窗</button>
+  </div>
+  <p class="muted" id="oraclePopupMessage" role="status" aria-live="polite">尚未載入設定。</p>
  </div>
 </section>
 <section id="system" class="panel"><div class="card" id="systemBox">檢查中...</div></section>
@@ -436,6 +462,8 @@ const titles={
   batch:"批次新增會員",
   wins:"恭喜會員紀錄",
   system:"系統狀態",
+  oracleCarousel:"輪播圖管理",
+  oraclePopup:"彈窗管理",
   logs:"操作紀錄",
   activity:"會員上線／操作紀錄"
 };
@@ -1564,4 +1592,137 @@ document.addEventListener("DOMContentLoaded",()=>{
  };
  document.addEventListener('DOMContentLoaded',()=>{const nav=document.querySelector('[data-tab="oracleCarousel"]');if(nav)nav.addEventListener('click',()=>window.oracleLoadSlides());});
 })();
-</script></body></html>
+</script>
+<script id="oracle-popup-admin-integrated-20261126">
+(()=>{
+ 'use strict';
+ const $=id=>document.getElementById(id);
+ const API='https://oracle-carousel-publisher.love06130430.workers.dev';
+ const prefix='https://xinyao-ai.github.io/xinyao-ai/';
+ let pending=null,previewUrl=null,busy=false,loaded=null,loadCount=0;
+ const msg=text=>{$('oraclePopupMessage').textContent=text};
+ function encodeText(text){
+  const bytes=new TextEncoder().encode(text);
+  let b='';for(let i=0;i<bytes.length;i+=8192)b+=String.fromCharCode(...bytes.subarray(i,i+8192));
+  return btoa(b);
+ }
+ function decodeText(b){
+  const raw=atob(String(b||'').replace(/\s/g,''));
+  return new TextDecoder().decode(Uint8Array.from(raw,c=>c.charCodeAt(0)));
+ }
+ async function gh(path,method='GET',data=null){
+  const token=sessionStorage.getItem('atg_admin_token');
+  if(!token)throw Error('請先登入 ATG 管理後台');
+  const response=await fetch(API+'/publish',{
+   method:'POST',
+   headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+   body:JSON.stringify({path,method,body:data})
+  });
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||!result.ok)throw Error(result.error||'後台安全發布服務未成功，請檢查權限');
+  return result.data;
+ }
+ function show(url){
+  const box=$('oraclePopupPreview');box.replaceChildren();
+  if(!url){box.textContent='尚未設定活動海報';return}
+  const img=document.createElement('img');img.src=url;img.alt='彈窗活動海報預覽';
+  img.style.cssText='display:block;max-width:100%;max-height:650px;width:auto;height:auto;object-fit:contain;border-radius:10px';
+  box.appendChild(img);
+ }
+ async function resizeImage(file){
+  if(!/^image\/(jpeg|png|webp)$/.test(file.type))throw Error('請選擇 JPG、PNG 或 WebP 圖片');
+  if(file.size>20*1024*1024)throw Error('圖片超過 20MB，請先縮小');
+  const bitmap=await createImageBitmap(file);
+  const scale=Math.min(1,1440/bitmap.width,1800/bitmap.height);
+  const canvas=document.createElement('canvas');
+  canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);
+  canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
+  bitmap.close?.();
+  const blob=await new Promise((resolve,reject)=>canvas.toBlob(x=>x?resolve(x):reject(Error('圖片壓縮失敗')),'image/webp',.84));
+  if(blob.size>6*1024*1024)throw Error('壓縮圖片仍超過 6MB，請使用較小圖檔');
+  return blob;
+ }
+ async function readBase64(blob){
+  return await new Promise((resolve,reject)=>{
+   const reader=new FileReader();
+   reader.onload=()=>resolve(String(reader.result).split(',')[1]);
+   reader.onerror=()=>reject(Error('圖片讀取失敗'));
+   reader.readAsDataURL(blob);
+  });
+ }
+ async function load(){
+  const sequence=++loadCount;
+  msg('⏳ 正在讀取目前彈窗設定…');
+  try{
+   const result=await gh('launch-popup-config.json?ref=main');
+   if(sequence!==loadCount)return;
+   const cfg=JSON.parse(decodeText(result.content));
+   loaded={cfg,sha:result.sha};
+   $('oraclePopupEnabled').checked=cfg.enabled!==false;
+   $('oraclePopupImageOnly').checked=cfg.imageOnly!==false;
+   $('oraclePopupLink').value=cfg.link||'';
+   $('oraclePopupButton').value=cfg.buttonText||'查看活動詳情';
+   $('oraclePopupTitle').value=cfg.title||'';
+   $('oraclePopupDescription').value=cfg.description||'';
+   $('oraclePopupRemoveImage').checked=false;
+   if(!pending)show(cfg.image?new URL(cfg.image,prefix).href:'');
+   msg('✅ 設定已載入，可以直接上傳海報後發布。');
+  }catch(e){msg('❌ 讀取失敗：'+e.message)}
+ }
+ async function publish(){
+  if(busy)return;
+  busy=true;$('oraclePopupPublish').disabled=true;
+  try{
+   const current=await gh('launch-popup-config.json?ref=main');
+   const cfg=JSON.parse(decodeText(current.content));
+   const link=$('oraclePopupLink').value.trim();
+   if(link&&!/^https:\/\//i.test(link))throw Error('活動連結必須是 https:// 開頭');
+   Object.assign(cfg,{
+    enabled:$('oraclePopupEnabled').checked,
+    imageOnly:$('oraclePopupImageOnly').checked,
+    link,buttonText:$('oraclePopupButton').value.trim()||'查看詳情',
+    title:$('oraclePopupTitle').value.trim()||'歡迎使用賽特神諭',
+    description:$('oraclePopupDescription').value.trim()
+   });
+   if($('oraclePopupRemoveImage').checked)cfg.image='';
+   else if(pending){
+    msg('⏳ 正在上傳並發布海報…');
+    const filename='assets/popup/launch-'+Date.now()+'.webp';
+    await gh(filename,'PUT',{message:'Upload SethOracle popup poster',branch:'main',content:await readBase64(pending)});
+    cfg.image='./'+filename;
+   }
+   msg('⏳ 正在發布彈窗設定…');
+   await gh('launch-popup-config.json','PUT',{
+    message:'Update SethOracle launch popup from ATG dashboard',
+    branch:'main',sha:current.sha,
+    content:encodeText(JSON.stringify(cfg,null,2)+'\n')
+   });
+   pending=null;
+   $('oraclePopupFile').value='';
+   loaded=null;
+   await load();
+   msg('✅ 發布成功！網站部署後，會員重新開啟賽特神諭就會看到新海報。');
+  }catch(e){msg('❌ 發布失敗：'+e.message)}
+  finally{busy=false;$('oraclePopupPublish').disabled=false}
+ }
+ $('oraclePopupFile').addEventListener('change',async ev=>{
+  const file=ev.target.files?.[0];if(!file)return;
+  try{
+   pending=await resizeImage(file);
+   if(previewUrl)URL.revokeObjectURL(previewUrl);
+   previewUrl=URL.createObjectURL(pending);
+   show(previewUrl);$('oraclePopupRemoveImage').checked=false;
+   msg('✅ 已完成圖片預覽（'+Math.round(pending.size/1024)+' KB）。按「發布彈窗」才會上線。');
+  }catch(e){pending=null;msg('❌ '+e.message)}
+ });
+ $('oraclePopupRemoveImage').addEventListener('change',ev=>{
+  if(ev.target.checked){pending=null;show('')}
+  else if(previewUrl&&pending)show(previewUrl);
+  else if(loaded?.cfg?.image)show(new URL(loaded.cfg.image,prefix).href);
+ });
+ $('oraclePopupRefresh').addEventListener('click',load);
+ $('oraclePopupPublish').addEventListener('click',publish);
+ document.querySelector('[data-tab="oraclePopup"]')?.addEventListener('click',load);
+})();
+</script>
+</body></html>
