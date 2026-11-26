@@ -4025,9 +4025,38 @@ html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:active:no
 <link rel="preload" as="image" href="https://xinyao-ai.github.io/xinyao-ai/assets/carousel/1794219024469-0-desktop.png" imagesrcset="https://xinyao-ai.github.io/xinyao-ai/assets/carousel/1794219032528-0-mobile.png 700w, https://xinyao-ai.github.io/xinyao-ai/assets/carousel/1794219024469-0-desktop.png 1280w" imagesizes="100vw" fetchpriority="high">
 <link rel="preload" as="image" href="./assets/seth2-cover.png?v=5045" fetchpriority="high">
 <link rel="preload" as="image" href="./assets/seth1-cover.png?v=5047">
+
+<style id="seth-launch-announcement-20261126">
+#sethLaunchNoticeOverlay{position:fixed;inset:0;z-index:2147483600;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(0,0,0,.78);box-sizing:border-box;font-family:"Microsoft JhengHei",system-ui,sans-serif}
+#sethLaunchNoticeOverlay.is-open{display:flex}
+#sethLaunchNoticeOverlay .seth-notice-modal{box-sizing:border-box;position:relative;width:min(420px,100%);max-height:min(86dvh,720px);overflow-y:auto;overscroll-behavior:contain;border:1px solid #e3ba69;border-radius:20px;background:linear-gradient(155deg,#152125 0%,#080f14 65%,#182024 100%);box-shadow:0 20px 60px rgba(0,0,0,.75),inset 0 0 0 1px rgba(255,231,169,.12);color:#f9e2a7;text-align:center;padding:25px 20px 22px}
+#sethLaunchNoticeOverlay .seth-notice-modal::before{content:"";height:3px;position:absolute;left:20%;right:20%;top:0;background:linear-gradient(90deg,transparent,#f9d78a,transparent)}
+#sethLaunchNoticeOverlay .seth-notice-close{position:absolute;top:9px;right:9px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;padding:0;border:1px solid #ae915d;border-radius:50%;font-size:23px;line-height:1;color:#f6e4bc;background:#172126;box-shadow:none;cursor:pointer;z-index:2}
+#sethLaunchNoticeOverlay .seth-notice-mark{font-size:36px;line-height:1.2;margin:2px auto 8px;color:#f5d27c}
+#sethLaunchNoticeOverlay .seth-notice-eyebrow{color:#cba765;font-size:12px;font-weight:800;letter-spacing:3px}
+#sethLaunchNoticeOverlay .seth-notice-title{margin:12px 0 10px;color:#ffe2a1;font-size:clamp(21px,5.5vw,27px);line-height:1.35;font-weight:900;text-shadow:0 2px 9px #000}
+#sethLaunchNoticeOverlay .seth-notice-image{display:none;width:100%;height:auto;max-height:48dvh;object-fit:contain;margin:15px auto;border-radius:10px}
+#sethLaunchNoticeOverlay .seth-notice-description{font-size:14px;line-height:1.8;color:#e7dac3;margin:8px auto 22px;white-space:pre-line}
+#sethLaunchNoticeOverlay .seth-notice-action{display:none;width:100%;box-sizing:border-box;padding:13px 14px;border-radius:12px;background:linear-gradient(#fff0bb,#deb15a 65%,#b68232);color:#281c0a!important;border:1px solid #fff0b3;font-weight:900;font-size:16px;text-decoration:none;box-shadow:0 3px 0 #664119;cursor:pointer}
+#sethLaunchNoticeOverlay .seth-notice-dismiss{display:block;margin:18px auto 0;background:none!important;border:0!important;box-shadow:none!important;color:#d8cbb0!important;font-size:13px;padding:6px 12px;cursor:pointer}
+@media(prefers-reduced-motion:reduce){#sethLaunchNoticeOverlay *{animation:none!important;transition:none!important}}
+</style>
 </head>
 
 <body>
+<div id="sethLaunchNoticeOverlay" aria-hidden="true">
+  <div class="seth-notice-modal" role="dialog" aria-modal="true" aria-labelledby="sethNoticeTitle" aria-describedby="sethNoticeDescription">
+    <button id="sethNoticeClose" class="seth-notice-close" type="button" aria-label="關閉公告">×</button>
+    <div class="seth-notice-mark" aria-hidden="true">𓂀</div>
+    <div class="seth-notice-eyebrow">SETH ORACLE</div>
+    <h2 class="seth-notice-title" id="sethNoticeTitle">歡迎使用賽特神諭</h2>
+    <img id="sethNoticeImage" class="seth-notice-image" alt="賽特神諭公告圖片">
+    <p id="sethNoticeDescription" class="seth-notice-description">最新活動與功能資訊，請留意官方公告。</p>
+    <a id="sethNoticeAction" class="seth-notice-action" target="_blank" rel="noopener noreferrer" href="#">查看詳情</a>
+    <button id="sethNoticeDismiss" class="seth-notice-dismiss" type="button">開始使用賽特神諭</button>
+  </div>
+</div>
+
 
   <a
     class="app-line-float"
@@ -6066,6 +6095,82 @@ setInterval(()=>{if(active&&!document.hidden)show(index+1)},6500);
   }
  }
  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});
+ else init();
+})();
+</script>
+
+<script id="seth-launch-announcement-script-20261126">
+(function(){
+ 'use strict';
+ if(window.__SETH_LAUNCH_NOTICE_INIT__)return;
+ window.__SETH_LAUNCH_NOTICE_INIT__=true;
+ function init(){
+  const root=document.getElementById('sethLaunchNoticeOverlay');
+  if(!root)return;
+  const closeButton=document.getElementById('sethNoticeClose');
+  const dismissButton=document.getElementById('sethNoticeDismiss');
+  const title=document.getElementById('sethNoticeTitle');
+  const description=document.getElementById('sethNoticeDescription');
+  const image=document.getElementById('sethNoticeImage');
+  const action=document.getElementById('sethNoticeAction');
+  let lastFocus=null,closed=false;
+  const close=()=>{
+   if(closed)return;closed=true;
+   root.classList.remove('is-open');root.setAttribute('aria-hidden','true');
+   document.documentElement.style.removeProperty('overflow');
+   if(lastFocus&&lastFocus.isConnected)lastFocus.focus({preventScroll:true});
+  };
+  const open=()=>{
+   if(closed)return;
+   lastFocus=document.activeElement;
+   root.classList.add('is-open');root.setAttribute('aria-hidden','false');
+   document.documentElement.style.setProperty('overflow','hidden');
+   closeButton.focus({preventScroll:true});
+  };
+  closeButton.addEventListener('click',close);
+  dismissButton.addEventListener('click',close);
+  root.addEventListener('click',event=>{if(event.target===root)close()});
+  document.addEventListener('keydown',event=>{
+   if(!root.classList.contains('is-open'))return;
+   if(event.key==='Escape'){event.preventDefault();close()}
+   if(event.key==='Tab'){
+    const focusables=[closeButton,action,dismissButton].filter(el=>el.offsetParent!==null);
+    const first=focusables[0],last=focusables[focusables.length-1];
+    if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}
+    else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}
+   }
+  });
+  // Every new app page load shows the popup. No daily-dismiss or persistence flags.
+  open();
+  // Optional announcement config; the popup is visible immediately without waiting for fetch.
+  fetch('./launch-popup-config.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(cfg=>{
+   if(!cfg||typeof cfg!=='object'||closed)return;
+   if(cfg.enabled===false){close();return}
+   if(typeof cfg.title==='string'&&cfg.title.trim())title.textContent=cfg.title.slice(0,100);
+   if(typeof cfg.description==='string')description.textContent=cfg.description.slice(0,1200);
+   if(typeof cfg.image==='string'&&cfg.image.trim()){
+    try{
+     const u=new URL(cfg.image,location.href);
+     if(u.protocol==='https:'||u.origin===location.origin){
+      image.onload=()=>{if(!closed)image.style.display='block'};
+      image.onerror=()=>{image.style.display='none'};
+      image.src=u.href;
+     }
+    }catch(_){}
+   }
+   if(typeof cfg.link==='string'&&cfg.link.trim()){
+    try{
+     const u=new URL(cfg.link,location.href);
+     if(u.protocol==='https:'){
+      action.href=u.href;
+      action.textContent=String(cfg.buttonText||'查看詳情').slice(0,40);
+      action.style.display='block';
+     }
+    }catch(_){}
+   }
+  }).catch(()=>{});
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
  else init();
 })();
 </script>
