@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>賽特神諭｜彈窗管理</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,"Microsoft JhengHei",sans-serif}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#263027,#080d10 65%);color:#efe2c6;padding:18px}
+main{width:min(920px,100%);margin:20px auto}h1{color:#f6d18b;font-size:27px;margin:0 0 8px}h2{font-size:18px;color:#ebca81}
+.note{font-size:13px;color:#c9baa2;line-height:1.7}.panel{border:1px solid #ac8643;border-radius:19px;background:rgba(9,20,23,.94);padding:20px;margin:18px 0;box-shadow:0 8px 35px #0006}
+label{display:block;margin:12px 0 6px;color:#ecd29a;font-weight:700;font-size:14px}
+input:not([type=checkbox]),textarea{width:100%;padding:12px;border-radius:10px;background:#101b20;border:1px solid #72613d;color:#fff;font-size:15px}
+textarea{min-height:90px;resize:vertical}input[type=checkbox]{accent-color:#d8b05d;width:19px;height:19px;vertical-align:middle}
+button{border:1px solid #edcc85;background:linear-gradient(130deg,#fbe1a1,#b9883f);color:#211704;padding:12px 20px;border-radius:11px;font-weight:900;font-size:15px;cursor:pointer}
+button:disabled{opacity:.5;cursor:wait}.row{display:flex;gap:14px;flex-wrap:wrap}.row>*{flex:1 1 230px}
+.preview{display:flex;align-items:center;justify-content:center;min-height:170px;max-height:640px;overflow:auto;background:#02080c;border:1px dashed #806439;border-radius:13px;padding:9px}
+.preview img{max-width:100%;max-height:610px;width:auto;height:auto;object-fit:contain}
+#status{white-space:pre-line;line-height:1.7;color:#d6c18e}
+small{color:#bcae92}a{color:#f0d38b}
+</style></head>
+<body><main><h1>𓂀 賽特神諭｜彈窗管理</h1>
+<p class="note">在這裡上傳宣傳圖片並儲存，玩家下次開啟程式就會讀取最新彈窗。海報採完整顯示，不裁切。此頁面的修改功能需要妳自己的 GitHub 授權，沒有任何預設後台密碼。</p>
+<section class="panel"><h2>🔐 管理員授權</h2>
+<label for="token">GitHub Fine-grained Personal Access Token（需授予 xinyao-ai/xinyao-ai 的 Contents：Read and write）</label>
+<input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="貼上自己的 GitHub Token（不會儲存）">
+<p class="note">Token 只暫存在這個頁面的記憶體，關閉就清除；不會加入網址、GitHub 檔案或瀏覽器儲存空間。請不要將 Token 提供給任何人。</p>
+<button id="load" type="button">讀取目前公告設定</button></section>
+<section class="panel"><h2>🖼️ 海報上傳與預覽</h2>
+<label for="upload">選擇活動海報（PNG / JPG / WebP，建議 1122×1402）</label>
+<input id="upload" type="file" accept="image/png,image/jpeg,image/webp">
+<p class="note">上傳後會在妳的瀏覽器自動縮圖並轉成 WebP，加快會員載入速度。重新選圖即可取代，未選新圖會沿用已發佈圖片。</p>
+<div class="preview" id="preview">尚未選擇圖片</div>
+<label><input id="clearImage" type="checkbox"> 移除目前圖片</label>
+<div class="row"><div><label for="link">活動點擊網址（選填）</label><input id="link" type="url" placeholder="https://..."></div>
+<div><label for="buttonText">下方按鈕文字（選填）</label><input id="buttonText" value="查看活動詳情"></div></div>
+</section>
+<section class="panel"><h2>⚙️ 彈窗設定</h2>
+<label><input id="enabled" type="checkbox" checked> 啟用彈窗（每次開啟 APP 顯示）</label>
+<label><input id="imageOnly" type="checkbox" checked> 圖片模式（隱藏額外標題文字，完整呈現活動海報）</label>
+<label for="title">沒有圖片時顯示的標題</label><input id="title" maxlength="100" value="歡迎使用賽特神諭">
+<label for="description">沒有圖片時顯示的說明</label><textarea id="description" maxlength="1200">最新活動與功能資訊，請留意官方公告。</textarea>
+<div style="margin-top:20px"><button id="save" type="button">💾 儲存並發布到 APP</button></div>
+<p id="status" role="status" aria-live="polite">尚未發布變更。</p>
+</section>
+<p class="note">發布會寫入 GitHub 的 <code>launch-popup-config.json</code> 與 <code>assets/popup/</code>。GitHub Pages 部署完成後才會同步到玩家裝置。</p>
+</main>
+<script>
+(()=>{
+ 'use strict';
+ const repo='xinyao-ai/xinyao-ai',api='https://api.github.com/repos/'+repo+'/contents/';
+ const $=id=>document.getElementById(id);
+ let original=null,selected=null,objectUrl=null;
+ function status(message){$('status').textContent=message}
+ function headers(){const t=$('token').value.trim();if(!t)throw Error('請先填入 GitHub Token');return {'Authorization':'Bearer '+t,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}}
+ async function request(path,method='GET',body){
+  const resp=await fetch(api+path,{method,headers:{...headers(),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,cache:'no-store'});
+  let data;try{data=await resp.json()}catch{data={}}
+  if(!resp.ok)throw Error('GitHub '+resp.status+'：'+(data.message||'授權或網路錯誤'));
+  return data;
+ }
+ function utf8Base64(text){const bytes=new TextEncoder().encode(text);let out='';for(let i=0;i<bytes.length;i+=16384)out+=String.fromCharCode(...bytes.subarray(i,i+16384));return btoa(out)}
+ function decodeBase64(content){const binary=atob(content.replace(/\s/g,'')),u=Uint8Array.from(binary,c=>c.charCodeAt(0));return new TextDecoder().decode(u)}
+ function show(url){
+  const box=$('preview');box.replaceChildren();
+  if(!url){box.textContent='尚未選擇圖片';return}
+  const img=document.createElement('img');img.alt='活動海報預覽';img.src=url;box.appendChild(img);
+ }
+ async function load(){
+  const info=await request('launch-popup-config.json');
+  const cfg=JSON.parse(decodeBase64(info.content));
+  original={...cfg,sha:info.sha};
+  $('enabled').checked=cfg.enabled!==false;$('imageOnly').checked=cfg.imageOnly!==false;
+  $('title').value=cfg.title||'';$('description').value=cfg.description||'';
+  $('link').value=cfg.link||'';$('buttonText').value=cfg.buttonText||'查看詳情';
+  $('clearImage').checked=false;
+  if(!selected)show(cfg.image||'');
+  status('✅ 已讀取目前公告設定。');
+ }
+ async function optimize(file){
+  if(!/^image\/(png|jpeg|webp)$/.test(file.type))throw Error('僅支援 PNG、JPG、WebP');
+  if(file.size>16*1024*1024)throw Error('原始圖片超過 16MB，請先壓縮');
+  const bitmap=await createImageBitmap(file);
+  const scale=Math.min(1,1440/bitmap.width,1800/bitmap.height);
+  const canvas=document.createElement('canvas');
+  canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+  canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
+  bitmap.close?.();
+  const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('圖片轉檔失敗')),'image/webp',.85));
+  if(blob.size>6*1024*1024)throw Error('圖片轉換後超過 6MB，請換較小的圖片');
+  return blob;
+ }
+ function fileBase64(blob){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]);r.onerror=()=>reject(Error('無法讀取圖片'));r.readAsDataURL(blob)})}
+ $('upload').addEventListener('change',async e=>{
+  const file=e.target.files?.[0];if(!file)return;
+  try{
+   selected=await optimize(file);
+   if(objectUrl)URL.revokeObjectURL(objectUrl);
+   objectUrl=URL.createObjectURL(selected);show(objectUrl);$('clearImage').checked=false;
+   status('✅ 圖片準備完成：'+Math.round(selected.size/1024)+' KB；按「儲存並發布」才會正式上線。');
+  }catch(err){selected=null;status('⚠️ '+err.message)}
+ });
+ $('clearImage').addEventListener('change',e=>{
+  if(e.target.checked){selected=null;show('')}
+  else if(original)show(original.image||'');
+ });
+ $('load').addEventListener('click',async()=>{try{await load()}catch(e){status('⚠️ '+e.message)}});
+ $('save').addEventListener('click',async()=>{
+  const button=$('save');button.disabled=true;status('⏳ 正在儲存…');
+  try{
+   // Always re-read the current SHA to avoid accidentally overwriting someone else's edits.
+   const current=await request('launch-popup-config.json');
+   const previous=JSON.parse(decodeBase64(current.content));
+   const cfg={...previous,enabled:$('enabled').checked,imageOnly:$('imageOnly').checked,
+    title:$('title').value.trim(),description:$('description').value.trim(),link:$('link').value.trim(),
+    buttonText:$('buttonText').value.trim()||'查看詳情'};
+   if(cfg.link&&!/^https:\/\//i.test(cfg.link))throw Error('活動網址必須以 https:// 開頭');
+   if($('clearImage').checked){cfg.image=''}
+   else if(selected){
+    status('⏳ 上傳已壓縮的海報圖片…');
+    const filename='assets/popup/launch-'+Date.now()+'.webp';
+    await request(filename,'PUT',{message:'Upload SethOracle popup poster',content:await fileBase64(selected)});
+    cfg.image='./'+filename;
+   }
+   status('⏳ 更新活動彈窗設定…');
+   await request('launch-popup-config.json','PUT',{message:'Update SethOracle popup settings',sha:current.sha,content:utf8Base64(JSON.stringify(cfg,null,2)+'\n')});
+   selected=null;$('upload').value='';await load();
+   status('✅ 已成功發布！GitHub Pages 部署後，會員重新開啟 APP 就會看到新的彈窗。');
+  }catch(e){status('❌ 發布失敗：'+e.message)}
+  finally{button.disabled=false}
+ });
+})();
+</script></body></html>
