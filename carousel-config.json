@@ -3,6 +3,14 @@
   "intervalMs": 6500,
   "slides": [
     {
+      "id": "slide-1795696989189-grozo",
+      "title": "",
+      "link": "",
+      "desktop": "https://xinyao-ai.github.io/xinyao-ai/assets/carousel/1795697115474-0-desktop.png",
+      "mobile": "https://xinyao-ai.github.io/xinyao-ai/assets/carousel/1795697120739-0-mobile.png",
+      "enabled": true
+    },
+    {
       "id": "slide-1794219008904-7m30n",
       "title": "",
       "link": "",
