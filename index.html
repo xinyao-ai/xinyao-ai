@@ -6158,7 +6158,9 @@ setInterval(()=>{if(active&&!document.hidden)show(index+1)},6500);
   // Every new app page load shows the popup. No daily-dismiss or persistence flags.
   open();
   // Optional announcement config; the popup is visible immediately without waiting for fetch.
-  fetch('./launch-popup-config.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(cfg=>{
+  fetch('./carousel-config.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(data=>{
+   const cfg=data?.popup;
+
    if(!cfg||typeof cfg!=='object'||closed)return;
    if(cfg.enabled===false){close();return}
    if(typeof cfg.title==='string'&&cfg.title.trim())title.textContent=cfg.title.slice(0,100);
