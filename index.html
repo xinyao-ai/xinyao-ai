@@ -4026,6 +4026,49 @@ html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:active:no
 <link rel="preload" as="image" href="./assets/seth2-cover.png?v=5045" fetchpriority="high">
 <link rel="preload" as="image" href="./assets/seth1-cover.png?v=5047">
 
+<script id="seth-popup-prefetch-20261128">
+(function(){
+ 'use strict';
+ const key='seth-popup-last-image-v1';
+ const cache=new Map();
+ const loadImage=function(url){
+  if(cache.has(url))return cache.get(url);
+  const result=new Promise(resolve=>{
+   const picture=new Image();
+   picture.decoding='async';
+   picture.onload=()=>resolve(picture);
+   picture.onerror=()=>{cache.delete(url);resolve(null)};
+   picture.src=url;
+  });
+  cache.set(url,result);
+  return result;
+ };
+ const safeUrl=function(raw){
+  try{
+   const u=new URL(raw,location.href);
+   return (u.protocol==='https:'||u.origin===location.origin)?u.href:null;
+  }catch(_){return null}
+ };
+ const configPromise=fetch('./carousel-config.json',{cache:'no-cache'})
+  .then(r=>r.ok?r.json():null).catch(()=>null);
+ window.__SETH_POPUP_BOOT__={configPromise,loadImage,safeUrl};
+ // The last successfully shown poster is preloaded in parallel with configuration.
+ // Image URLs change on every upload, so browser caching never keeps an old poster.
+ try{
+  const previous=safeUrl(localStorage.getItem(key));
+  if(previous)loadImage(previous);
+ }catch(_){}
+ configPromise.then(data=>{
+  const cfg=data?.popup;
+  if(cfg?.enabled===false||!cfg?.image)return;
+  const u=safeUrl(cfg.image);
+  if(u)loadImage(u);
+ }).catch(()=>{});
+ window.__SETH_POPUP_REMEMBER__=function(url){
+  try{localStorage.setItem(key,url)}catch(_){}
+ };
+})();
+</script>
 <style id="seth-launch-announcement-20261126">
 #sethLaunchNoticeOverlay{position:fixed;inset:0;z-index:2147483600;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(0,0,0,.78);box-sizing:border-box;font-family:"Microsoft JhengHei",system-ui,sans-serif}
 #sethLaunchNoticeOverlay.is-open{display:flex}
@@ -6194,9 +6237,11 @@ setInterval(()=>{if(active&&!document.hidden)show(index+1)},6500);
     else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}
    }
   });
-  // Keep the overlay hidden until the configured poster is fully loaded.
-  // Never flash the default welcome text before the image arrives.
-  fetch('./carousel-config.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(data=>{
+  // Load the configured image from a warmed browser cache; show the popup only
+  // after the final poster is ready, never flashing placeholder welcome text.
+  const boot=window.__SETH_POPUP_BOOT__;
+  const configPromise=boot?.configPromise||fetch('./carousel-config.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null);
+  configPromise.then(async data=>{
    const cfg=data?.popup;
    if(!cfg||typeof cfg!=='object'||cfg.enabled===false||closed)return;
    if(typeof cfg.title==='string'&&cfg.title.trim())title.textContent=cfg.title.slice(0,100);
@@ -6211,23 +6256,20 @@ setInterval(()=>{if(active&&!document.hidden)show(index+1)},6500);
      }
     }catch(_){}
    }
-   // No valid poster: do not show a temporary welcome popup.
    if(typeof cfg.image!=='string'||!cfg.image.trim())return;
-   let u;
-   try{
-    u=new URL(cfg.image,location.href);
-    if(u.protocol!=='https:'&&u.origin!==location.origin)return;
-   }catch(_){return}
-   const poster=new Image();
-   poster.onload=()=>{
-    if(closed)return;
-    image.src=poster.src;
-    image.style.display='block';
-    if(cfg.imageOnly!==false)modal.classList.add('is-poster');
-    open();
-   };
-   poster.onerror=()=>{}; // No fallback welcome card on failed image.
-   poster.src=u.href;
+   const href=boot?.safeUrl?.(cfg.image)||(()=>{
+    try{const u=new URL(cfg.image,location.href);return u.protocol==='https:'?u.href:null}catch(_){return null}
+   })();
+   if(!href)return;
+   const poster=boot?await boot.loadImage(href):await new Promise(resolve=>{
+    const pic=new Image();pic.onload=()=>resolve(pic);pic.onerror=()=>resolve(null);pic.src=href;
+   });
+   if(!poster||closed)return;
+   image.src=poster.src;
+   image.style.display='block';
+   if(cfg.imageOnly!==false)modal.classList.add('is-poster');
+   window.__SETH_POPUP_REMEMBER__?.(href);
+   open();
   }).catch(()=>{});
 
  }
