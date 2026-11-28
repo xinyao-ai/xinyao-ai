@@ -4044,6 +4044,7 @@ html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:active:no
   return result;
  };
  const safeUrl=function(raw){
+  if(typeof raw!=='string'||!raw.trim())return null;
   try{
    const u=new URL(raw,location.href);
    return (u.protocol==='https:'||u.origin===location.origin)?u.href:null;
