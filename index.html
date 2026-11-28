@@ -4044,16 +4044,55 @@ html body #loginPage .oracle-hd-entry-actions-5127 > #oracleHdSsoLogin:active:no
 /* 海報模式：完整顯示 1122x1402 等直式活動圖，不裁切、不擠壓內容 */
 #sethLaunchNoticeOverlay{padding:8px!important}
 #sethLaunchNoticeOverlay .seth-notice-modal{width:min(96vw,580px)!important;max-height:94dvh!important;max-height:94svh!important;overflow-y:auto!important;scrollbar-width:thin;padding:17px 15px 14px!important}
-#sethLaunchNoticeOverlay .seth-notice-modal.is-poster{width:min(96vw,640px)!important;padding:7px!important;overflow-y:auto!important;background:#0a1014!important}
+#sethLaunchNoticeOverlay .seth-notice-modal.is-poster{
+ width:min(92vw,560px,86svh)!important;
+ height:auto!important;
+ aspect-ratio:1 / 1!important;
+ max-width:92vw!important;
+ max-height:86svh!important;
+ padding:9px!important;
+ overflow:hidden!important;
+ background:#0a1014!important;
+ display:flex!important;
+ flex-direction:column!important;
+ justify-content:center!important;
+ align-items:center!important;
+ gap:6px!important;
+}
 #sethLaunchNoticeOverlay .seth-notice-modal.is-poster .seth-notice-mark,
 #sethLaunchNoticeOverlay .seth-notice-modal.is-poster .seth-notice-eyebrow,
 #sethLaunchNoticeOverlay .seth-notice-modal.is-poster .seth-notice-title,
 #sethLaunchNoticeOverlay .seth-notice-modal.is-poster .seth-notice-description,
 #sethLaunchNoticeOverlay .seth-notice-modal.is-poster .seth-notice-dismiss{display:none!important}
-#sethLaunchNoticeOverlay .seth-notice-modal.is-poster .seth-notice-image{display:block!important;width:100%!important;height:auto!important;max-height:none!important;aspect-ratio:auto!important;object-fit:contain!important;margin:0!important;border-radius:12px!important}
-#sethLaunchNoticeOverlay .seth-notice-modal.is-poster .seth-notice-close{top:12px!important;right:12px!important;background:rgba(2,10,13,.91)!important;border:1px solid #f2d38b!important;color:#ffe09a!important;box-shadow:0 1px 12px #0009!important}
-#sethLaunchNoticeOverlay .seth-notice-modal.is-poster .seth-notice-action{margin-top:8px!important}
-@media(min-width:750px){#sethLaunchNoticeOverlay .seth-notice-modal.is-poster{width:min(76vw,650px)!important}}
+#sethLaunchNoticeOverlay .seth-notice-modal.is-poster .seth-notice-image{
+ display:block!important;
+ width:100%!important;
+ height:auto!important;
+ flex:1 1 0!important;
+ min-height:0!important;
+ max-height:100%!important;
+ object-fit:contain!important;
+ object-position:center!important;
+ margin:0!important;
+ border-radius:10px!important;
+}
+#sethLaunchNoticeOverlay .seth-notice-modal.is-poster .seth-notice-close{
+ top:12px!important;right:12px!important;
+ background:rgba(2,10,13,.91)!important;
+ border:1px solid #f2d38b!important;
+ color:#ffe09a!important;
+ box-shadow:0 1px 12px #0009!important;
+}
+#sethLaunchNoticeOverlay .seth-notice-modal.is-poster .seth-notice-action{
+ flex:0 0 auto!important;
+ width:100%!important;
+ margin:0!important;
+ padding:10px!important;
+}
+@media(max-width:420px){
+ #sethLaunchNoticeOverlay .seth-notice-modal.is-poster{padding:7px!important}
+}
+
 </style>
 </head>
 
