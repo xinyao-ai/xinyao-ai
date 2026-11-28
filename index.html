@@ -6194,30 +6194,13 @@ setInterval(()=>{if(active&&!document.hidden)show(index+1)},6500);
     else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}
    }
   });
-  // Every new app page load shows the popup. No daily-dismiss or persistence flags.
-  open();
-  // Optional announcement config; the popup is visible immediately without waiting for fetch.
+  // Keep the overlay hidden until the configured poster is fully loaded.
+  // Never flash the default welcome text before the image arrives.
   fetch('./carousel-config.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(data=>{
    const cfg=data?.popup;
-
-   if(!cfg||typeof cfg!=='object'||closed)return;
-   if(cfg.enabled===false){close();return}
+   if(!cfg||typeof cfg!=='object'||cfg.enabled===false||closed)return;
    if(typeof cfg.title==='string'&&cfg.title.trim())title.textContent=cfg.title.slice(0,100);
    if(typeof cfg.description==='string')description.textContent=cfg.description.slice(0,1200);
-   if(typeof cfg.image==='string'&&cfg.image.trim()){
-    try{
-     const u=new URL(cfg.image,location.href);
-     if(u.protocol==='https:'||u.origin===location.origin){
-      image.onload=()=>{
-       if(closed)return;
-       image.style.display='block';
-       if(cfg.imageOnly!==false)modal.classList.add('is-poster');
-      };
-      image.onerror=()=>{image.style.display='none';modal.classList.remove('is-poster')};
-      image.src=u.href;
-     }
-    }catch(_){}
-   }
    if(typeof cfg.link==='string'&&cfg.link.trim()){
     try{
      const u=new URL(cfg.link,location.href);
@@ -6228,7 +6211,25 @@ setInterval(()=>{if(active&&!document.hidden)show(index+1)},6500);
      }
     }catch(_){}
    }
+   // No valid poster: do not show a temporary welcome popup.
+   if(typeof cfg.image!=='string'||!cfg.image.trim())return;
+   let u;
+   try{
+    u=new URL(cfg.image,location.href);
+    if(u.protocol!=='https:'&&u.origin!==location.origin)return;
+   }catch(_){return}
+   const poster=new Image();
+   poster.onload=()=>{
+    if(closed)return;
+    image.src=poster.src;
+    image.style.display='block';
+    if(cfg.imageOnly!==false)modal.classList.add('is-poster');
+    open();
+   };
+   poster.onerror=()=>{}; // No fallback welcome card on failed image.
+   poster.src=u.href;
   }).catch(()=>{});
+
  }
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
  else init();
